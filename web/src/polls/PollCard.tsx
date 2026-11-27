@@ -1,3 +1,4 @@
+import { Trophy } from 'lucide-react';
 import { useId, useRef, useState, type SyntheticEvent } from 'react';
 import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
@@ -25,6 +26,7 @@ export function PollCard(props: PollCardProps) {
 function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
   const t = ru.polls;
   const titleId = useId();
+  const submitReasonId = useId();
   const title = useRef<HTMLHeadingElement>(null);
   const Heading = level === 3 ? 'h3' : 'h2';
   const open = isOpenPoll(poll);
@@ -56,7 +58,9 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
   const validSelection = selected !== '' && poll.options.some((option) => option.id === selected);
   const canSubmit = mayVote && !busy && validSelection && selected !== poll.myVote;
   const action = hasVoted ? t.changeVote : t.vote;
-  const visibleCounts = poll.status === 'cancelled' ? null : poll.counts;
+  const submitReason =
+    mayVote && !busy && !canSubmit ? (hasVoted ? t.chooseToChangeVote : t.chooseToVote) : null;
+  const visibleCounts = poll.status === 'cancelled' ? null : (poll.counts ?? null);
   const counts = new Map(visibleCounts?.map((count) => [count.optionId, count.votes]) ?? []);
   const winner =
     poll.status === 'closed' ? poll.options.find((option) => option.id === poll.result) : null;
@@ -135,41 +139,121 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
           {t.ownVote(ownOption.unavailable ? t.nominationCandidateHidden : ownOption.label)}
         </p>
       ) : null}
-      <form
-        data-private={poll.anonymous || undefined}
-        noValidate
-        onSubmit={(event) => {
-          void submit(event);
-        }}
-        className="grid min-w-0 gap-3"
-      >
-        <ChoiceGroup
-          label={mayVote && !hasVoted ? t.legend : t.options}
-          options={poll.options.map((option) => {
-            const count = counts.get(option.id);
-            return {
-              value: option.id,
-              label: option.unavailable ? t.nominationCandidateHidden : option.label,
-              ...(count !== undefined ? { description: t.votes(count) } : {}),
-            };
-          })}
-          value={open ? selected : (ownOption?.id ?? '')}
-          onChange={(value) => {
-            if (!mayVote || busy) return;
-            setDraft({ value, dirty: value !== poll.myVote });
+      {open ? (
+        <form
+          data-private={poll.anonymous || undefined}
+          noValidate
+          onSubmit={(event) => {
+            void submit(event);
           }}
-          disabled={!mayVote || busy}
-          readOnly={!mayVote}
-          checkMark
-          multiline
-        />
-        {open && visibleCounts === null ? (
-          <p className="text-sm text-ink-soft">
-            {awaitingResult ? t.pendingCounts : t.hiddenCounts}
-          </p>
-        ) : null}
-        {poll.status === 'closed' ? (
-          <p className="font-medium wrap-anywhere">
+          className="grid min-w-0 gap-3"
+        >
+          <ChoiceGroup
+            label={mayVote && !hasVoted ? t.legend : t.options}
+            options={poll.options.map((option) => {
+              const count = counts.get(option.id);
+              return {
+                value: option.id,
+                label: option.unavailable ? t.nominationCandidateHidden : option.label,
+                ...(count !== undefined ? { description: t.votes(count) } : {}),
+              };
+            })}
+            value={selected}
+            onChange={(value) => {
+              if (!mayVote || busy) return;
+              setDraft({ value, dirty: value !== poll.myVote });
+            }}
+            disabled={!mayVote || busy}
+            readOnly={!mayVote}
+            checkMark
+            multiline
+          />
+          {visibleCounts === null ? (
+            <p className="text-sm text-ink-soft">
+              {awaitingResult ? t.pendingCounts : t.hiddenCounts}
+            </p>
+          ) : null}
+          {!mayVote ? <p className="text-sm text-ink-soft">{reason}</p> : null}
+          {failed && mayVote ? <Notice tone="danger">{t.voteFailed}</Notice> : null}
+          {accepted !== null && accepted === poll.myVote ? (
+            <Notice tone="success">{t.accepted}</Notice>
+          ) : null}
+          {mayVote && poll.options.length > 0 ? (
+            <>
+              <Button
+                type="submit"
+                variant="main"
+                aria-label={action}
+                aria-describedby={submitReason ? submitReasonId : undefined}
+                loading={busy}
+                disabled={!canSubmit}
+                className="justify-self-start"
+              >
+                {action}
+              </Button>
+              {submitReason ? (
+                <p id={submitReasonId} className="text-sm text-ink-soft">
+                  {submitReason}
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </form>
+      ) : (
+        <PollResults poll={poll} counts={counts} winner={winner} />
+      )}
+    </article>
+  );
+}
+
+function PollResults({
+  poll,
+  counts,
+  winner,
+}: {
+  poll: Schemas['PollView'];
+  counts: ReadonlyMap<string, number>;
+  winner: Schemas['PollOptionView'] | null | undefined;
+}) {
+  const t = ru.polls;
+  const total = poll.options.reduce((sum, option) => sum + (counts.get(option.id) ?? 0), 0);
+
+  return (
+    <div className="grid min-w-0 gap-3">
+      <ul role="list" aria-label={t.options} className="grid gap-3">
+        {poll.options.map((option) => {
+          const count = counts.get(option.id);
+          const share = count !== undefined && total > 0 ? count / total : 0;
+          return (
+            <li key={option.id} className="grid min-w-0 gap-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <span className="min-w-0 font-medium wrap-anywhere">
+                  {option.unavailable ? t.nominationCandidateHidden : option.label}
+                </span>
+                {count !== undefined ? (
+                  <span className="text-sm text-ink-soft tabular-nums">
+                    {t.votes(count)}, {t.voteShare(share)}
+                  </span>
+                ) : null}
+              </div>
+              {count !== undefined ? (
+                <div aria-hidden className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={option.id === winner?.id ? 'h-full bg-action' : 'h-full bg-ink-soft'}
+                    style={{ width: `${share * 100}%` }}
+                  />
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      {poll.status === 'closed' ? (
+        <p className="flex items-start gap-2 font-medium wrap-anywhere">
+          {winner && !winner.unavailable ? (
+            <Trophy size={20} aria-hidden className="shrink-0" />
+          ) : null}
+          <span>
             {winner
               ? winner.unavailable
                 ? ru.nominationResults.hiddenWinner
@@ -177,27 +261,10 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
               : poll.result === null
                 ? t.noResult
                 : t.resultUnavailable}
-          </p>
-        ) : null}
-        {open && !mayVote ? <p className="text-sm text-ink-soft">{reason}</p> : null}
-        {failed && mayVote ? <Notice tone="danger">{t.voteFailed}</Notice> : null}
-        {accepted !== null && accepted === poll.myVote && open ? (
-          <Notice tone="success">{t.accepted}</Notice>
-        ) : null}
-        {mayVote && poll.options.length > 0 ? (
-          <Button
-            type="submit"
-            variant="main"
-            aria-label={action}
-            loading={busy}
-            disabled={!canSubmit}
-            className="justify-self-start"
-          >
-            {action}
-          </Button>
-        ) : null}
-      </form>
-    </article>
+          </span>
+        </p>
+      ) : null}
+    </div>
   );
 }
 

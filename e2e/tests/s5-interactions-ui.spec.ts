@@ -55,7 +55,7 @@ test('two players start a duel in the browser and see it on a run and in the sea
     const link = page.getByTestId('season-interactions');
     await expect(link).toHaveAttribute('href', path);
     await link.click();
-    await expect(page.getByRole('heading', { name: 'Взаимодействия', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Напарники и дуэли', level: 1 })).toBeVisible();
   }
   await first.getByLabel('Соперник', { exact: true }).selectOption(petya.playerId);
   await first.getByRole('button', { name: 'Вызвать на дуэль' }).click();

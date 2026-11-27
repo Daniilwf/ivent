@@ -307,6 +307,7 @@
 | Голосование общего ивента | вопрос первого действия общего ивента голосующим; итог раздаётся всем ответом на вопрос (EV23) | `PollSource.GlobalEvent`, `PollStarted.GlobalEventId`, `ForAllQueued.Answers` |
 | Баннер общего ивента | плашка общего ивента на главной: идущие ивенты с прогрессом цели | поле вида сезона `SeasonView.GlobalEvents` (`GlobalEventView`, `GlobalGoalView`), экран — 5.22 |
 | Напарник | второй игрок кооп-прохождения | `RunState.PartnerId`, событие `CoopJoined` |
+| Напарники и дуэли | раздел сезона с приглашениями, доской «ищу напарника» и дуэлями | `InteractionsScreen` |
 | Ролливший | игрок, чей ролл дал кооп-прохождение; бросает кубы и получает долю с округлением вверх | `RunState.PlayerId` |
 | Приглашение в кооп | предложение стать напарником в своём прохождении | `InteractionKind.Coop`, команда `InviteToCoop`, события `InteractionCreated`, `InteractionAnswered`, `InteractionExpired` |
 | Ответ на приглашение | принять или отклонить; без ответа за N часов приглашение сгорает | команда `AnswerInvitation`, `InteractionStatus` (`Pending`, `Accepted`, `Declined`, `Withdrawn`, `Expired`) |

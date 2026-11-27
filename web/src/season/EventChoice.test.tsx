@@ -42,12 +42,15 @@ describe('an event waiting for my answer', () => {
     render(<EventChoice choice={question()} busy={false} onChoose={onChoose} />);
 
     expect(submit()).toBeDisabled();
+    expect(submit()).toHaveAccessibleDescription('Выбери вариант, чтобы ответить.');
+    expect(screen.getByText('Выбери вариант, чтобы ответить.')).toBeVisible();
     expect(
       screen.getAllByRole('radio').every((radio) => !(radio as HTMLInputElement).checked),
     ).toBe(true);
     await userEvent.click(screen.getByRole('radio', { name: 'Другу' }));
     expect(onChoose).not.toHaveBeenCalled();
     expect(submit()).toBeEnabled();
+    expect(submit()).not.toHaveAccessibleDescription();
     await userEvent.click(submit());
     expect(onChoose).toHaveBeenCalledExactlyOnceWith('Другу');
   });
@@ -142,11 +145,14 @@ describe('an event waiting for my answer', () => {
           choice={choice}
           busy={block === 'busy'}
           disabled={block === 'disabled'}
+          {...(block === 'disabled' ? { unavailableReason: 'Сначала закончи ход.' } : {})}
           onChoose={onChoose}
         />,
       );
 
       expect(submit()).toBeDisabled();
+      if (block === 'disabled')
+        expect(submit()).toHaveAccessibleDescription('Сначала закончи ход.');
       for (const radio of screen.getAllByRole('radio')) expect(radio).toBeDisabled();
       await userEvent.click(submit());
       expect(onChoose).not.toHaveBeenCalled();

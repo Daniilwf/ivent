@@ -106,7 +106,7 @@ async function openInteractions(page: Page, seasonId: string) {
   const link = page.getByTestId('season-interactions');
   await expect(link).toHaveAttribute('href', `/seasons/${seasonId}/interactions`);
   await link.click();
-  await expect(page.getByRole('heading', { name: 'Взаимодействия', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Напарники и дуэли', level: 1 })).toBeVisible();
 }
 
 test('two players complete one coop run, receive their shares and lose both shares after proof rejection', async ({
@@ -263,6 +263,11 @@ for (const { difficulty, label, met } of [
         .getByRole('region', { name: 'Приглашения', exact: true })
         .getByRole('button', { name: 'Принять', exact: true })
         .click();
+
+      // Leaving Interactions cancels outstanding requests. Confirm that the invitation joined the run first.
+      await expect
+        .poll(async () => (await seasonOf(partnerApi, world.seasonId)).me?.activeRun?.id, live)
+        .toBe(run.id);
 
       await partnerPage.getByTestId('nav-season').click();
       const partnerRun = partnerPage.getByTestId('active-run');

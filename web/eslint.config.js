@@ -6,6 +6,15 @@ import globals from 'globals';
 import design from './eslint-rules/design-tokens.js';
 import tseslint from 'typescript-eslint';
 
+const foldSummary = {
+  selector: "JSXOpeningElement[name.name='summary']",
+  message: 'A fold opens with <Summary> from src/ui/Disclosure.tsx (K2-5).',
+};
+const pageHeading = {
+  selector: "JSXOpeningElement[name.name='h1']",
+  message: 'Use <PageHeader> from src/ui/PageHeader.tsx for a page heading (DR7-11).',
+};
+
 export default tseslint.config(
   { ignores: ['dist', 'coverage', 'src/api/schema.ts'] },
   {
@@ -30,13 +39,7 @@ export default tseslint.config(
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
       'design/tokens-only': 'error',
       // Every fold opens with the Summary primitive and its chevron: the browser's triangle is hidden (K2-5)
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "JSXOpeningElement[name.name='summary']",
-          message: 'A fold opens with <Summary> from src/ui/Disclosure.tsx (K2-5).',
-        },
-      ],
+      'no-restricted-syntax': ['error', foldSummary, pageHeading],
       // The animation engine stays out of the main page's script (FL-3, DESIGN.md «Производительность»): `m` inside
       // <Motion>, `animate` from loadMotion(); only src/board/motionFeatures.ts takes the heavy parts
       '@typescript-eslint/no-restricted-imports': [
@@ -66,7 +69,11 @@ export default tseslint.config(
   },
   {
     files: ['src/ui/Disclosure.tsx'],
-    rules: { 'no-restricted-syntax': 'off' },
+    rules: { 'no-restricted-syntax': ['error', pageHeading] },
+  },
+  {
+    files: ['src/ui/PageHeader.tsx'],
+    rules: { 'no-restricted-syntax': ['error', foldSummary] },
   },
   // The tokens themselves live in src/design/: the one place allowed to hold raw values
   {

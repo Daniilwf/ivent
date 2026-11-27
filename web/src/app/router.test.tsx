@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { PageHeader } from '../ui/PageHeader';
 import { Link } from './Link';
 import { adminPlayersSeason, navigate, paths, routeOf, usePageHeading, usePath } from './router';
 
@@ -15,9 +16,9 @@ function Page() {
   const heading = usePageHeading();
   return (
     <>
-      <h1 ref={heading} tabIndex={-1}>
+      <PageHeader ref={heading} tabIndex={-1}>
         Страница
-      </h1>
+      </PageHeader>
       <input aria-label="Поле" />
     </>
   );

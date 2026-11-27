@@ -114,10 +114,6 @@
   --map-label-min: 9px;
   /* An uploaded map picture is a bright raster: the dark theme dims it to sit on the dark page */
   --map-picture-filter: none;
-  /* A disabled control: half opacity in both themes; the dark theme also greys it, so a light fill on the dark page
-     does not read as a live button (DT-6) */
-  --disabled-filter: none;
-
   /* ---- Radii by level: a tag, a row, a card, a pill ---- */
   --radius-*: initial;
   --radius-sm: 8px;
@@ -212,7 +208,6 @@
   --color-zone-castle: #a898e6;
   --color-snow: #e8eaf0;
   --map-picture-filter: brightness(0.62) saturate(0.85);
-  --disabled-filter: grayscale(1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -255,7 +250,6 @@
     --color-zone-castle: #a898e6;
     --color-snow: #e8eaf0;
     --map-picture-filter: brightness(0.62) saturate(0.85);
-    --disabled-filter: grayscale(1);
   }
 }
 
@@ -286,9 +280,14 @@
   --xy-attribution-background-color: var(--color-card);
 }
 
-/* A disabled control's colour, on top of its half opacity */
+/* Disabled buttons stay legible and flat in both themes. Loading keeps the action's own appearance. */
 @utility disabled-look {
-  filter: var(--disabled-filter);
+  background-color: var(--color-muted);
+  border-color: color-mix(in srgb, var(--color-muted) 75%, var(--color-ink-soft));
+  color: var(--color-ink-soft);
+  text-decoration-color: currentColor;
+  box-shadow: none;
+  translate: none;
 }
 
 /* An uploaded map picture under the cells (the players' map and the editor) */

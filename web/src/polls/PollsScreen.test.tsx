@@ -617,13 +617,15 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
       expect(screen.getByText('Хорроры', { exact: true })).toBeVisible();
       expect(screen.getByText('Стратегии', { exact: true })).toBeVisible();
       expect(screen.getByText('Твой голос: Хорроры')).toBeVisible();
+      expect(screen.getByRole('list', { name: ru.polls.options })).toBeVisible();
+      expect(screen.queryByRole('radio')).not.toBeInTheDocument();
       expect(screen.queryByText('Голосование закрыто')).not.toBeInTheDocument();
       expect(screen.queryByText(/^Итог:/)).not.toBeInTheDocument();
       expect(screen.queryByText('Счёт скрыт до закрытия')).not.toBeInTheDocument();
       expect(screen.queryByText('Счёт появится после подведения итогов.')).not.toBeInTheDocument();
       if (visibility === 'visible') {
-        expect(screen.getByText('2 голоса', { exact: true })).toBeVisible();
-        expect(screen.getByText('0 голосов', { exact: true })).toBeVisible();
+        expect(screen.getByText(/^2 голоса, 100\s*%$/)).toBeVisible();
+        expect(screen.getByText(/^0 голосов, 0\s*%$/)).toBeVisible();
       } else {
         expect(screen.queryByText(/^\d+ голос/)).not.toBeInTheDocument();
       }

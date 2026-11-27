@@ -10,6 +10,7 @@ import { Cover } from '../board/GameCards';
 import { GameFacts } from '../pool/GameFacts';
 import { NotFound } from '../app/NotFound';
 import { ru } from '../i18n/ru';
+import { PageHeader } from '../ui/PageHeader';
 import { standaloneLink } from '../ui/buttonStyles';
 import { Badge, Tag } from '../ui/Marks';
 import { AsyncState } from '../ui/AsyncState';
@@ -271,13 +272,13 @@ export function GameDetails({
         {/* The pool's cover, as on the pool page and the roll's cards */}
         <Cover game={{ title: game.title, cover: game.cover?.thumbnailUrl }} width={88} />
         <div className="grid min-w-0 justify-items-start gap-2">
-          <h1
+          <PageHeader
             ref={headingRef}
             tabIndex={-1}
-            className="font-display text-lg font-heavy text-balance wrap-anywhere outline-none desk:text-xl"
+            className="text-balance wrap-anywhere outline-none"
           >
             {game.title}
-          </h1>
+          </PageHeader>
           <GameFacts game={game} />
         </div>
       </header>

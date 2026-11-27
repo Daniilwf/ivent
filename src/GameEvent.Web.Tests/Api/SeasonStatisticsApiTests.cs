@@ -74,6 +74,81 @@ public sealed class SeasonStatisticsApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task An_active_recap_uses_the_owners_visible_place_points_and_token_even_for_a_provisional_first_finish()
+    {
+        await EnableStatisticsAsync(SeasonId);
+        using var vasya = await _site.SignedInAsync("vasya");
+        using var petya = await _site.SignedInAsync("petya");
+        var vasyaId = _site.Players["vasya"];
+        var petyaId = _site.Players["petya"];
+        const int HigherScore = 60;
+        await _site.SendAsync(new AdjustPlayer(petyaId, "Points bonus", PointsDelta: HigherScore));
+        var beforeFinish = $"c{RulesetJson.Default().Map.LinearLength - 1}";
+        await _site.SendAsync(new AdjustPlayer(vasyaId, "One cell before the finish", CellId: beforeFinish));
+        await CompleteAsync(vasya);
+
+        var season = await ReadJsonAsync(vasya, Season);
+        var board = season.GetProperty("leaderboard").EnumerateArray().ToArray();
+        Assert.Equal(vasyaId, board[0].GetProperty("playerId").GetGuid());
+        Assert.True(board[0].GetProperty("provisional").GetBoolean());
+        var firstPoints = board[0].GetProperty("points").GetInt32();
+        Assert.True(firstPoints < HigherScore);
+
+        var vasyaToken = ReadPlayerToken(season, vasyaId);
+        var petyaToken = ReadPlayerToken(season, petyaId);
+        Assert.NotEqual(vasyaToken, petyaToken);
+        // Supplying a different player's id cannot change whose private recap is returned.
+        Assert.Equal((1, firstPoints, vasyaToken, true), await ReadRecapStandingAsync(vasya, $"?playerId={petyaId}"));
+        Assert.Equal((2, HigherScore, petyaToken, false), await ReadRecapStandingAsync(petya));
+    }
+
+    [Fact]
+    public async Task An_archived_recap_keeps_the_saved_place_and_points_when_the_live_projection_differs()
+    {
+        await EnableStatisticsAsync(SeasonId);
+        using var vasya = await _site.SignedInAsync("vasya");
+        using var admin = await _site.SignedInAsync("admin");
+        var vasyaId = _site.Players["vasya"];
+        const int SavedPoints = 37;
+        await _site.SendAsync(new AdjustPlayer(vasyaId, "Points bonus", PointsDelta: SavedPoints));
+        await _site.SendAsync(new AdjustPlayer(_site.Players["petya"], "Higher points bonus", PointsDelta: 60));
+        var liveView = await ReadJsonAsync(vasya, Season);
+        var token = ReadPlayerToken(liveView, vasyaId);
+        foreach (var status in new[] { "closing", "finished", "archived" })
+        {
+            await PostOkAsync(admin, $"{AdminSeason}/status", new { commandId = Guid.NewGuid(), to = status });
+        }
+
+        await using (var db = _site.NewDb())
+        {
+            var stored = await db.SeasonResults.AsNoTracking()
+                .SingleAsync(row => row.SeasonId == SeasonId && row.PlayerId == vasyaId, Ct);
+            Assert.Equal((2, SavedPoints), (stored.Place, stored.Points));
+            // Deliberately diverge the projections in this isolated test database to distinguish the two sources.
+            await db.SeasonPlayers.Where(player => player.Id == vasyaId)
+                .ExecuteUpdateAsync(update => update.SetProperty(player => player.Points, 900), Ct);
+        }
+
+        Assert.Equal((2, SavedPoints, token, false), await ReadRecapStandingAsync(vasya));
+    }
+
+    private static int ReadPlayerToken(JsonElement season, Guid playerId) =>
+        Assert.Single(season.GetProperty("players").EnumerateArray(), p => p.GetProperty("id").GetGuid() == playerId)
+            .GetProperty("token").GetInt32();
+
+    private static async Task<(int Place, int Points, int PlayerToken, bool Provisional)> ReadRecapStandingAsync(HttpClient player, string query = "")
+    {
+        using var response = await player.GetAsync(Statistics(SeasonId) + query, Ct);
+        var recap = await OkAsync(response);
+        Assert.True(response.Headers.CacheControl?.Private);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.True(recap.TryGetProperty("place", out var place), "The owner recap is missing the leaderboard place.");
+        Assert.True(recap.TryGetProperty("points", out var points), "The owner recap is missing the leaderboard points.");
+        Assert.True(recap.TryGetProperty("playerToken", out var token), "The owner recap is missing the player's map token.");
+        return (place.GetInt32(), points.GetInt32(), token.GetInt32(), recap.GetProperty("provisional").GetBoolean());
+    }
+
+    [Fact]
     public async Task The_profile_offers_recaps_only_to_the_owner_for_enabled_seasons()
     {
         using var participant = await _site.SignedInAsync("vasya");

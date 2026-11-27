@@ -98,7 +98,6 @@ function IrlProofForm({
   }
   const [uploading, setUploading] = useState(false);
   const [uploadProblem, setUploadProblem] = useState<string | null>(null);
-  const [formProblem, setFormProblem] = useState<string | null>(null);
   const uploadingNow = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const form = useRef<HTMLFormElement>(null);
@@ -106,6 +105,8 @@ function IrlProofForm({
   const focusReturn = useRef<FocusReturn | null>(null);
   const titleId = useId();
   const capProblemId = useId();
+  const linkProblemId = useId();
+  const missingProofId = useId();
   const readOnlyProof = proof?.status === 'pending' || proof?.status === 'approved';
   const open = enabled && !readOnlyProof;
   const busy = pending || uploading;
@@ -113,8 +114,12 @@ function IrlProofForm({
   const link = trimIrlLink(draft.link);
   const badLink = link !== '' && parseIrlLink(link) === null;
   const overCap = draft.files.length > cap;
-  const canSubmit =
-    open && !busy && !badLink && !overCap && (link !== '' || draft.files.length > 0);
+  const missingProof = link === '' && draft.files.length === 0;
+  const canSubmit = open && !busy && !badLink && !overCap && !missingProof;
+  const submitDescription = busy
+    ? undefined
+    : cx(overCap && capProblemId, badLink && linkProblemId, missingProof && missingProofId) ||
+      undefined;
   const shownFiles = readOnlyProof ? proof.files : draft.files;
   const shownLink = readOnlyProof ? proof.link : !open ? draft.link : null;
   const shownUrl = shownLink ? parseIrlLink(shownLink) : null;
@@ -160,13 +165,7 @@ function IrlProofForm({
 
   function submit(event: SyntheticEvent) {
     event.preventDefault();
-    if (!open || pending || uploadingNow.current) return;
-    if (badLink || overCap) return;
-    if (link === '' && draft.files.length === 0) {
-      setFormProblem(t.required);
-      return;
-    }
-    setFormProblem(null);
+    if (!canSubmit || uploadingNow.current) return;
     const active = document.activeElement;
     focusReturn.current =
       active instanceof HTMLElement && form.current?.contains(active)
@@ -184,7 +183,6 @@ function IrlProofForm({
     const picked = input.files?.[0];
     input.value = '';
     if (!picked || !open || pending || uploadingNow.current || draft.files.length >= cap) return;
-    setFormProblem(null);
     setUploadProblem(null);
     if (picked.type !== '' && !acceptedTypes.has(picked.type)) {
       setUploadProblem(ru.upload.errors['file.typeInvalid']);
@@ -327,7 +325,6 @@ function IrlProofForm({
           <p className="text-sm text-ink-soft">
             {proof?.status === 'rejected' ? t.retryLead : t.lead}
           </p>
-          {cap === 0 ? <p className="text-sm text-ink-soft">{t.linkOnly}</p> : null}
           {draft.files.length < cap ? (
             <FilePicker
               ref={fileInput}
@@ -361,17 +358,22 @@ function IrlProofForm({
             value={draft.link}
             disabled={busy}
             error={badLink ? t.linkInvalid : undefined}
+            errorId={linkProblemId}
             announce={false}
             onChange={(event) => {
               const value = event.currentTarget.value;
               setDraft((current) => ({ ...current, link: value, dirty: true }));
-              setFormProblem(null);
             }}
           />
-          {formProblem ? <Notice tone="danger">{formProblem}</Notice> : null}
+          {cap === 0 || missingProof ? (
+            <p id={missingProofId} className="text-sm text-ink-soft">
+              {cap === 0 ? t.linkOnly : t.required}
+            </p>
+          ) : null}
           <Button
             type="submit"
             aria-label={t.submit}
+            aria-describedby={submitDescription}
             loading={pending}
             disabled={!canSubmit}
             className="justify-self-start"

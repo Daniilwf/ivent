@@ -5,6 +5,7 @@ import { usePageHeading, useRestoredScroll } from '../app/router';
 import { useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
+import { PageHeader } from '../ui/PageHeader';
 import { Skeleton } from '../ui/Progress';
 import { EmptyState, Notice } from '../ui/States';
 import { InteractionsContent } from './InteractionsContent';
@@ -185,9 +186,9 @@ function SeasonInteractions({ seasonId, role, onSignedOut }: InteractionsScreenP
 
   return (
     <main className="mx-auto grid w-full max-w-180 min-w-0 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8">
-      <h1 ref={heading} tabIndex={-1} className="font-display text-xl font-heavy outline-none">
+      <PageHeader ref={heading} tabIndex={-1} className="outline-none">
         {t.title}
-      </h1>
+      </PageHeader>
       {!seasonId || state.kind === 'notFound' ? (
         <EmptyState
           title={seasonId ? t.notFound : t.unavailable}

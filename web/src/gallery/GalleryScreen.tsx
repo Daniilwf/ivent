@@ -16,6 +16,7 @@ import { answerOf, useLoaded } from '../app/useLoaded';
 import { useSeasonVersion } from '../app/useSeasonVersion';
 import type { ChangeReaction } from '../feed/ReviewReactionButtons';
 import { ru } from '../i18n/ru';
+import { PageHeader } from '../ui/PageHeader';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Field';
 import { Skeleton } from '../ui/Progress';
@@ -605,13 +606,9 @@ function GalleryPage({
   return (
     <main className="mx-auto grid max-w-300 gap-4 px-4 py-6 desk:gap-5 desk:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="font-display text-2xl font-heavy text-balance desk:text-3xl"
-        >
+        <PageHeader ref={heading} tabIndex={-1} className="text-balance">
           {t.title}
-        </h1>
+        </PageHeader>
         {action}
       </div>
       {children}

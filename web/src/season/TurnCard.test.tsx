@@ -192,6 +192,70 @@ describe('the turn card (K1S)', () => {
     expect(new Set(summaries).size).toBe(summaries.length);
   });
 
+  const submittedProof: Run['proof'] = {
+    status: 'pending',
+    links: ['https://example.com/a.png'],
+    note: null,
+    comment: null,
+    files: [],
+  };
+
+  it.each([
+    ['no proof yet', null],
+    ['a submitted proof', submittedProof],
+  ] as const)('DR7-13: explains the roll limit for a completed run with %s', async (_, proof) => {
+    serve(
+      season({
+        ...idle,
+        lastCompleted: completed('run-1', 'Darkwood', { proof }),
+        unchecked: { count: 1, limit: 2 },
+      }),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const turn = await screen.findByTestId('turn');
+    expect(within(turn).getByTestId('roll')).toBeEnabled();
+    expect(within(turn).getByTestId('unchecked')).toHaveTextContent(
+      'Одно прохождение ещё не проверено. Если завершишь ещё одно до проверки, новый ролл закроется.',
+    );
+  });
+
+  it.each([
+    {
+      count: 1,
+      limit: 1,
+      message:
+        'Одно прохождение ещё не проверено. Новый ролл откроется, когда админ проверит ещё одно.',
+    },
+    {
+      count: 3,
+      limit: 2,
+      message:
+        '3 прохождения ещё не проверены. Новый ролл откроется, когда админ проверит ещё 2 прохождения.',
+    },
+  ])(
+    'DR7-13: names the reviews still needed at $count of $limit with every proof already sent',
+    async ({ count, limit, message }) => {
+      const olderRuns = Array.from({ length: count - 1 }, (_, index) =>
+        completed(`other-run-${index}`, 'Inside', { proof: submittedProof }),
+      );
+      serve(
+        season({
+          ...idle,
+          lastCompleted: completed('run-1', 'Darkwood', { proof: submittedProof }),
+          checks: olderRuns,
+          unchecked: { count, limit },
+        }),
+      );
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+      const turn = await screen.findByTestId('turn');
+      expect(within(turn).queryByTestId('roll')).toBeNull();
+      expect(within(turn).queryByTestId('send-proof')).toBeNull();
+      expect(within(turn).getByText(message)).toBeInTheDocument();
+    },
+  );
+
   it('K1S-1: at the check limit the main slot is the proof of the oldest run, not a dead roll', async () => {
     serve(
       season({

@@ -109,7 +109,7 @@ test.describe('smoke @smoke', () => {
     await page.goto(`/seasons/${id}/interactions`);
     const interactions = page.getByRole('main');
     await expect(
-      interactions.getByRole('heading', { level: 1, name: 'Взаимодействия' }),
+      interactions.getByRole('heading', { level: 1, name: 'Напарники и дуэли' }),
     ).toBeVisible();
     if (interactionFeatures?.duels || interactionFeatures?.partnerBoard) {
       if (interactionFeatures.duels)
@@ -120,7 +120,7 @@ test.describe('smoke @smoke', () => {
         ).toBeVisible();
     } else {
       await expect(
-        interactions.getByRole('heading', { name: 'Взаимодействия недоступны в этом сезоне' }),
+        interactions.getByRole('heading', { name: 'Напарники и дуэли недоступны в этом сезоне' }),
       ).toBeVisible();
     }
   });

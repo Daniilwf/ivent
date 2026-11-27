@@ -175,7 +175,9 @@ test('the efficiency column stays readable for dense, zero, missing and loading 
     await capture(page, info, 'points-per-hour-dense-bottom');
 
     state = 'error';
-    await page.reload();
+    // Reopen the fixture's season so a parallel test's newer season cannot bypass the mocked response.
+    await openAdmin(page, world, 'statistics');
+    await expect(page.getByTestId('admin-season-name')).toContainText(world.seasonName);
     const error = page.getByRole('alert');
     await expect(error).toBeVisible();
     await capture(page, info, 'points-per-hour-error');

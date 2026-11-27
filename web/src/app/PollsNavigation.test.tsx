@@ -5,6 +5,7 @@ import { SIGNED_OUT_EVENT, type Schemas } from '../api/client';
 import type { SeasonUpdate } from '../api/realtime';
 import { ru } from '../i18n/ru';
 import { fakeServer, json, type Handler } from '../test/fakeServer';
+import { PageHeader } from '../ui/PageHeader';
 import { navigate, paths, routeOf } from './router';
 
 type Navigation = Schemas['SeasonNavigationView'];
@@ -35,7 +36,7 @@ vi.mock('../api/realtime', () => ({
 vi.mock('../season/SeasonScreen', () => ({
   SeasonScreen: ({ seasonId, onNavigationLoaded }: HomeProps) => (
     <main data-testid="navigation-home" data-season-id={seasonId}>
-      <h1>Главная макета</h1>
+      <PageHeader>Главная макета</PageHeader>
       <button
         onClick={() =>
           onNavigationLoaded?.({
@@ -58,7 +59,7 @@ vi.mock('../season/SeasonScreen', () => ({
 vi.mock('../feed/FeedScreen', () => ({
   FeedScreen: ({ seasonId }: { seasonId: string }) => (
     <main data-testid="navigation-feed" data-season-id={seasonId}>
-      <h1>Лента макета</h1>
+      <PageHeader>Лента макета</PageHeader>
     </main>
   ),
 }));
@@ -71,7 +72,7 @@ vi.mock('../polls/PollsScreen', () => {
       observed.pollsRendered.push(seasonId);
       return (
         <main data-testid="navigation-polls" data-season-id={seasonId}>
-          <h1>Голосования макета</h1>
+          <PageHeader>Голосования макета</PageHeader>
         </main>
       );
     },

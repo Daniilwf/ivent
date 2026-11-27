@@ -100,6 +100,9 @@ test('an anonymous poll shows each player their own vote and reveals the result 
   await expect(firstCard.getByRole('heading', { level: 3, name: question })).toBeVisible();
   const firstSubmit = firstCard.getByRole('button', { name: 'Голосовать', exact: true });
   await expect(firstSubmit).toBeDisabled();
+  await expect(firstSubmit).toHaveAccessibleDescription('Выбери вариант, чтобы проголосовать.');
+  await expect(firstSubmit).toHaveCSS('opacity', '1');
+  await expect(firstSubmit).toHaveCSS('box-shadow', 'none');
   await activate(firstCard.getByText(finish, { exact: true }), phone);
   await expect(firstCard.getByRole('radio', { name: finish })).toBeChecked();
   await activate(firstSubmit, phone);
@@ -135,8 +138,10 @@ test('an anonymous poll shows each player their own vote and reveals the result 
   for (const card of [firstCard, secondCard]) {
     await expect(card.getByText('Голосование закрыто')).toBeVisible(live);
     await expect(card.getByText(`Итог: ${finish}`)).toBeVisible();
-    await expect(card.getByRole('radio', { name: finish })).toHaveAccessibleDescription('2 голоса');
-    await expect(card.getByRole('radio', { name: roll })).toHaveAccessibleDescription('0 голосов');
+    const rows = card.getByRole('list', { name: 'Варианты ответа' }).getByRole('listitem');
+    await expect(rows.filter({ hasText: finish })).toContainText(/2 голоса, 100\s*%/u);
+    await expect(rows.filter({ hasText: roll })).toContainText(/0 голосов, 0\s*%/u);
+    await expect(card.getByRole('radio')).toHaveCount(0);
     await expect(card.getByRole('button', { name: 'Изменить голос' })).toHaveCount(0);
   }
   await designShot(second, `s5-22-polls-closed-${info.project.name}`);
@@ -193,8 +198,10 @@ test('an unfinished vote moves to ended without revealing the result when the se
   await expect(page.getByRole('region', { name: 'Открытые' })).toHaveCount(0);
   await expect(card.getByText('Сезон завершён без итога голосования.')).toBeVisible();
   await expect(card.getByText(`Твой голос: ${firstChoice}`)).toBeVisible();
-  await expect(savedVote).toBeChecked();
-  await expect(unsentVote).toBeDisabled();
+  const options = card.getByRole('list', { name: 'Варианты ответа' });
+  await expect(options.getByText(firstChoice, { exact: true })).toBeVisible();
+  await expect(options.getByText(secondChoice, { exact: true })).toBeVisible();
+  await expect(card.getByRole('radio')).toHaveCount(0);
   await expect(card.getByText('Счёт скрыт до закрытия')).toHaveCount(0);
   await expect(card.getByText(/^Итог:/)).toHaveCount(0);
   const heading = card.getByRole('heading', { name: question });
@@ -327,8 +334,10 @@ test('a spectator joins an everyone poll after a rule change and votes only once
     const card = everyoneCard(page);
     await expect(card.getByText('Голосование закрыто')).toBeVisible(live);
     await expect(card.getByText(`Итог: ${hades}`)).toBeVisible();
-    await expect(card.getByRole('radio', { name: portal })).toHaveAccessibleDescription('1 голос');
-    await expect(card.getByRole('radio', { name: hades })).toHaveAccessibleDescription('2 голоса');
+    const rows = card.getByRole('list', { name: 'Варианты ответа' }).getByRole('listitem');
+    await expect(rows.filter({ hasText: portal })).toContainText(/1 голос, 33\s*%/u);
+    await expect(rows.filter({ hasText: hades })).toContainText(/2 голоса, 67\s*%/u);
+    await expect(card.getByRole('radio')).toHaveCount(0);
   }
 });
 

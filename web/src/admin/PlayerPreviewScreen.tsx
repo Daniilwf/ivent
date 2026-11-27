@@ -24,6 +24,7 @@ import { WaitingEvents } from '../season/WaitingEvents';
 import { MyFinish } from '../season/MyFinish';
 import { parseIrlLink } from '../season/irlLink';
 import { seasonPicture } from '../season/seasonView';
+import { PageHeader } from '../ui/PageHeader';
 import { AsyncState } from '../ui/AsyncState';
 import { buttonClass, standaloneLink } from '../ui/buttonStyles';
 import { Summary } from '../ui/Disclosure';
@@ -75,9 +76,9 @@ export function PlayerPreviewScreen({
   return (
     <main className="mx-auto grid max-w-300 gap-6 px-4 py-6 desk:px-8" data-testid="player-preview">
       <header className="grid gap-3">
-        <h1 ref={heading} tabIndex={-1} className="font-display text-xl font-heavy">
+        <PageHeader ref={heading} tabIndex={-1}>
           {t.title}
-        </h1>
+        </PageHeader>
         {loaded.kind === 'ready' ? (
           <p className="flex flex-wrap gap-2">
             <Chip>{ru.seasonStatus[loaded.value.season.status]}</Chip>

@@ -5,10 +5,13 @@ import { Link } from '../app/Link';
 import { paths, usePageHeading } from '../app/router';
 import { answerOf, useLoaded } from '../app/useLoaded';
 import { useSeasonVersion } from '../app/useSeasonVersion';
+import { playerToken } from '../design/players';
 import { ru } from '../i18n/ru';
 import { AsyncState } from '../ui/AsyncState';
 import { Button } from '../ui/Button';
+import { PageHeader } from '../ui/PageHeader';
 import { standaloneLink } from '../ui/buttonStyles';
+import { cx } from '../ui/cx';
 import { EmptyState } from '../ui/States';
 import { recapCard, type RecapCard, type RecapMetric } from './recapCard';
 
@@ -24,9 +27,16 @@ const refreshEvents = new Set([
   'run-dice-modified',
   'run-dice-rerolled',
   'run-reviewed',
+  'proof-approved',
   'proof-rejected',
   'coop-reward-split',
   'hostile-received',
+  'points-changed',
+  'player-finished',
+  'player-finish-revoked',
+  'player-frozen',
+  'season-player-added',
+  'season-result-recorded',
 ]);
 
 export function SeasonRecap({
@@ -91,13 +101,9 @@ export function SeasonRecap({
           return (
             <div className="grid items-center gap-6 desk:grid-cols-2 desk:gap-12">
               <header className="grid min-w-0 gap-3 desk:justify-items-start">
-                <h1
-                  ref={heading}
-                  tabIndex={-1}
-                  className="font-display text-2xl font-heavy outline-none desk:text-3xl"
-                >
+                <PageHeader ref={heading} tabIndex={-1} className="outline-none">
                   {t.title}
-                </h1>
+                </PageHeader>
                 <p className="text-sm text-ink-soft">{t.preview}</p>
                 <Button
                   variant="main"
@@ -137,18 +143,22 @@ export function RecapPreview({ card }: { card: RecapCard }) {
         <h2 id={playerHeading} className="font-display text-xl font-heavy">
           {card.player}
         </h2>
+        {card.standing && (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-bold tabular-nums">
+            {card.playerToken !== null && (
+              <span
+                className="h-1 w-8 shrink-0 rounded-full"
+                style={{ background: playerToken(card.playerToken).fill }}
+                data-testid="recap-player-accent"
+                aria-hidden
+              />
+            )}
+            <span>{card.standing.place}</span>
+            <span className="text-ink-soft">{card.standing.points}</span>
+          </p>
+        )}
       </header>
-      <dl className="flex flex-wrap gap-4 rounded-md bg-me p-4 text-on-color desk:p-5">
-        {[card.completed, card.hours].map(({ label, value }) => (
-          <div
-            key={label}
-            className="flex max-w-full shrink-0 grow flex-col-reverse justify-end gap-1"
-          >
-            <dt className="font-medium">{label}</dt>
-            <dd className="font-display text-2xl font-heavy wrap-anywhere tabular-nums">{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <MetricPair metrics={[card.completed, card.hours]} featured />
       <div className="grid grid-cols-2 divide-x divide-muted">
         <section className="grid min-w-0 content-start gap-2 pr-2 desk:pr-4">
           <h3 className="font-display text-sm font-heavy">{t.ratings}</h3>
@@ -173,21 +183,49 @@ export function RecapPreview({ card }: { card: RecapCard }) {
           )}
         </section>
       )}
+      <footer className="border-t border-muted pt-2 text-xs text-ink-soft">{ru.app.title}</footer>
     </article>
   );
 }
 
-function MetricPair({ metrics }: { metrics: RecapMetric[] }) {
+function MetricPair({ metrics, featured = false }: { metrics: RecapMetric[]; featured?: boolean }) {
   return (
-    <dl className="grid grid-cols-2 gap-x-2 desk:gap-x-3">
+    <dl
+      className={
+        featured
+          ? 'flex flex-wrap gap-4 rounded-md bg-me p-4 text-on-color desk:p-5'
+          : 'grid grid-cols-2 gap-x-2 desk:gap-x-3'
+      }
+    >
       {metrics.map(({ label, value, unit, detail }) => (
-        <div key={label} className="flex min-w-0 flex-col-reverse gap-1">
-          <dt className="text-xs wrap-anywhere text-ink-soft desk:text-sm">{label}</dt>
+        <div
+          key={label}
+          className={cx('grid content-start gap-1', featured ? 'max-w-full grow' : 'min-w-0')}
+        >
+          <dt
+            className={
+              featured ? 'font-medium' : 'text-xs wrap-anywhere text-ink-soft desk:text-sm'
+            }
+          >
+            {label}
+          </dt>
           <dd className="flex flex-wrap items-baseline gap-x-1">
-            <span className="font-display text-lg font-heavy wrap-anywhere tabular-nums">
+            <span
+              className={cx(
+                'font-display font-heavy wrap-anywhere tabular-nums',
+                featured ? 'text-2xl' : 'text-lg',
+              )}
+            >
               {value}
             </span>
-            {unit ? <span className="text-xs text-ink-soft">{unit}</span> : null}
+            {unit ? (
+              <>
+                {' '}
+                <span className={featured ? 'text-sm font-medium' : 'text-xs text-ink-soft'}>
+                  {unit}
+                </span>
+              </>
+            ) : null}
             {detail ? (
               <span className="basis-full text-xs wrap-anywhere text-ink-soft">{detail}</span>
             ) : null}

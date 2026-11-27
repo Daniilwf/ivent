@@ -82,7 +82,7 @@ export function IconButton({
       data-force={force}
       aria-busy={loading || undefined}
       className={cx(
-        'inline-grid size-11 shrink-0 cursor-pointer aria-busy:cursor-progress place-items-center rounded-full border-2 border-ink bg-card text-ink transition duration-(--duration-fast) is-hover:bg-page is-focus:focus-ring is-active:translate-y-px disabled:cursor-default disabled:opacity-50 disabled:disabled-look',
+        'inline-grid size-11 shrink-0 cursor-pointer aria-busy:cursor-progress place-items-center rounded-full border-2 border-ink bg-card text-ink transition duration-(--duration-fast) is-hover:bg-page is-focus:focus-ring is-active:translate-y-px disabled:cursor-default disabled:not-aria-busy:disabled-look',
         className,
       )}
       {...rest}

@@ -2,12 +2,14 @@ using System.Security.Claims;
 using System.Text.Json;
 using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Ranking;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Statistics;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Hosting;
+using GameEvent.Web.Map;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,7 +17,7 @@ namespace GameEvent.Web.Seasons;
 
 public sealed record SeasonStatisticsView(
     Guid SeasonId, int CompletedRuns, int? BestRating, int? WorstRating, int AttacksMade, int AttacksReceived, string SeasonName,
-    decimal TotalHours, SeasonRollView? BestRoll, SeasonRollView? WorstRoll);
+    decimal TotalHours, SeasonRollView? BestRoll, SeasonRollView? WorstRoll, int? Place, int? Points, int? PlayerToken, bool Provisional);
 
 public sealed record SeasonRollView(Guid RunId, long Sum, long Minimum, long Maximum, decimal Luck);
 
@@ -61,14 +63,24 @@ internal static class SeasonStatisticsEndpoints
             join season in db.Seasons.AsNoTracking() on player.SeasonId equals season.Id
             where player.SeasonId == seasonId && player.UserId == userId
             select new { PlayerId = player.Id, season.RulesetJson, season.Name }).SingleOrDefaultAsync(ct);
-        if (participation is null || !IsEnabled(participation.RulesetJson))
+        if (participation is null
+            || JsonSerializer.Deserialize<Ruleset>(participation.RulesetJson, EngineJson.Options) is not { Features.SeasonStatistics: true } rules)
         {
             return TypedResults.NotFound();
         }
 
         var stats = await LoadAsync(db, new Dictionary<Guid, Guid> { [seasonId] = participation.PlayerId }, ct);
+        var players = (await db.SeasonPlayers.AsNoTracking().Where(player => player.SeasonId == seasonId)
+            .Select(p => new { p.Name, Rank = new RankingEntry(p.Id, p.Points, p.CellId, p.FinishOrder, p.Frozen, 0, p.PointsTick) })
+            .ToListAsync(ct)).InTokenOrder(p => p.Name, p => p.Rank.PlayerId);
+        var token = players.FindIndex(player => player.Rank.PlayerId == participation.PlayerId);
+        var map = await SeasonMaps.CurrentAsync(db, seasonId, ct);
+        var row = map is null ? null
+            : (await SeasonLeaderboard.ReadAsync(db, seasonId, rules.Ranking, map, players.Select(p => p.Rank), ct))
+                .SingleOrDefault(player => player.PlayerId == participation.PlayerId);
         return TypedResults.Ok(new SeasonStatisticsView(seasonId, stats.CompletedRuns, stats.BestRating, stats.WorstRating,
-            stats.AttacksMade, stats.AttacksReceived, participation.Name, stats.TotalHours, stats.BestRoll, stats.WorstRoll));
+            stats.AttacksMade, stats.AttacksReceived, participation.Name, stats.TotalHours, stats.BestRoll, stats.WorstRoll,
+            row?.Place, row?.Points, token < 0 ? null : token, row?.Provisional == true));
     }
 
     private static async Task<Results<Ok<AllTimeStatisticsView>, UnauthorizedHttpResult>> ReadAllTimeAsync(
