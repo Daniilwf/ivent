@@ -65,6 +65,33 @@ describe('FeedPreview', () => {
     expect(calls).toHaveBeenCalledTimes(2);
   });
 
+  it('reads the preview again at a hidden roll deadline without a live update', async () => {
+    const latest = page(0);
+    const [first] = entries(1);
+    if (!first) throw new Error('The fixture needs a roll');
+    const hidden = {
+      ...first,
+      type: 'game-roll-hidden',
+      data: { playerId: vasya, revealId: 'preview-reveal', disclosureInMilliseconds: 300 },
+    };
+    const revealed = {
+      ...first,
+      type: 'game-rolled',
+      data: { playerId: vasya, gameId: 'g', category: 'Platformer' },
+    };
+    let requests = 0;
+    const calls = serve(() =>
+      json(200, { ...latest, entries: [requests++ === 0 ? hidden : revealed] }),
+    );
+    render(<FeedPreview seasonId={seasonId} version={1} />);
+
+    const roll = await screen.findByTestId('feed-item-c0');
+    expect(roll).toHaveTextContent('Вася крутит колесо игр…');
+    expect(calls).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(roll).toHaveTextContent('Вася выкручивает Celeste'));
+    expect(calls).toHaveBeenCalledTimes(2);
+  });
+
   it('holds an entire command until its result is visible on the season screen', async () => {
     const latest = page(3);
     const first = latest.entries[0];
@@ -81,6 +108,34 @@ describe('FeedPreview', () => {
     rerender(<FeedPreview seasonId={seasonId} version={1} visibleThrough={101} />);
 
     expect(screen.getByTestId('feed-item-c0')).toBeVisible();
+    expect(calls).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the owner’s published roll out while other recent commands stay visible', async () => {
+    const latest = page(3);
+    const older = latest.entries[2];
+    if (!older) throw new Error('The fixture needs a command to hold');
+    latest.entries.splice(1, 1, {
+      ...older,
+      sequence: 99,
+      type: 'game-rolled',
+      data: { playerId: vasya, gameId: 'g', category: 'Platformer' },
+    });
+    latest.entries[2] = {
+      ...older,
+      type: 'coins-changed',
+      data: { playerId: vasya, delta: -2, reason: 'reroll' },
+    };
+    const calls = serve(() => json(200, latest));
+    const { rerender } = render(
+      <FeedPreview seasonId={seasonId} version={1} hiddenRollSequence={99} />,
+    );
+
+    expect(await screen.findByTestId('feed-item-c0')).toBeVisible();
+    expect(screen.queryByTestId('feed-item-c2')).not.toBeInTheDocument();
+
+    rerender(<FeedPreview seasonId={seasonId} version={1} />);
+    expect(screen.getByTestId('feed-item-c2')).toHaveTextContent('Вася выкручивает Celeste');
     expect(calls).toHaveBeenCalledTimes(1);
   });
 

@@ -223,7 +223,13 @@ describe('Game covers on the season screen (D-222)', () => {
             phase: 'rolling',
             offer: offered('Silent Hill', cover(1)),
             nextReroll: { payment: 'freeThisRoll', coins: 0 },
-            roll: { sequence: 7, category: 'Horror', sectors: ['Action', 'Horror'], misses: [] },
+            roll: {
+              sequence: 7,
+              category: 'Horror',
+              sectors: ['Action', 'Horror'],
+              misses: [],
+              revealed: true,
+            },
           }),
           lastSequence: 7,
         };

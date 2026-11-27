@@ -9,7 +9,7 @@ import { useIsPast } from '../app/useIsPast';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
-import { ChoiceCard, OfferCard, rollResultTitle } from './RollResult';
+import { ChoiceCard, OfferCard, RollGenre, rollGameButton, rollResultTitle } from './RollResult';
 import { CompletionMoment } from './CompletionMoment';
 import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
@@ -56,6 +56,7 @@ import { Summary } from '../ui/Disclosure';
 type Season = Schemas['SeasonView'];
 type Command =
   | { kind: 'roll' }
+  | { kind: 'revealRoll'; revealId: string }
   // D-600: what the page showed goes with the action; the server refuses it when the turn has changed since
   | { kind: 'start'; gameId: string; difficulty: Schemas['Difficulty'] }
   | { kind: 'reroll'; expected: Schemas['RerollPayment'] | null }
@@ -107,6 +108,11 @@ function send(seasonId: string, command: Command) {
   switch (command.kind) {
     case 'roll':
       return api.POST('/api/seasons/{seasonId}/roll', { params, body: { commandId } });
+    case 'revealRoll':
+      return api.POST('/api/seasons/{seasonId}/roll/reveal', {
+        params,
+        body: { commandId, revealId: command.revealId },
+      });
     case 'start':
       return api.POST('/api/seasons/{seasonId}/start', {
         params,
@@ -217,6 +223,12 @@ export function SeasonScreen({
   // The last roll whose wheel has stopped (or the one the page opened with); undefined until the first load
   const [landed, setLanded] = useState<number | null | undefined>(undefined);
   const wheel = useRef<MomentHandle>(null);
+  const [revealStep, setRevealStep] = useState<{
+    id: string;
+    phase: 'opening' | 'spinning' | 'shown';
+  } | null>(null);
+  const revealRequest = useRef<string | null>(null);
+  const alreadyPlayedRoll = useRef<{ sequence: number; category: string } | null>(null);
   // Desktop: the roll whose landed wheel still stands on the map's stage; and the result said to screen readers
   const [staged, setStaged] = useState<number | null>(null);
   const [animatedRoll, setAnimatedRoll] = useState<number | null>(null);
@@ -263,12 +275,37 @@ export function SeasonScreen({
         lastSequence.current = loaded.season.lastSequence;
         setSeason(loaded.season);
         // The roll the page opened with is shown at once; only a roll that comes while it is open spins (D-136)
-        const opened = loaded.season.me?.roll?.sequence ?? null;
-        setLanded((landed) => (landed === undefined ? opened : landed));
         const view = loaded.season;
+        const roll = view.me?.roll;
+        const opened = roll?.sequence ?? null;
+        const continued = alreadyPlayedRoll.current;
+        // An already-played free reroll into the same genre keeps its first step settled.
+        const sameGenre =
+          roll?.revealId &&
+          continued &&
+          roll.sequence > continued.sequence &&
+          roll.category === continued.category;
+        setLanded((landed) => (landed === undefined || sameGenre ? opened : landed));
+        if (sameGenre) {
+          requestAnimationFrame(() => {
+            document.getElementById(rollGameButton)?.focus({ preventScroll: true });
+          });
+        }
         const previous = shownSeason.current;
-        if (previous && opened !== null && previous.me?.roll?.sequence !== opened)
+        if (previous && opened !== null && previous.me?.roll?.sequence !== opened) {
           setRollBefore(previous);
+          setAnnounced('');
+        }
+        // Decide on the first snapshot for this roll. The public timer must not finish an open player's step.
+        if (roll?.revealId && previous?.me?.roll?.revealId !== roll.revealId && view.me) {
+          const key = rollStorageKey(view.id, view.me.playerId, roll.sequence);
+          const shown = readRollMarker(key, roll.revealId);
+          setRevealStep(
+            shown || (roll.revealed && !freshRoll(roll))
+              ? { id: roll.revealId, phase: 'shown' }
+              : null,
+          );
+        }
         const draw = view.me?.lastEvent?.sequence;
         if (previous && draw != null && previous.me?.lastEvent?.sequence !== draw)
           setDrawBefore(previous);
@@ -358,6 +395,12 @@ export function SeasonScreen({
 
   async function act(command: Command) {
     const drawBeforeCommand = season?.me?.lastEvent?.sequence ?? 0;
+    if (command.kind === 'alreadyPlayed' && season?.me?.roll) {
+      alreadyPlayedRoll.current = {
+        sequence: season.me.roll.sequence,
+        category: season.me.roll.category,
+      };
+    }
     // Starting a new action also skips any celebration still waiting for the previous card.
     setCelebration(null);
     arrivedAt.current = null;
@@ -372,7 +415,7 @@ export function SeasonScreen({
       const result = await send(seasonId, command);
       if (result.response.status === 401) {
         onSignedOut();
-        return;
+        return false;
       }
       if (result.error) {
         const code = rejectionCode(result.error);
@@ -384,9 +427,12 @@ export function SeasonScreen({
           version: previous.version + 1,
         }));
       apply(await fetchSeason(seasonId));
+      return result.response.ok && !result.error;
     } catch {
       setMessage(ru.app.loadError);
+      return false;
     } finally {
+      if (command.kind === 'alreadyPlayed') alreadyPlayedRoll.current = null;
       setPending(false);
     }
   }
@@ -538,12 +584,20 @@ export function SeasonScreen({
   // A branch choice is part of a throw made before the deadline: it is answered after it too (D-305)
   const branch = me?.choice?.kind === 'branch' ? me.choice : null;
   const offer = turnsOpen && !effectChoice && me?.phase === 'rolling' ? me.offer : null;
-  // A roll that came while the page is open spins its wheel first; the server chose everything, the page only shows it
+  const currentRoll = offer || choice ? (me?.roll ?? null) : null;
+  const splitRoll = currentRoll?.revealId ? currentRoll : null;
+  const localReveal = revealStep?.id === splitRoll?.revealId ? revealStep : null;
+  const openingGame = localReveal?.phase === 'opening';
+  const heldGenre = splitRoll !== null && (localReveal === null || openingGame);
+  // An opened page owns the new genre spin. A loaded result starts at the settled genre or the disclosed game.
   const fresh =
-    (offer ?? choice) && me?.roll && landed !== undefined && me.roll.sequence > (landed ?? 0)
-      ? me.roll
+    currentRoll && landed !== undefined && currentRoll.sequence > (landed ?? 0)
+      ? currentRoll
       : null;
-  const spin: WheelRoll | null = fresh ? wheelRoll(fresh, offer, choice) : null;
+  const spin = fresh ? (splitRoll ? genreWheelRoll(fresh) : wheelRoll(fresh, offer, choice)) : null;
+  const gameWheel = splitRoll && offer ? gameWheelRoll(splitRoll, offer) : null;
+  const gameSpin = localReveal?.phase === 'spinning' ? gameWheel : null;
+  const showRollResult = !spin && !gameSpin && !heldGenre;
   const rollRevealClass =
     !desk && animatedRoll !== null && animatedRoll === me?.roll?.sequence
       ? 'animate-wheel-result'
@@ -587,13 +641,13 @@ export function SeasonScreen({
   const beforeMoment =
     (throwing ? thrown?.before : null) ??
     moving?.before ??
-    (spin ? rollBefore : null) ??
+    (spin || gameSpin ? rollBefore : null) ??
     (drawPending ? drawBefore : null);
   const momentRows = throwing
     ? held?.rows
     : moving
       ? walkingHeld?.rows
-      : spin && rollBefore
+      : (spin || gameSpin) && rollBefore
         ? rollHeld.rows
         : drawPending && drawBefore
           ? drawHeld.rows
@@ -872,66 +926,131 @@ export function SeasonScreen({
         ) : null}
       </section>
     ) : null;
-  // The wheel's stage: on a desktop it takes the map's place and stays with the result until I answer or close it,
-  // on a phone it plays in the turn card and gives way to the result
-  const staging =
-    desk && (offer ?? choice) && me?.roll && staged === me.roll.sequence ? me.roll : null;
-  const onStage = spin ?? (staging ? wheelRoll(staging, offer, choice) : null);
-  const stage = onStage ? (
-    <div
-      data-testid="wheel"
-      className={
-        desk
-          ? 'grid h-full w-full grid-rows-[minmax(0,1fr)_auto] justify-items-center gap-3'
-          : 'grid w-full content-center justify-items-center gap-3'
-      }
-    >
-      <WheelMoment
-        key={onStage.id}
-        ref={wheel}
-        sectors={(fresh ?? staging)?.sectors ?? []}
-        roll={onStage}
-        announce={false}
-        fill={desk}
-        onAnimatedResult={() => {
-          setAnimatedRoll(onStage.id);
-        }}
-        onPhase={(phase) => {
-          if (phase !== 'done') return;
-          setLanded(onStage.id);
-          if (desk) setStaged(onStage.id);
-          setAnnounced(
-            ru.moments.wheel.announce(
-              me?.roll?.category ?? '',
-              offer
-                ? ru.moments.wheel.result(offer.title)
-                : ru.moments.wheel.choice(onStage.pick.choices ?? 0),
-            ),
-          );
-          requestAnimationFrame(() => {
-            document.getElementById(rollResultTitle)?.focus({ preventScroll: true });
-          });
-        }}
-      />
-      {spin ? (
-        desk ? null : (
-          <Button onClick={() => wheel.current?.skip()}>{ru.moments.skip}</Button>
-        )
-      ) : (
-        <Button
-          onClick={() => {
-            setStaged(null);
-            // The stage goes with the button: the focus goes to the rolled game
-            requestAnimationFrame(() => {
-              document.getElementById(rollResultTitle)?.focus();
-            });
+  const wheelWords = ru.moments.wheel;
+  const announceGame = (roll: Schemas['WheelRollView']) => {
+    const count = choice?.options.filter((option) => option.game).length ?? 0;
+    setAnnounced(
+      wheelWords.announce(
+        roll.category,
+        offer ? wheelWords.result(offer.title) : wheelWords.choice(count),
+      ),
+    );
+    requestAnimationFrame(() => {
+      document.getElementById(rollResultTitle)?.focus({ preventScroll: true });
+    });
+  };
+
+  const showGame = (roll: Schemas['WheelRollView'], revealId: string, keepWheel: boolean) => {
+    if (!me) return;
+    writeRollMarker(rollStorageKey(season.id, me.playerId, roll.sequence), revealId);
+    setRevealStep({ id: revealId, phase: 'shown' });
+    setStaged(keepWheel && desk ? roll.sequence : null);
+    announceGame(roll);
+  };
+
+  async function revealGame(animate: boolean) {
+    const revealId = splitRoll?.revealId;
+    if (!splitRoll || !revealId || pending || revealRequest.current !== null) return;
+    revealRequest.current = revealId;
+    setRevealStep({ id: revealId, phase: 'opening' });
+    if (spin) wheel.current?.skip();
+    const requested = splitRoll.revealed || (await act({ kind: 'revealRoll', revealId }));
+    revealRequest.current = null;
+    const latestRoll = shownSeason.current?.me?.roll;
+    if (latestRoll?.revealId !== revealId) return;
+    if (!requested && !latestRoll.revealed) {
+      setRevealStep(null);
+      return;
+    }
+    // Another tab or the timer may have published the same result while this request was queued.
+    if (!requested) setMessage(null);
+    if (animate && gameWheel) {
+      setRevealStep({ id: revealId, phase: 'spinning' });
+    } else {
+      showGame(splitRoll, revealId, false);
+    }
+  }
+
+  // A settled genre waits in place. After the game wheel lands, the desktop keeps it over the map until I close it.
+  const staging = desk && currentRoll && staged === currentRoll.sequence ? currentRoll : null;
+  const genreOnStage = splitRoll && (spin || heldGenre) ? splitRoll : null;
+  const gameOnStage = gameSpin || (staging && splitRoll ? gameWheel : null);
+  const onStage =
+    gameOnStage?.roll ??
+    spin ??
+    (genreOnStage ? genreWheelRoll(genreOnStage) : null) ??
+    (staging && !splitRoll ? wheelRoll(staging, offer, choice) : null);
+  const wheelKind = gameOnStage ? 'game' : genreOnStage ? 'genre' : undefined;
+  const wheelSettled = !spin && !gameSpin;
+  const spinningStatus = splitRoll
+    ? spin
+      ? wheelWords.spinGenre
+      : gameSpin
+        ? wheelWords.spinGame
+        : null
+    : desk && spin
+      ? wheelWords.spinning
+      : null;
+  const stage =
+    onStage && currentRoll ? (
+      <div
+        data-testid="wheel"
+        data-wheel-kind={wheelKind}
+        data-wheel-settled={wheelSettled}
+        className={
+          desk
+            ? 'grid h-full w-full grid-rows-[minmax(0,1fr)_auto] justify-items-center gap-3'
+            : 'grid w-full content-center justify-items-center gap-3'
+        }
+      >
+        <WheelMoment
+          key={`${wheelKind ?? 'legacy'}:${String(onStage.id)}`}
+          ref={wheel}
+          sectors={gameOnStage?.sectors ?? currentRoll.sectors}
+          roll={onStage}
+          kind={wheelKind}
+          settled={wheelSettled}
+          announce={false}
+          fill={desk}
+          onAnimatedResult={() => {
+            if (wheelKind !== 'genre') setAnimatedRoll(onStage.id);
           }}
-        >
-          {ru.moments.wheel.toMap}
-        </Button>
-      )}
-    </div>
-  ) : null;
+          onPhase={(phase) => {
+            if (phase !== 'done') return;
+            if (wheelKind === 'game' && splitRoll?.revealId) {
+              showGame(splitRoll, splitRoll.revealId, true);
+            } else {
+              setLanded(onStage.id);
+              if (wheelKind === 'genre') {
+                setAnnounced(wheelWords.genre(currentRoll.category));
+                requestAnimationFrame(() => {
+                  document.getElementById(rollGameButton)?.focus({ preventScroll: true });
+                });
+              } else {
+                if (desk) setStaged(onStage.id);
+                announceGame(currentRoll);
+              }
+            }
+          }}
+        />
+        {!splitRoll && spin && !desk ? (
+          <Button onClick={() => wheel.current?.skip()}>{ru.moments.skip}</Button>
+        ) : null}
+        {staging && !spin && !gameSpin && !heldGenre ? (
+          <Button
+            onClick={() => {
+              setStaged(null);
+              // The stage goes with the button: the focus goes to the rolled game
+              requestAnimationFrame(() => {
+                document.getElementById(rollResultTitle)?.focus();
+              });
+            }}
+          >
+            {wheelWords.toMap}
+          </Button>
+        ) : null}
+      </div>
+    ) : null;
 
   // The completion's stage: on a desktop over the map, on a phone in the turn card; it goes when the token stands
   const throwFrom = thrown && mine ? (cellNumber.get(thrown.from) ?? mine.cell) : 0;
@@ -1207,14 +1326,25 @@ export function SeasonScreen({
             {phoneMoment}
           </div>
         ) : null}
-        {desk && spin ? (
+        {spinningStatus ? (
           <div className="grid gap-2 justify-items-start">
             <p data-testid="moment-status" role="status" className="text-ink-soft">
-              {ru.moments.wheel.spinning}
+              {spinningStatus}
             </p>
-            <Button variant="quiet" onClick={() => wheel.current?.skip()}>
-              {ru.moments.skip}
-            </Button>
+            {splitRoll && spin ? (
+              <Button
+                data-testid="skip-roll"
+                variant="quiet"
+                disabled={pending}
+                onClick={() => void revealGame(false)}
+              >
+                {wheelWords.skipRoll}
+              </Button>
+            ) : (
+              <Button variant="quiet" onClick={() => wheel.current?.skip()}>
+                {ru.moments.skip}
+              </Button>
+            )}
           </div>
         ) : null}
         {desk && throwing ? (
@@ -1260,6 +1390,7 @@ export function SeasonScreen({
         ) : null}
         {rollSlot && !uncheckedBlocked && (
           <div className="grid gap-2">
+            <p className="text-sm text-ink-soft">{wheelWords.genreStep}</p>
             <Button
               variant={finishProof || (drawPending && me.finish) ? 'quiet' : 'main'}
               data-testid="roll"
@@ -1276,6 +1407,16 @@ export function SeasonScreen({
             ) : null}
           </div>
         )}
+        {splitRoll && heldGenre && !spin ? (
+          <RollGenre
+            category={splitRoll.category}
+            games={gameWheel?.sectors.length ?? 0}
+            choice={choice !== null}
+            opening={openingGame || pending}
+            onOpen={() => void revealGame(true)}
+            onSkip={() => void revealGame(false)}
+          />
+        ) : null}
         {desk ? null : stage}
         {effectChoice && !throwing && !moving ? (
           <div className={cx('grid min-w-0 gap-3', phoneDraw && phoneMomentClass)}>
@@ -1303,7 +1444,7 @@ export function SeasonScreen({
             {closePhoneDraw}
           </div>
         ) : null}
-        {choice && !spin && (
+        {choice && showRollResult && (
           <ChoiceCard
             choice={choice}
             className={rollRevealClass}
@@ -1319,7 +1460,7 @@ export function SeasonScreen({
             onReroll={() => void act({ kind: 'reroll', expected: me?.nextReroll?.payment ?? null })}
           />
         )}
-        {offer && !spin && (
+        {offer && showRollResult && (
           <OfferCard
             offer={offer}
             className={rollRevealClass}
@@ -1570,6 +1711,7 @@ export function SeasonScreen({
           seasonId={seasonId}
           version={visibleThrough}
           visibleThrough={visibleThrough}
+          hiddenRollSequence={splitRoll && !showRollResult ? splitRoll.sequence : undefined}
           className="desk:col-start-1 desk:w-96"
         />
       ) : null}
@@ -1656,7 +1798,72 @@ function cellWords(
     .join(', ');
 }
 
-/** The server's roll as the wheel plays it: each miss is a stop on the picked category, then the pick */
+const rollStepLifetime = 10 * 60 * 1000;
+
+function freshRoll(roll: Schemas['WheelRollView']) {
+  return roll.rolledAt != null && Date.now() - Date.parse(roll.rolledAt) < rollStepLifetime;
+}
+
+function rollStorageKey(seasonId: string, playerId: string, sequence: number) {
+  return `ivent.roll.shown:${seasonId}:${playerId}:${String(sequence)}`;
+}
+
+function readRollMarker(key: string, revealId: string) {
+  try {
+    return localStorage.getItem(key) === revealId;
+  } catch {
+    return false;
+  }
+}
+
+function writeRollMarker(key: string, revealId: string) {
+  try {
+    localStorage.setItem(key, revealId);
+  } catch {
+    // The current page still remembers the step when this browser blocks storage.
+  }
+}
+
+function genreWheelRoll(roll: Schemas['WheelRollView']): WheelRoll {
+  return {
+    id: roll.sequence,
+    misses: [],
+    pick: {
+      sector: Math.max(roll.sectors.indexOf(roll.category), 0),
+      game: { title: roll.category },
+    },
+  };
+}
+
+function gameWheelRoll(roll: Schemas['WheelRollView'], offer: Schemas['OfferedGameView']) {
+  const games = roll.wheelGames ?? [];
+  const sector = games.findIndex((game) => game.id === offer.id);
+  if (sector < 0) return null;
+  const misses = roll.misses.flatMap((miss) => {
+    const stop = games.findIndex((game) => game.id === miss.gameId);
+    return stop < 0
+      ? []
+      : [
+          {
+            sector: stop,
+            game: { title: miss.game },
+            by: miss.player,
+            playing: miss.reason === 'beingPlayed',
+          },
+        ];
+  });
+  return {
+    sectors: games.map((game) => game.title),
+    roll: {
+      id: roll.sequence,
+      misses,
+      unshownMisses: Math.max(0, (roll.missCount ?? roll.misses.length) - misses.length),
+      pick: { sector, game: { title: offer.title, cover: offer.cover?.thumbnailUrl } },
+    } satisfies WheelRoll,
+  };
+}
+
+/** Versioned older rolls already include their misses on the genre wheel. */
 function wheelRoll(
   roll: Schemas['WheelRollView'],
   offer: Schemas['OfferedGameView'] | null,

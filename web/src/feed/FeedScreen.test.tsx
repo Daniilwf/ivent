@@ -125,6 +125,71 @@ describe('FeedScreen', () => {
     globalThis.history.replaceState(null, '', '/');
   });
 
+  it('updates a loaded older placeholder when its reveal receipt arrives', async () => {
+    let disclosed = false;
+    const hidden = {
+      ...started(1, 'older-roll', '2026-09-26T09:00:00Z'),
+      type: 'game-roll-hidden',
+      data: { playerId: vasya, revealId: 'older-reveal' },
+    };
+    const revealed = {
+      ...hidden,
+      type: 'game-rolled',
+      data: { playerId: vasya, gameId: hollow, category: 'Adventure' },
+    };
+    const newest = started(3, 'newest', '2026-09-26T10:00:00Z');
+    const receipt = {
+      ...started(4, 'shown', '2026-09-26T10:01:00Z'),
+      type: 'roll-game-shown',
+      data: { playerId: vasya, revealId: 'older-reveal' },
+    };
+    const queried = serve((before) => {
+      if (before === null) return json(200, page(disclosed ? [receipt, newest] : [newest], 3));
+      if (before === '3') return json(200, page([hidden]));
+      if (before === '2') return json(200, page([revealed]));
+      return json(404, {});
+    });
+    render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('feed-more'));
+    const roll = await screen.findByTestId('feed-item-older-roll');
+    expect(roll).toHaveTextContent('Вася крутит колесо игр…');
+    expect(roll).not.toHaveTextContent('Hollow Knight');
+    disclosed = true;
+    await flushLiveChange(4, 'roll-game-shown');
+
+    await waitFor(() => expect(roll).toHaveTextContent('Вася выкручивает Hollow Knight'));
+    expect(screen.queryByTestId('feed-item-shown')).not.toBeInTheDocument();
+    expect(queried).toEqual([null, '3', null, '2']);
+  });
+
+  it('refreshes an older hidden roll when its public deadline passes without a receipt', async () => {
+    const hidden = {
+      ...started(1, 'older-roll', '2026-09-26T09:00:00Z'),
+      type: 'game-roll-hidden',
+      data: { playerId: vasya, revealId: 'older-reveal', disclosureInMilliseconds: 300 },
+    };
+    const revealed = {
+      ...hidden,
+      type: 'game-rolled',
+      data: { playerId: vasya, gameId: hollow, category: 'Adventure' },
+    };
+    const queried = serve((before) => {
+      if (before === null) return json(200, page([started(3, 'newest', hidden.occurredAt)], 3));
+      if (before === '3') return json(200, page([hidden]));
+      if (before === '2') return json(200, page([revealed]));
+      return json(404, {});
+    });
+    render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await userEvent.click(await screen.findByTestId('feed-more'));
+    const roll = await screen.findByTestId('feed-item-older-roll');
+    expect(roll).toHaveTextContent('Вася крутит колесо игр…');
+    expect(queried).toEqual([null, '3']);
+    await waitFor(() => expect(roll).toHaveTextContent('Вася выкручивает Hollow Knight'));
+    expect(queried).toEqual([null, '3', '2']);
+  });
+
   it('shows a skeleton, then the lines under their days with links to the player and the game', async () => {
     serve(() => json(200, page([started(2, 'c2', new Date().toISOString())])));
 

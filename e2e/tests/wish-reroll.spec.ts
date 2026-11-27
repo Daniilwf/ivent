@@ -1,7 +1,15 @@
 import { expect, test } from '@playwright/test';
 import type { Schemas } from '../support/api.ts';
 import { holdingTheClock } from '../support/clock.ts';
-import { apiOf, rollAndStart, seasonOf, setUpSeason, signIn } from '../support/world.ts';
+import {
+  apiOf,
+  revealRollHere,
+  rollAndStart,
+  rollAndStartHere,
+  seasonOf,
+  setUpSeason,
+  signIn,
+} from '../support/world.ts';
 
 // D-325, D-261: «Реролл по желанию» — a free give-up of a game of a genre the season's rules list, within the tech
 // reroll window: the turn card offers it only while the server says it is open, a window says what it does, a yes
@@ -19,11 +27,7 @@ test('wish reroll: hidden without listed genres; with them a confirmed, free new
   await holdingTheClock(async () => {
     // The default rules list no genre: the active run offers the tech reroll, not the wish reroll
     const page = await signIn(browser, vasya);
-    await page.getByTestId('roll').click();
-    await expect(page.getByTestId('offer').or(page.getByTestId('choice'))).toBeVisible();
-    if (await page.getByTestId('choice').isVisible())
-      await page.getByTestId('choice').locator('[data-testid^="option-"]').first().click();
-    await page.getByTestId('start').click();
+    await rollAndStartHere(page);
     await expect(page.getByTestId('tech-reroll')).toBeVisible();
     await expect(page.getByTestId('wish-reroll')).toHaveCount(0);
     await player.post(url('drop'));
@@ -73,6 +77,7 @@ test('wish reroll: hidden without listed genres; with them a confirmed, free new
     // A yes: a new roll at once, no points and no cells lost (the drop before cost its own)
     await page.getByTestId('wish-reroll').click();
     await page.getByTestId('wish-reroll-confirm').click();
+    await revealRollHere(page);
     await expect(page.getByTestId('offer').or(page.getByTestId('choice'))).toBeVisible();
     view = await seasonOf(player, world.seasonId);
     expect(view.me?.activeRun ?? null).toBeNull();

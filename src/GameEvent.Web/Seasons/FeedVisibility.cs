@@ -55,6 +55,7 @@ public static class FeedVisibility
         ["choice-discarded"] = Access.Public,
         ["game-rolled"] = Access.Public,
         ["game-choice-rolled"] = Access.Public,
+        ["roll-game-shown"] = Access.Public,
         ["game-rerolled"] = Access.Public,
         ["game-excluded"] = Access.Public,
         ["choice-made"] = Access.Public,

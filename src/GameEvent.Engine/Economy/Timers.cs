@@ -2,6 +2,7 @@ using GameEvent.Engine.Content;
 using GameEvent.Engine.Finish;
 using GameEvent.Engine.Inventory;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Seasons;
 
 namespace GameEvent.Engine.Economy;
@@ -28,6 +29,7 @@ public static class Timers
             .. features.Items && !Finishes.IsFrozen(player) ? wallet.Inventory.Select(o => o.ExpiresAt) : [],
             .. features.Bets ? wallet.Bets.Where(b => b.Status == BetStatus.Open).Select(b => (DateTimeOffset?)b.Deadline) : [],
             Effects.Suspensions.Due(player, features),
+            RollReveals.PendingOf(player)?.ExpiresAt,
         ];
         return moments.Where(m => m is not null).Min();
     }
@@ -80,6 +82,11 @@ public static class Timers
         var events = new List<IGameEvent>();
         foreach (var player in state.Players.Values)
         {
+            if (RollReveals.PendingOf(player) is { } reveal && reveal.ExpiresAt <= now)
+            {
+                events.Add(new RollGameShown(player.PlayerId, reveal.Id));
+            }
+
             var wallet = player.Wallet;
             if (features.Shop && wallet.Shop is { } offer && offer.ExpiresAt <= now)
             {

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Runs;
 using GameEvent.Infrastructure.Database;
@@ -41,7 +42,7 @@ public static class SeasonPoolEndpoints
 
     // Read-only: the state is folded from the log so the page and the wheel share one predicate (PoolStats.Taken, D-160)
     private static async Task<Results<Ok<IReadOnlyList<SeasonGameView>>, NotFound>> GetAsync(
-        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, CancellationToken ct)
+        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, IClock clock, CancellationToken ct)
     {
         if (seasonId == Guid.Empty)
         {
@@ -56,7 +57,14 @@ public static class SeasonPoolEndpoints
 
         var viewer = user.UserId();
         var me = state.Players.Values.FirstOrDefault(p => p.UserId == viewer);
-        var taken = PoolStats.Taken(state, me?.PlayerId ?? Guid.Empty).ToDictionary(m => m.GameId);
+        var now = clock.UtcNow;
+        var pending = state.Players.Values
+            .Select(player => (player.PlayerId, Roll: RollPresentation.Pending(player.Offer, player.Choice)))
+            .Where(player => player.Roll is not null)
+            .ToDictionary(player => player.PlayerId, player => player.Roll!);
+        var taken = PoolStats.Taken(state, me?.PlayerId ?? Guid.Empty)
+            .Where(miss => !RollPresentation.HidesMiss(pending, miss, now))
+            .ToDictionary(miss => miss.GameId);
         var marks = state.Runs.Values
             .Where(r => r.PlayerId != me?.PlayerId && r.Status is RunStatus.Dropped or RunStatus.TechRerolled)
             .OrderBy(r => r.StartedAt)

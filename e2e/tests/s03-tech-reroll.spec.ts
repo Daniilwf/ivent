@@ -5,6 +5,7 @@ import {
   apiOf,
   commandId,
   openAdmin,
+  revealRollHere,
   rollAndStartHere,
   seasonOf,
   setUpSeason,
@@ -32,6 +33,7 @@ test('tech reroll: free within the window, closed 49 hours after the roll, then 
     await expect(page.getByTestId('tech-reroll-until')).toBeVisible();
     await page.getByTestId('tech-reroll-reason').selectOption('doesNotLaunch');
     await page.getByTestId('tech-reroll-submit').click();
+    await revealRollHere(page);
     await expect(page.getByTestId('offer')).toBeVisible();
     const second = (await page.locator('#roll-result-title').textContent())?.trim();
     // The tech-rerolled game is excluded for the player
@@ -73,6 +75,7 @@ test('tech reroll: free within the window, closed 49 hours after the roll, then 
   await expect(admin.getByTestId('admin-players')).toContainText('Вася');
 
   // The player's page follows: a new roll to answer
+  await revealRollHere(page);
   await expect(page.getByTestId('offer')).toBeVisible();
   const view = await seasonOf(player, world.seasonId);
   expect(view.me?.phase).toBe('rolling');

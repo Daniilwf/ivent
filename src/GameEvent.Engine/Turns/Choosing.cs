@@ -96,7 +96,10 @@ internal static class Choosing
     public static SeasonState Apply(SeasonState state, GameChoiceRolled e)
     {
         var choice = new PendingChoice(
-            e.ChoiceId, ChoiceKind.Game, [.. e.Offers.Select(o => new ChoiceOption(o.GameId.ToString("N"), o))]);
+            e.ChoiceId, ChoiceKind.Game, [.. e.Offers.Select(o => new ChoiceOption(o.GameId.ToString("N"), o))])
+        {
+            Reveal = e.Reveal,
+        };
         return Update(state, e.PlayerId, p => p with { Phase = TurnPhase.Rolling, Offer = null, Choice = choice });
     }
 

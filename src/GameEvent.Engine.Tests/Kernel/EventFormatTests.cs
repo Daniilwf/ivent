@@ -137,17 +137,23 @@ public partial class EventFormatTests
         },
         {
             "game-rolled",
-            new GameRolled(s_player, "Horror", [new RollMiss(s_game, RollMissReason.CompletedInSeason, s_other)], s_game, Snapshot(), s_at, ["Horror", "RPG"]),
-            2,
+            new GameRolled(s_player, "Horror", [new RollMiss(s_game, RollMissReason.CompletedInSeason, s_other)], s_game, Snapshot(), s_at, ["Horror", "RPG"], [s_game], new RollReveal(s_run, s_at.AddMinutes(2))),
+            3,
             """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[{"gameId":"20000000-0000-0000-0000-000000000001","reason":"completedInSeason","byPlayerId":"10000000-0000-0000-0000-000000000002"}],"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
-            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00","sectors":["Horror","RPG"]}"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00","sectors":["Horror","RPG"],"wheelGames":["20000000-0000-0000-0000-000000000001"],"reveal":{"id":"00000000-0000-0000-0000-000000000001","expiresAt":"2026-10-01T12:32:00+00:00"}}"""
         },
         {
             "game-choice-rolled",
-            new GameChoiceRolled(s_player, "Horror", [], s_run, [new RollOffer(s_game, Snapshot(), s_at)], ["Horror"]),
-            2,
+            new GameChoiceRolled(s_player, "Horror", [], s_run, [new RollOffer(s_game, Snapshot(), s_at)], ["Horror"], [s_game], new RollReveal(s_run, s_at.AddMinutes(2))),
+            3,
             """{"playerId":"10000000-0000-0000-0000-000000000001","category":"Horror","misses":[],"choiceId":"00000000-0000-0000-0000-000000000001","offers":[{"gameId":"20000000-0000-0000-0000-000000000001","snapshot":"""
-            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}],"sectors":["Horror"]}"""
+            + SnapshotJson + ""","rolledAt":"2026-10-01T12:30:00+00:00"}],"sectors":["Horror"],"wheelGames":["20000000-0000-0000-0000-000000000001"],"reveal":{"id":"00000000-0000-0000-0000-000000000001","expiresAt":"2026-10-01T12:32:00+00:00"}}"""
+        },
+        {
+            "roll-game-shown",
+            new RollGameShown(s_player, s_run),
+            1,
+            """{"playerId":"10000000-0000-0000-0000-000000000001","revealId":"00000000-0000-0000-0000-000000000001"}"""
         },
         {
             "choice-made",

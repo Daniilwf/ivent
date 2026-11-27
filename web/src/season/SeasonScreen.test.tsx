@@ -2156,6 +2156,7 @@ describe('SeasonScreen: runs waiting for the admin (D-134)', () => {
 describe('SeasonScreen wheel (H3, D-136)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    localStorage.clear();
   });
 
   const offered = {
@@ -2166,6 +2167,7 @@ describe('SeasonScreen wheel (H3, D-136)', () => {
   };
   const roll: Schemas['WheelRollView'] = {
     sequence: 7,
+    revealed: true,
     category: 'Horror',
     sectors: ['Action', 'Horror', 'RPG'],
     misses: [
@@ -2187,6 +2189,200 @@ describe('SeasonScreen wheel (H3, D-136)', () => {
       },
     };
   };
+
+  const revealId = 'b1000000-0000-0000-0000-000000000002';
+  const twoStep = (
+    revealed: boolean,
+    rolledAt = new Date().toISOString(),
+  ): Schemas['SeasonView'] => {
+    const view = rolled();
+    if (!view.me) throw new Error('the fixture has a player');
+    const privateRoll = {
+      ...roll,
+      revealId,
+      revealed,
+      rolledAt,
+      misses: roll.misses.map((miss, index) => ({
+        ...miss,
+        gameId: index === 0 ? 'a1000000-0000-0000-0000-000000000002' : null,
+      })),
+      wheelGames: [
+        { id: offered.id, title: offered.title },
+        { id: 'a1000000-0000-0000-0000-000000000002', title: 'Outlast' },
+        { id: 'a1000000-0000-0000-0000-000000000003', title: 'Resident Evil' },
+      ],
+    };
+    return { ...view, lastSequence: revealed ? 8 : 7, me: { ...view.me, roll: privateRoll } };
+  };
+
+  it('holds a new genre after the first press and only shows the game after one reveal', async () => {
+    let view = season();
+    const sent: { path: string; body: unknown }[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, view);
+      const path = new URL(r.url).pathname;
+      sent.push({ path, body: await r.json() });
+      view = twoStep(path.endsWith('/reveal'));
+      return json(200, { duplicate: false, events: [] });
+    });
+    const user = userEvent.setup();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Крутить жанр' }));
+    const genreWheel = await screen.findByTestId('wheel');
+    expect(genreWheel).toHaveAttribute('data-wheel-kind', 'genre');
+    expect(genreWheel).not.toHaveTextContent('Silent Hill');
+    const disc = genreWheel.querySelector('svg');
+    if (!disc) throw new Error('The wheel has no disc.');
+    await user.click(disc);
+    const second = await screen.findByRole('button', { name: 'Крутить игру' });
+    expect(screen.getByTestId('roll-genre')).toHaveTextContent('Horror');
+    expect(screen.queryByTestId('offer')).not.toBeInTheDocument();
+    expect(sent.map((entry) => entry.path)).toEqual([`/api/seasons/${seasonId}/roll`]);
+
+    await user.click(second);
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('wheel')).toHaveAttribute('data-wheel-kind', 'game');
+    });
+    expect(screen.getByTestId('wheel')).toHaveTextContent('Resident Evil');
+    expect(screen.queryByTestId('offer')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: ru.moments.skip }));
+
+    expect(await screen.findByTestId('offer')).toHaveTextContent('Silent Hill');
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toMatchObject({
+      path: `/api/seasons/${seasonId}/roll/reveal`,
+      body: { revealId },
+    });
+    expect(sent[1]?.body).toHaveProperty('commandId');
+  });
+
+  it('reloads an undisclosed roll at the held genre and shows a roll older than ten minutes immediately', async () => {
+    let view = twoStep(false);
+    const fetch = serve((r) => (isSeasonGet(r) ? json(200, view) : json(404, {})));
+    const first = render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('roll-genre')).toHaveTextContent('Horror');
+    expect(screen.getByTestId('wheel')).toHaveAttribute('data-wheel-settled', 'true');
+    expect(screen.getByRole('button', { name: 'Крутить игру' })).toBeEnabled();
+    expect(screen.queryByTestId('offer')).not.toBeInTheDocument();
+    first.unmount();
+
+    view = twoStep(true, new Date(Date.now() - 11 * 60 * 1000).toISOString());
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    expect(await screen.findByTestId('offer')).toHaveTextContent('Silent Hill');
+    expect(screen.queryByTestId('roll-game')).not.toBeInTheDocument();
+    expect(fetch.mock.calls.every(([request]) => request.method === 'GET')).toBe(true);
+  });
+
+  it('preserves the second press after public timeout and remembers a game shown on this device', async () => {
+    const view = twoStep(true);
+    const fetch = serve((r) => (isSeasonGet(r) ? json(200, view) : json(404, {})));
+    const user = userEvent.setup();
+    const first = render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('roll-genre')).toHaveTextContent('Horror');
+    expect(screen.queryByTestId('offer')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Крутить игру' }));
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('wheel')).toHaveAttribute('data-wheel-kind', 'game'),
+    );
+    await user.click(screen.getByRole('button', { name: ru.moments.skip }));
+    expect(await screen.findByTestId('offer')).toHaveTextContent('Silent Hill');
+    first.unmount();
+
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    expect(await screen.findByTestId('offer')).toHaveTextContent('Silent Hill');
+    expect(screen.queryByTestId('roll-game')).not.toBeInTheDocument();
+    expect(fetch.mock.calls.every(([request]) => request.method === 'GET')).toBe(true);
+  });
+
+  it('opens a choice of games on the second press without spinning a game wheel', async () => {
+    const snapshot = twoStep(false);
+    if (!snapshot.me) throw new Error('the fixture has a player');
+    let view: Schemas['SeasonView'] = {
+      ...snapshot,
+      me: {
+        ...snapshot.me,
+        offer: null,
+        choice: { id: 'choice', kind: 'game', options: [{ id: 'one', game: offered }] },
+      },
+    };
+    const commands: string[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, view);
+      commands.push(new URL(r.url).pathname);
+      await r.text();
+      if (view.me?.roll) {
+        view = {
+          ...view,
+          lastSequence: 8,
+          me: { ...view.me, roll: { ...view.me.roll, revealed: true } },
+        };
+      }
+      return json(200, { duplicate: false, events: [] });
+    });
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const open = await screen.findByRole('button', { name: 'Открыть варианты' });
+    expect(screen.queryByTestId('choice')).not.toBeInTheDocument();
+    await userEvent.click(open);
+    expect(await screen.findByTestId('choice')).toHaveTextContent('Silent Hill');
+    expect(screen.queryByTestId('wheel')).not.toBeInTheDocument();
+    expect(commands).toEqual([`/api/seasons/${seasonId}/roll/reveal`]);
+  });
+
+  it('skips the genre spin after Already Played rerolls within the same genre', async () => {
+    let view = twoStep(true, new Date(Date.now() - 11 * 60 * 1000).toISOString());
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, view);
+      await r.text();
+      const next = twoStep(false);
+      if (!next.me?.roll) throw new Error('the fixture has a private roll');
+      view = {
+        ...next,
+        lastSequence: 8,
+        me: {
+          ...next.me,
+          roll: { ...next.me.roll, sequence: 8, revealId: `${revealId.slice(0, -1)}3` },
+        },
+      };
+      return json(200, { duplicate: false, events: [] });
+    });
+    const user = userEvent.setup();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await user.click(await screen.findByTestId('already-played'));
+    await user.click(await screen.findByTestId('already-played-confirm-yes'));
+    expect(await screen.findByTestId('roll-game')).toBeEnabled();
+    expect(screen.getByTestId('wheel')).toHaveAttribute('data-wheel-settled', 'true');
+    expect(screen.queryByTestId('offer')).not.toBeInTheDocument();
+  });
+
+  it('reveals both steps immediately on skip without another game selection', async () => {
+    let view = season();
+    const paths: string[] = [];
+    serve(async (r) => {
+      if (isSeasonGet(r)) return json(200, view);
+      const path = new URL(r.url).pathname;
+      await r.text();
+      paths.push(path);
+      view = twoStep(path.endsWith('/reveal'));
+      return json(200, { duplicate: false, events: [] });
+    });
+    const user = userEvent.setup();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Крутить жанр' }));
+    await user.click(await screen.findByRole('button', { name: 'Показать игру сразу' }));
+
+    expect(await screen.findByTestId('offer')).toHaveTextContent('Silent Hill');
+    expect(screen.queryByTestId('roll-game')).not.toBeInTheDocument();
+    expect(paths).toEqual([
+      `/api/seasons/${seasonId}/roll`,
+      `/api/seasons/${seasonId}/roll/reveal`,
+    ]);
+  });
 
   it('shows a roll the page opened with at once, its misses in words', async () => {
     serve((r) => (isSeasonGet(r) ? json(200, rolled()) : json(404, {})));

@@ -14,6 +14,7 @@ import {
   openAdmin,
   points,
   rollAndStartHere,
+  rollHere,
   seasonOf,
   setUpSeason,
   signIn,
@@ -239,7 +240,7 @@ for (const { difficulty, label, met } of [
         expect.objectContaining({ objectId: 'coop-easy-condition', difficultyAtMost: 'easy' }),
       ]);
       await expect(rollerPage.getByTestId('roll')).toBeEnabled(live);
-      await rollerPage.getByTestId('roll').click();
+      await rollHere(rollerPage);
       const offer = rollerPage.getByTestId('offer');
       await expect(offer).toBeVisible();
       await expect(offer).toContainText(coopGameTitle);

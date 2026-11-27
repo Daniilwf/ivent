@@ -34,6 +34,17 @@
 | MOT4 | В броске с десятью кубиками сохранённые грани видны к показу суммы, даже если Motion ещё загружается. Пропуск и reduced motion показывают тот же результат | `web/src/board/Dice.motion.test.tsx`, `web/src/season/CompletionMoment.motion.test.tsx` | ✅ |
 | MOT5 | На своём ходу лента и таблица раскрывают результат после завершения момента. Во время движения видны сумма кубов и расстояние, страница сохраняет прокрутку. Цепочка занимает до 7,5 с или пропускается одним нажатием | `web/src/feed/FeedPreview.test.tsx`, `web/src/season/CompletionMoment.motion.test.tsx`, `web/src/season/DrawnEventLazyMotion.test.tsx`, `e2e/tests/s5-event-motion.spec.ts` | ✅ |
 
+### Двухшаговый показ ролла
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| SRW1 | Первый ролл выбирает и резервирует результат. Событие v3 сохраняет до 12 разных игр для колеса, включая выпавшее предложение и показанные промахи, а также срок раскрытия | `Engine.Tests/Rolls/RollRevealTests.The_roll_stores_the_game_wheel_and_reveal_deadline_in_its_v3_event`, `A_large_game_wheel_keeps_twelve_different_games_from_the_picked_category_including_the_result`, `The_game_wheel_keeps_the_logged_miss_and_the_offer_as_distinct_sectors` | ✅ |
+| SRW2 | Второе нажатие раскрывает своё текущее предложение один раз. Цена, снимок правил, резервирование и порядок случайных бросков сохраняются. Чужой и устаревший идентификатор ничего не меняют | `Engine.Tests/Rolls/RollRevealTests.The_owner_shows_the_saved_result_once_without_spending_releasing_or_rolling_again`, `Someone_elses_reveal_id_cannot_reveal_either_players_roll`, `A_late_show_from_an_old_tab_cannot_disclose_the_replacement_roll`, `Revealing_a_roll_does_not_change_the_following_draw_or_release_its_reservation`, `e2e/tests/s10-two-tabs.spec.ts` | ✅ |
+| SRW3 | Через две минуты непоказанный ролл раскрывает таймер, в том числе в статусе «Закрытие». Старые события v1/v2 читаются без колеса игр и нового таймера | `Engine.Tests/Rolls/RollRevealTests.The_timer_shows_an_unseen_roll_at_its_deadline_even_in_closing`, `Older_roll_events_have_no_game_wheel_or_pending_reveal` | ✅ |
+| SRW4 | Лента, пул и чужое колесо не выдают скрытую игру. Снятие предложения и чтение ленты одновременно с записью ролла не раскрывают её досрочно | `Web.Tests/Api/WheelRollApiTests.The_result_is_private_in_the_feed_and_pool_until_the_owner_shows_it`, `An_unshown_reservation_does_not_leak_through_another_players_wheel`, `An_admin_discard_keeps_an_unshown_result_private_until_its_disclosure_time`, `Discarding_a_hidden_offer_does_not_unmask_another_players_saved_miss`, `Web.Tests/Api/RollDisclosureFeedRaceTests.A_roll_committed_during_a_spectators_feed_read_does_not_disclose_the_game` | ✅ |
+| SRW5 | Перезагрузка возвращает к жанру, если устройство ещё не показало игру. Второе нажатие или пропуск показывают сохранённый результат, в том числе с системным уменьшением анимаций | `web/src/season/SeasonScreen.test.tsx`, `e2e/tests/s7-roll-reveal.spec.ts` | ✅ |
+| SRW6 | Отменённый сброс предложения не выдаёт название до срока. Уже открытая лента и её превью обновляют скрытую запись по сроку даже без сигнала | `Web.Tests/Api/WheelRollApiTests.Undoing_a_discard_and_its_roll_keeps_the_discard_private_until_disclosure_time`, `web/src/feed/FeedScreen.test.tsx`, `web/src/feed/FeedPreview.test.tsx` | ✅ |
+
 ### Статистика админа (7.5)
 
 | ID | Правило | Тесты | Статус |

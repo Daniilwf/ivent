@@ -20,6 +20,7 @@ import {
   type FeedReactionMap,
 } from './feedApi';
 import { ReactionButtons, type ChangeReaction } from './ReviewReactionButtons';
+import { useRollDisclosureRefresh } from './useRollDisclosureRefresh';
 
 type Entry = Schemas['FeedEntryView'];
 type ReactionRow = { values: FeedReactionMap[string]; revision: number; stale: boolean };
@@ -40,6 +41,15 @@ type State =
 // A live refresh can use both feed reads, which share the season's 60-per-minute budget.
 const liveRefreshIntervalMs = 3000;
 const commandIdsOf = (entries: readonly Entry[]) => [...new Set(entries.map((e) => e.commandId))];
+
+function rollRevealId({ data }: Entry) {
+  return data !== null &&
+    typeof data === 'object' &&
+    'revealId' in data &&
+    typeof data.revealId === 'string'
+    ? data.revealId
+    : null;
+}
 
 function mergeCommentTargets(
   previous: ReadonlyMap<string, boolean> | null,
@@ -189,6 +199,40 @@ export function FeedScreen({
     [seasonId, onSignedOut, show],
   );
 
+  const refreshHiddenRolls = useCallback(
+    async (entries: readonly Entry[], signal: AbortSignal) => {
+      for (const entry of entries) {
+        // A receipt or elapsed delay only asks the server again. The server still decides when to name the game.
+        const updated = await fetchFeedPage(seasonId, entry.sequence + 1, 1, signal);
+        if (signal.aborted) return;
+        if (updated.kind === 'signedOut') {
+          onSignedOut();
+          return;
+        }
+        const latest = current.current;
+        if (updated.kind !== 'ready' || latest.kind !== 'ready') continue;
+        const roll = updated.value.entries.find(
+          (candidate) => candidate.sequence === entry.sequence,
+        );
+        const previous = latest.entries.find((candidate) => candidate.sequence === entry.sequence);
+        if (roll && previous?.type === 'game-roll-hidden') {
+          show({
+            ...latest,
+            entries: mergeEntries(latest.entries, [
+              previous.undone ? { ...roll, undone: true } : roll,
+            ]),
+            refs: withRefs(latest.refs, updated.value),
+          });
+        }
+      }
+    },
+    [seasonId, onSignedOut, show],
+  );
+  useRollDisclosureRefresh(state.kind === 'ready' ? state.entries : null, (due) => {
+    const signal = lifetime.current?.signal;
+    if (signal) void refreshHiddenRolls(due, signal);
+  });
+
   const load = useCallback(async () => {
     newestPage.current?.abort();
     const request = new AbortController();
@@ -244,7 +288,9 @@ export function FeedScreen({
     const known = new Set(before.entries.map((e) => e.commandId));
     const arrived = new Set(
       page.entries
-        .filter((e) => e.sequence > newest && !known.has(e.commandId))
+        .filter(
+          (e) => e.type !== 'roll-game-shown' && e.sequence > newest && !known.has(e.commandId),
+        )
         .map((e) => e.commandId),
     );
     const entries = markUndone(mergeEntries(before.entries, page.entries), page.entries);
@@ -258,6 +304,19 @@ export function FeedScreen({
     if (arrived.size) {
       setFresh(arrived);
       setAnnounced(ru.feed.fresh(arrived.size));
+    }
+    const revealed = new Set(
+      page.entries
+        .filter((entry) => entry.type === 'roll-game-shown' && !entry.undone)
+        .map(rollRevealId)
+        .filter((id) => id !== null),
+    );
+    if (revealed.size) {
+      const hidden = entries.filter((entry) => {
+        const id = rollRevealId(entry);
+        return entry.type === 'game-roll-hidden' && id !== null && revealed.has(id);
+      });
+      void refreshHiddenRolls(hidden, request.signal);
     }
     if (commentTargets && page.nextBefore !== null) {
       const oldestUnchecked = entries.findLast(
@@ -273,7 +332,7 @@ export function FeedScreen({
       );
       void refreshReactions(olderIds, request.signal);
     }
-  }, [seasonId, onSignedOut, refreshCommentTargets, refreshReactions, show]);
+  }, [seasonId, onSignedOut, refreshCommentTargets, refreshHiddenRolls, refreshReactions, show]);
 
   // Others' actions come in without a reload (DESIGN.md «Обновления в реальном времени»)
   const version = useSeasonVersion(seasonId, {

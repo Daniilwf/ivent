@@ -32,14 +32,17 @@ public sealed class FeedApiTests : IAsyncLifetime
     {
         var vasya = await _site.SignedInAsync("vasya");
         await PostOkAsync(vasya, Url("roll"));
+        await ShowCurrentRollAsync(vasya);
 
         var feed = await OkAsync(await (await _site.SignedInAsync("zritel")).GetAsync(Feed, Ct));
 
         var entries = feed.GetProperty("entries").EnumerateArray().ToList();
-        Assert.Equal("game-rolled", entries[0].GetProperty("type").GetString());
-        Assert.Equal("vasya", entries[0].GetProperty("author").GetString());
-        Assert.Equal(_site.Players["vasya"], entries[0].GetProperty("data").GetProperty("playerId").GetGuid());
-        Assert.False(entries[0].GetProperty("undone").GetBoolean());
+        Assert.Equal("roll-game-shown", entries[0].GetProperty("type").GetString());
+        var rolled = entries[1];
+        Assert.Equal("game-rolled", rolled.GetProperty("type").GetString());
+        Assert.Equal("vasya", rolled.GetProperty("author").GetString());
+        Assert.Equal(_site.Players["vasya"], rolled.GetProperty("data").GetProperty("playerId").GetGuid());
+        Assert.False(rolled.GetProperty("undone").GetBoolean());
         Assert.Equal("season-created", entries[^1].GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, entries[^1].GetProperty("author").ValueKind);
         var sequences = entries.Select(e => e.GetProperty("sequence").GetInt64()).ToList();
@@ -76,9 +79,10 @@ public sealed class FeedApiTests : IAsyncLifetime
 
         Assert.Equal("command-undone", entries[0].GetProperty("type").GetString());
         Assert.Equal("admin", entries[0].GetProperty("author").GetString());
-        var rolled = entries.Single(e => e.GetProperty("type").GetString() == "game-rolled");
+        var rolled = entries.Single(e => e.GetProperty("type").GetString() == "game-roll-hidden");
         Assert.True(rolled.GetProperty("undone").GetBoolean());
         Assert.Equal(roll, rolled.GetProperty("commandId").GetGuid());
+        Assert.False(rolled.GetProperty("data").TryGetProperty("gameId", out _));
     }
 
     [Fact]

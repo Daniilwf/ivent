@@ -231,10 +231,24 @@ export async function complete(
   });
 }
 
+/** Reveals a saved roll on the season screen, whether it offers one game or a choice. */
+export async function revealRollHere(page: Page) {
+  const showGame = page.getByTestId('roll-game');
+  const result = page.getByTestId('offer').or(page.getByTestId('choice'));
+  await expect(showGame.or(result)).toBeVisible(live);
+  if (await showGame.isVisible()) await showGame.click();
+  await expect(result).toBeVisible(live);
+}
+
+/** Requests the server's roll and reveals the saved game on the season screen. */
+export async function rollHere(page: Page) {
+  await page.getByTestId('roll').click();
+  await revealRollHere(page);
+}
+
 /** Rolls and starts a game on the season's screen: the game's title */
 export async function rollAndStartHere(page: Page): Promise<string> {
-  await page.getByTestId('roll').click();
-  await expect(page.getByTestId('offer').or(page.getByTestId('choice'))).toBeVisible();
+  await rollHere(page);
   if (await page.getByTestId('choice').isVisible())
     await page.getByTestId('choice').locator('[data-testid^="option-"]').first().click();
   await expect(page.getByTestId('offer')).toBeVisible();

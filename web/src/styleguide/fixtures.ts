@@ -117,6 +117,7 @@ export const demoOffer: Schemas['OfferedGameView'] = {
 
 export const demoRoll: Schemas['WheelRollView'] = {
   sequence: 1,
+  revealed: true,
   category: 'Adventure',
   sectors: ['Action', 'Adventure', 'Horror', 'RPG'],
   misses: [

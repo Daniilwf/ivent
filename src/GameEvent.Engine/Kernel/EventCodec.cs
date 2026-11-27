@@ -26,6 +26,10 @@ public static class EventCodec
         [("game-rolled", 1)] = WheelOfOne,
         [("game-choice-rolled", 1)] = WheelOfOne,
 
+        // v3 adds the optional game sectors and disclosure marker. Earlier results were public as soon as they rolled.
+        [("game-rolled", 2)] = data => data,
+        [("game-choice-rolled", 2)] = data => data,
+
         // D-410: v2 lets «drawEvent» be null for the text of an object (with «objectId»); a v1 effect always drew an event
         [("manual-effect-created", 1)] = data => data,
 

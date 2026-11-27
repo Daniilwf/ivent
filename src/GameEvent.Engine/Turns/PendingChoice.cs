@@ -42,6 +42,10 @@ public sealed record PendingChoice(Guid ChoiceId, ChoiceKind Kind, EquatableArra
     /// <summary>The paused move of a branch choice; written only for one.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public PendingMove? Move { get; init; }
+
+    /// <summary>Present on the game choice until the player or timer reveals this roll.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public RollReveal? Reveal { get; init; }
 }
 
 /// <summary>

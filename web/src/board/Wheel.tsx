@@ -15,6 +15,7 @@ export type WheelGame = { title: string; cover?: string | undefined };
 export type WheelRoll = {
   id: number;
   misses: { sector: number; game: WheelGame; by: string; playing?: boolean | undefined }[];
+  unshownMisses?: number;
   /** The game, or none when the roll offers a choice of `choices` games of the category */
   pick: { sector: number; game: WheelGame | null; choices?: number | undefined };
 };
@@ -50,9 +51,13 @@ export function WheelMoment({
   ref,
   announce = true,
   fill = false,
+  kind,
+  settled = false,
 }: {
   /** The wheel fills its frame (the map's stage on a desktop); the miss and the result lie over the table */
   fill?: boolean;
+  kind?: 'genre' | 'game' | undefined;
+  settled?: boolean;
   /** False when the page has its own live region for the result (it outlives the wheel) */
   announce?: boolean;
   sectors: string[];
@@ -64,9 +69,11 @@ export function WheelMoment({
   const reduce = useReducedMotion() ?? false;
   const sector = 360 / Math.max(sectors.length, 1);
   const turn = (at: number) => -(at * sector + sector / 2);
-  const [stage, setStage] = useState<Stage>(roll ? (reduce ? 'instant' : 'spinning') : 'idle');
+  const [stage, setStage] = useState<Stage>(
+    roll ? (reduce || settled ? 'instant' : 'spinning') : 'idle',
+  );
   const [missShown, setMissShown] = useState(0);
-  const rotation = useMotionValue(roll && reduce ? turn(roll.pick.sector) : 0);
+  const rotation = useMotionValue(roll && (reduce || settled) ? turn(roll.pick.sector) : 0);
   const running = useRef<ReturnType<typeof animate> | null>(null);
   const timer = useRef<number | undefined>(undefined);
   // The end is reported once, whether the wheel stops or the moment is skipped
@@ -88,7 +95,7 @@ export function WheelMoment({
   });
 
   const finish = () => {
-    if (!roll || ended.current) return;
+    if (!roll || settled || ended.current) return;
     ended.current = true;
     running.current?.stop();
     window.clearTimeout(timer.current);
@@ -103,7 +110,7 @@ export function WheelMoment({
   // which must not restart the spin
   const rollId = roll?.id;
   useEffect(() => {
-    if (!roll) return;
+    if (!roll || settled) return;
     if (reduce) {
       const id = window.setTimeout(reveal, 0);
       return () => {
@@ -134,7 +141,7 @@ export function WheelMoment({
         const duration =
           i === 0
             ? Math.min(
-                wheelMotion.firstSpinSeconds,
+                kind === 'game' ? wheelMotion.gameSpinSeconds : wheelMotion.firstSpinSeconds,
                 wheelMotion.loadingBudgetSeconds - (performance.now() - started) / 1000,
               )
             : wheelMotion.nextSpinSeconds;
@@ -168,12 +175,14 @@ export function WheelMoment({
     };
     // The rotation and the turns are fixed for one roll: the component is keyed by it
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rollId, reduce]);
+  }, [rollId, reduce, settled]);
 
   const playing = stage === 'spinning' || stage === 'miss';
   const showResult = stage === 'done' || stage === 'instant';
   const miss = roll?.misses[missShown];
-  const otherMisses = (roll?.misses.length ?? 0) - wheelMotion.visibleMisses;
+  const visibleMisses = roll?.misses.length ?? 0;
+  const totalMisses = visibleMisses + (roll?.unshownMisses ?? 0);
+  const otherMisses = totalMisses - Math.min(visibleMisses, wheelMotion.visibleMisses);
   const size = 300;
   const r = size / 2;
   const missSays = (m: WheelRoll['misses'][number]) =>
@@ -183,7 +192,11 @@ export function WheelMoment({
     m.playing ? t.missedPlaying(m.game.title, m.by) : t.missedCompleted(m.game.title, m.by, null);
   const over = fill ? 'absolute inset-x-4 bottom-4 grid justify-items-center' : undefined;
   const picked = (pick: WheelRoll['pick']) =>
-    pick.game ? t.result(pick.game.title) : t.choice(pick.choices ?? 0);
+    pick.game
+      ? kind === 'genre'
+        ? t.genre(pick.game.title)
+        : t.result(pick.game.title)
+      : t.choice(pick.choices ?? 0);
 
   return (
     <Motion>
@@ -219,13 +232,17 @@ export function WheelMoment({
                   // Labels run along the radius; on the left half they turn over to stay upright
                   const tilt = Math.cos(mid) < 0 ? midDeg + 180 : midDeg;
                   return (
-                    <g key={name}>
-                      <path
-                        d={`M${r} ${r} L${r + r * Math.cos(a0)} ${r + r * Math.sin(a0)} A${r} ${r} 0 0 1 ${r + r * Math.cos(a1)} ${r + r * Math.sin(a1)} Z`}
-                        fill={sectorFills[i % sectorFills.length]}
-                        stroke="var(--color-ink)"
-                        strokeWidth={3}
-                      />
+                    <g key={i}>
+                      {sectors.length === 1 ? (
+                        <circle cx={r} cy={r} r={r} fill={sectorFills[0]} />
+                      ) : (
+                        <path
+                          d={`M${r} ${r} L${r + r * Math.cos(a0)} ${r + r * Math.sin(a0)} A${r} ${r} 0 0 1 ${r + r * Math.cos(a1)} ${r + r * Math.sin(a1)} Z`}
+                          fill={sectorFills[i % sectorFills.length]}
+                          stroke="var(--color-ink)"
+                          strokeWidth={3}
+                        />
+                      )}
                       <text
                         x={lx}
                         y={ly}
@@ -235,7 +252,7 @@ export function WheelMoment({
                         dominantBaseline="central"
                         fill="var(--color-ink)"
                       >
-                        {name}
+                        {kind === 'game' && name.length > 16 ? `${name.slice(0, 15)}…` : name}
                       </text>
                     </g>
                   );
@@ -301,12 +318,14 @@ export function WheelMoment({
                 <strong className="font-display text-xl font-heavy text-balance">
                   {roll.pick.game ? roll.pick.game.title : picked(roll.pick)}
                 </strong>
-                <span className="text-sm text-ink-soft">
-                  {t.category(sectors[roll.pick.sector] ?? '')}
-                </span>
-                {roll.misses.length > 0 ? (
+                {kind === undefined ? (
+                  <span className="text-sm text-ink-soft">
+                    {t.category(sectors[roll.pick.sector] ?? '')}
+                  </span>
+                ) : null}
+                {totalMisses > 0 ? (
                   <span className="text-xs text-ink-soft">
-                    {otherMisses > 0 ? t.moreMisses(otherMisses) : t.missed(roll.misses.length)}
+                    {otherMisses > 0 ? t.moreMisses(otherMisses) : t.missed(totalMisses)}
                   </span>
                 ) : null}
               </MomentCard>
@@ -318,7 +337,9 @@ export function WheelMoment({
           {announce && showResult && roll
             ? [
                 ...roll.misses.map((miss) => `${missedLine(miss)}.`),
-                `${t.category(sectors[roll.pick.sector] ?? '')}. ${picked(roll.pick)}`,
+                kind === undefined
+                  ? `${t.category(sectors[roll.pick.sector] ?? '')}. ${picked(roll.pick)}`
+                  : picked(roll.pick),
               ].join(' ')
             : ''}
         </p>
