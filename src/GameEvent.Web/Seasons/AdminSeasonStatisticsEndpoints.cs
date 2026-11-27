@@ -5,12 +5,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GameEvent.Web.Seasons;
 
-/// <summary>A season's attack and activity report for the admin.</summary>
+/// <summary>A season's attack, completion efficiency and activity report for the admin.</summary>
 public sealed record AdminSeasonStatisticsView(IReadOnlyList<AdminSeasonStatisticsPlayerView> Players);
 
-/// <summary>Effective attacks and the latest command authored by a participant in this season.</summary>
+/// <summary>Effective attacks, credited completion rewards and the latest command authored by a participant in this season.</summary>
 public sealed record AdminSeasonStatisticsPlayerView(
-    Guid PlayerId, string Name, int AttacksMade, int AttacksReceived, DateTimeOffset? LastActionAt);
+    Guid PlayerId, string Name, int AttacksMade, int AttacksReceived, DateTimeOffset? LastActionAt,
+    long CompletedRunPoints, double CompletedRunHours, double? PointsPerHour);
 
 internal static class AdminSeasonStatisticsEndpoints
 {
@@ -39,6 +40,7 @@ internal static class AdminSeasonStatisticsEndpoints
         // An attack from the target is already in their outgoing group.
         var received = attacks.Where(attack => attack.PlayerId != attack.FromPlayerId).ToLookup(attack => attack.PlayerId);
         var lastActions = await AdminPlayerEndpoints.ReadLastOwnActionsAsync(db, seasonId, players.Select(player => player.UserId), ct);
+        var completions = await AdminCompletionStatistics.ReadAsync(db, seasonId, ct);
 
         IReadOnlyList<AdminSeasonStatisticsPlayerView> report = [.. players
             .InTokenOrder(player => player.Name, player => player.Id)
@@ -46,7 +48,9 @@ internal static class AdminSeasonStatisticsEndpoints
             {
                 var stats = AttackStatistics.ForPlayer(player.Id, made[player.Id].Concat(received[player.Id]));
                 DateTimeOffset? lastAction = lastActions.TryGetValue(player.UserId, out var at) ? at : null;
-                return new AdminSeasonStatisticsPlayerView(player.Id, player.Name, stats.AttacksMade, stats.AttacksReceived, lastAction);
+                var completed = completions.GetValueOrDefault(player.Id);
+                return new AdminSeasonStatisticsPlayerView(player.Id, player.Name, stats.AttacksMade, stats.AttacksReceived, lastAction,
+                    completed.Points, completed.Hours, completed.PointsPerHour);
             })];
         return TypedResults.Ok(new AdminSeasonStatisticsView(report));
     }
