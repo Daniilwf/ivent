@@ -42,7 +42,7 @@ describe('the main moments with reduced motion', () => {
     await waitFor(() => {
       expect(phase).toHaveBeenCalledWith('done');
     });
-    expect(screen.getByText('+16')).toBeInTheDocument();
+    expect(screen.getByTestId('dice-equation')).toHaveTextContent('2 + 5 + 3 + 6 = 16');
     expect(screen.getByText(ru.moments.dice.result([2, 5, 3], [6], 16))).toBeInTheDocument();
   });
 
@@ -74,7 +74,7 @@ describe('the main moments with reduced motion', () => {
   it('says free mode and shows no total when the dice give no points', async () => {
     render(<DiceMoment roll={{ id: 1, values: [2, 3], challenge: 0 }} mode="free" />);
     expect(await screen.findByText(ru.moments.dice.resultFree([2, 3], []))).toBeInTheDocument();
-    expect(screen.queryByText('+5')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dice-equation')).not.toBeInTheDocument();
   });
 
   it('says only points when the token stays', async () => {

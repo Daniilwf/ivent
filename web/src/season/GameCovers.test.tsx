@@ -234,8 +234,9 @@ describe('Game covers on the season screen (D-222)', () => {
 
     await userEvent.click(await screen.findByTestId('roll'));
 
+    expect(await screen.findByTestId('wheel')).toBeInTheDocument();
     await userEvent.click(
-      within(await screen.findByTestId('wheel')).getByRole('button', { name: ru.moments.skip }),
+      within(screen.getByTestId('turn')).getByRole('button', { name: ru.moments.skip }),
     );
     expect(pictures(await screen.findByTestId('wheel'))).toContain(cover(1).thumbnailUrl);
   });

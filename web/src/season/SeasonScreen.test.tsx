@@ -216,8 +216,14 @@ describe('SeasonScreen', () => {
     expect(card).toHaveTextContent(ru.events.kinds.good);
     // Drawn while the page was open: it comes off the deck (a key moment)
     expect(card).toHaveAttribute('data-drawing', 'true');
-    expect(screen.getByTestId('draw-announce')).toHaveTextContent(
-      'Вытянут хороший ивент: «Попутный ветер»',
+    expect(screen.getByTestId('draw-announce')).toBeEmptyDOMElement();
+    await vi.waitFor(
+      () => {
+        expect(screen.getByTestId('draw-announce')).toHaveTextContent(
+          'Вытянут хороший ивент: «Попутный ветер»',
+        );
+      },
+      { timeout: 2000 },
     );
   });
 
@@ -2277,8 +2283,11 @@ describe('SeasonScreen wheel (H3, D-136)', () => {
     await userEvent.click(await screen.findByTestId('roll'));
 
     const wheel = await screen.findByTestId('wheel');
-    expect(within(screen.getByTestId('turn')).queryByTestId('wheel')).not.toBeInTheDocument();
-    await userEvent.click(within(wheel).getByRole('button', { name: ru.moments.skip }));
+    expect(wheel).toBeInTheDocument();
+    const turn = within(screen.getByTestId('turn'));
+    expect(turn.queryByTestId('wheel')).not.toBeInTheDocument();
+    expect(turn.getByRole('status')).toHaveTextContent(ru.moments.wheel.spinning);
+    await userEvent.click(turn.getByRole('button', { name: ru.moments.skip }));
     // The answer is in the turn card at once; the landed wheel stays on the stage
     expect(await screen.findByTestId('start')).toBeInTheDocument();
     const landed = screen.getByTestId('wheel');

@@ -65,6 +65,25 @@ describe('FeedPreview', () => {
     expect(calls).toHaveBeenCalledTimes(2);
   });
 
+  it('holds an entire command until its result is visible on the season screen', async () => {
+    const latest = page(3);
+    const first = latest.entries[0];
+    if (!first) throw new Error('The fixture needs a command to hold');
+    latest.entries.unshift({ ...first, sequence: 101 });
+    const calls = serve(() => json(200, latest));
+    const { rerender } = render(
+      <FeedPreview seasonId={seasonId} version={1} visibleThrough={100} />,
+    );
+
+    expect(await screen.findByTestId('feed-item-c1')).toBeVisible();
+    expect(screen.queryByTestId('feed-item-c0')).not.toBeInTheDocument();
+
+    rerender(<FeedPreview seasonId={seasonId} version={1} visibleThrough={101} />);
+
+    expect(screen.getByTestId('feed-item-c0')).toBeVisible();
+    expect(calls).toHaveBeenCalledTimes(1);
+  });
+
   it('says the feed is empty', async () => {
     serve(() => json(200, page(0)));
 

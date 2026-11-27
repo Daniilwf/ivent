@@ -1,11 +1,11 @@
 import { useReducedMotion, type animate } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Schemas } from '../api/client';
 import { loadMotion } from '../board/loadMotion';
-import { momentBudget } from '../board/moment';
-import { eventDraw } from '../design/motion';
+import { eventDraw, eventDrawBudgetSeconds, eventDrawDelaySeconds } from '../design/motion';
 import { ru } from '../i18n/ru';
+import { Button } from '../ui/Button';
 import { cx } from '../ui/cx';
 
 type Drawn = Schemas['DrawnEventView'];
@@ -57,6 +57,8 @@ export function DrawnEventCard({
   const reduce = useReducedMotion() ?? false;
   const [skipped, setSkipped] = useState(false);
   const [progress, setProgress] = useState(0);
+  const focusOnReveal = useRef(false);
+  const heading = useRef<HTMLHeadingElement>(null);
   // The sequence owns the moment: a live refresh must not restart or cut a draw already in progress.
   const [freshOnMount] = useState(fresh);
   const reported = useRef<number | null>(null);
@@ -67,6 +69,12 @@ export function DrawnEventCard({
     }
   }, [freshOnMount, drawn.sequence, onShown]);
   const animated = freshOnMount && !reduce && !skipped;
+  useLayoutEffect(() => {
+    if (!animated && focusOnReveal.current) {
+      focusOnReveal.current = false;
+      heading.current?.focus({ preventScroll: true });
+    }
+  }, [animated]);
   useEffect(() => {
     if (!animated) onSettled?.(drawn.sequence);
   }, [animated, drawn.sequence, onSettled]);
@@ -77,7 +85,7 @@ export function DrawnEventCard({
     // Downloading the animation also counts against the moment's budget.
     const timer = window.setTimeout(() => {
       setSkipped(true);
-    }, momentBudget * 1000);
+    }, eventDrawBudgetSeconds * 1000);
     const run = async () => {
       const motion = await loadMotion().catch(() => null);
       if (cancelled) return;
@@ -89,6 +97,7 @@ export function DrawnEventCard({
       // even before the lazy renderer exists, without a later Motion frame hiding its children again.
       controls = motion.animate(0, 1, {
         ...eventDraw.transition,
+        delay: eventDrawDelaySeconds,
         onUpdate: (value) => {
           if (!cancelled) setProgress(value);
         },
@@ -107,16 +116,19 @@ export function DrawnEventCard({
   const titleId = headingId ?? `drawn-event-${String(drawn.sequence)}`;
   const Heading = level === 3 ? 'h3' : 'h4';
   return (
-    <div className="perspective-distant">
+    <div
+      className="grid gap-2 perspective-distant"
+      onClick={() => {
+        if (animated) setSkipped(true);
+      }}
+    >
       <article
         data-testid="drawn-event"
         data-drawing={animated ? 'true' : undefined}
         aria-labelledby={titleId}
+        inert={animated}
         className="grid min-w-0 gap-1 rounded-lg border-2 border-ink bg-card p-4"
         style={drawStyle(animated ? progress : 1)}
-        onClick={() => {
-          if (animated) setSkipped(true);
-        }}
       >
         <p className="flex flex-wrap items-center gap-2 text-sm">
           <span
@@ -129,7 +141,8 @@ export function DrawnEventCard({
         </p>
         <Heading
           id={titleId}
-          tabIndex={headingId ? -1 : undefined}
+          ref={heading}
+          tabIndex={-1}
           className="font-display text-lg font-heavy break-words focus:outline-none"
         >
           {drawn.name}
@@ -138,6 +151,19 @@ export function DrawnEventCard({
         <p className="text-sm text-ink-soft">{waitingForAnswer ? t.waitingAnswer : t.played}</p>
         {children}
       </article>
+      {animated ? (
+        <Button
+          variant="quiet"
+          className="justify-self-start"
+          data-testid="event-moment-skip"
+          onClick={() => {
+            focusOnReveal.current = true;
+            setSkipped(true);
+          }}
+        >
+          {ru.moments.skip}
+        </Button>
+      ) : null}
     </div>
   );
 }

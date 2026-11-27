@@ -28,6 +28,13 @@ type MomentSample = {
   busy: boolean;
   drawing: boolean;
   announcement: string;
+  equation: string;
+  distance: string;
+  scroll: number;
+  scrollLimit: number;
+  feedRevealed: boolean;
+  leader: string;
+  canSkipDraw: boolean;
 };
 type VisualStyle = { element: number; transform: string; opacity: string };
 type PhysicalFrame = {
@@ -45,7 +52,7 @@ type MotionTrace = {
 type MotionWindow = Window & { __eventMotion?: MotionTrace };
 
 /** Observe existing public DOM states, without substituting animations, clocks or server responses. */
-function observeMotion() {
+function observeMotion(title: string) {
   const host = window as MotionWindow;
   if (host.__eventMotion) return;
   const trace: MotionTrace = { samples: [], drawStarts: [], announcements: [], physicalFrames: [] };
@@ -122,6 +129,16 @@ function observeMotion() {
     );
     const announcement =
       document.querySelector('[data-testid="draw-announce"]')?.textContent.trim() ?? '';
+    const equation = document.querySelector('[data-testid="dice-equation"]')?.textContent ?? '';
+    const distance = document.querySelector('[data-testid="move-distance"]')?.textContent ?? '';
+    const scroll = window.scrollY;
+    const scrollLimit = (document.scrollingElement?.scrollHeight ?? innerHeight) - innerHeight;
+    const feedRevealed =
+      document.querySelector('[data-testid="feed-preview"]')?.textContent.includes(title) ?? false;
+    const leader =
+      document.querySelector('[data-testid="leaderboard"] [data-testid="leader-sentence"]')
+        ?.textContent ?? '';
+    const canSkipDraw = Boolean(document.querySelector('[data-testid="event-moment-skip"]'));
     const at = performance.now();
     for (const draw of draws) {
       if (!activeDraws.has(draw)) trace.drawStarts.push({ at, busy });
@@ -130,7 +147,20 @@ function observeMotion() {
     if (announcement && announcement !== previousAnnouncement)
       trace.announcements.push({ at, text: announcement, busy });
     previousAnnouncement = announcement;
-    const state = { dice, moving, busy, drawing: draws.size > 0, announcement };
+    const state = {
+      dice,
+      moving,
+      busy,
+      drawing: draws.size > 0,
+      announcement,
+      equation,
+      distance,
+      scroll,
+      scrollLimit,
+      feedRevealed,
+      leader,
+      canSkipDraw,
+    };
     const key = JSON.stringify(state);
     if (key !== previous) {
       trace.samples.push({ at, ...state });
@@ -141,6 +171,7 @@ function observeMotion() {
       requestAnimationFrame(physicalFrame);
     }
   };
+  window.addEventListener('scroll', sample, { passive: true });
   new MutationObserver(sample).observe(document, {
     subtree: true,
     childList: true,
@@ -272,7 +303,7 @@ async function motionSeason() {
 for (const skip of [false, true]) {
   test(
     skip
-      ? 'clicking through the dice and the fresh event reveals the same one server result'
+      ? 'one skip reveals the dice and fresh event from the same server result'
       : 'real dice, token movement and the fresh event play in order without replay on refresh or history',
     async ({ browser }, info) => {
       const world = await motionSeason();
@@ -290,29 +321,39 @@ for (const skip of [false, true]) {
         await expect(page.getByTestId('drawn-event')).toHaveCount(0);
         await rollAndStartHere(page);
         await fillCompletionHere(page);
-        await page.addInitScript(observeMotion);
-        await page.evaluate(observeMotion);
+        await page.addInitScript(observeMotion, eventName);
+        const complete = page.getByTestId('complete-submit');
+        await complete.scrollIntoViewIfNeeded();
+        const box = await complete.boundingBox();
+        if (!box) throw new Error('The completion button did not appear.');
+        await page.evaluate(observeMotion, eventName);
 
         // completeHere deliberately waits until the whole moment ends; observe the actual click instead.
-        await page.getByTestId('complete-submit').click();
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
         await expect(page.getByTestId('dice').locator('[data-die]')).toHaveCount(3);
+        const card = page.getByTestId('drawn-event');
         if (skip) {
           await page
             .getByTestId('dice')
             .getByRole('button', { name: 'Показать результат', exact: true })
             .click();
         } else {
+          await expect(page.getByTestId('dice-equation')).toBeInViewport({ ratio: 0.9 });
+          await page.screenshot({ path: info.outputPath('dice-total.png'), scale: 'css' });
           await expect(page.getByTestId('dice').getByRole('application')).toBeVisible();
-        }
-        await expect.poll(async () => (await motionTrace(activePage)).drawStarts.length).toBe(1);
-        const card = page.getByTestId('drawn-event');
-        if (skip) {
-          await expect(card).toHaveAttribute('data-drawing', 'true');
-          // An ordinary click can auto-wait for the moving card to settle; force bypasses only that stability wait.
-          await card.click({ force: true });
+          await expect(page.getByTestId('move-distance')).toBeInViewport({ ratio: 0.9 });
+          await page.screenshot({ path: info.outputPath('token-moving.png'), scale: 'css' });
+          await expect.poll(async () => (await motionTrace(activePage)).drawStarts.length).toBe(1);
+          await expect(card).toBeInViewport({ ratio: 0.75 });
+          const skipDraw = page.getByTestId('event-moment-skip');
+          await expect(skipDraw).toHaveAccessibleName('Показать результат');
+          await expect(skipDraw).toBeInViewport({ ratio: 0.9 });
         }
         await expect(card).not.toHaveAttribute('data-drawing');
         await expect(card).toContainText(eventName);
+        if (info.project.name === 'phone') await expect(card).toBeInViewport({ ratio: 0.9 });
+        if (!skip)
+          await page.screenshot({ path: info.outputPath('event-drawn.png'), scale: 'css' });
         await expect(page.getByTestId('last-dice')).toBeVisible();
         await expect(page.getByTestId('dice')).toHaveCount(0);
 
@@ -322,9 +363,29 @@ for (const skip of [false, true]) {
         const firstMove = trace.samples.findIndex((s) => s.moving);
         const firstDraw = trace.samples.findIndex((s) => s.drawing);
         expect(firstDice).toBeGreaterThanOrEqual(0);
+        const baseline = trace.samples[0];
+        if (!baseline) throw new Error('The previous result was not recorded.');
         if (!skip) {
           expect(firstMove).toBeGreaterThan(firstDice);
           expect(firstDraw).toBeGreaterThan(firstMove);
+          const opening = trace.samples[firstDice];
+          const end = trace.samples.find((sample, index) => index > firstDraw && !sample.drawing);
+          if (!opening || !end) throw new Error('The completion chain did not settle.');
+          const during = trace.samples.slice(0, trace.samples.indexOf(end));
+          expect(end.at - opening.at).toBeLessThanOrEqual(7_500);
+          expect(
+            Math.max(...during.map((item) => Math.abs(item.scroll - baseline.scroll))),
+          ).toBeLessThan(3);
+          expect(trace.samples.some((sample) => sample.drawing && sample.canSkipDraw)).toBe(true);
+          if (info.project.name === 'desktop') {
+            expect(baseline.leader).not.toBe('');
+            expect(during.every((sample) => sample.leader === baseline.leader)).toBe(true);
+            expect(during.some((sample) => sample.feedRevealed)).toBe(false);
+            await expect(page.getByTestId('feed-preview')).toContainText(eventName, live);
+            await expect(
+              page.getByTestId('leaderboard').getByTestId('leader-sentence'),
+            ).not.toHaveText(baseline.leader);
+          }
           expect(
             hasVisualMotion(trace, 'dice'),
             'A die must visibly move across painted frames',
@@ -343,7 +404,11 @@ for (const skip of [false, true]) {
             'The token must move in SVG coordinates, independently of the camera',
           ).toBeGreaterThanOrEqual(3);
         }
-        expect(trace.drawStarts).toHaveLength(1);
+        expect(trace.drawStarts).toHaveLength(skip ? 0 : 1);
+        if (skip) {
+          expect(firstMove).toBe(-1);
+          expect(firstDraw).toBe(-1);
+        }
         expect(trace.drawStarts.every((s) => !s.busy)).toBe(true);
         expect(trace.samples.filter((s) => s.drawing && s.busy)).toEqual([]);
         expect(trace.announcements).toHaveLength(1);
@@ -365,6 +430,19 @@ for (const skip of [false, true]) {
         await expect.poll(() => cellOf(activePage, player.name)).toBe(`cell-e${String(total)}`);
 
         if (!skip) {
+          expect(
+            trace.samples.some(
+              (sample) =>
+                sample.equation ===
+                `${completed.dice.map((die) => String(die.value)).join(' + ')} = ${String(total)}`,
+            ),
+          ).toBe(true);
+          expect(
+            trace.samples.some(
+              (sample) =>
+                sample.moving && sample.distance.startsWith(`Фишка идёт на ${String(total)} клет`),
+            ),
+          ).toBe(true);
           const coins = result.me?.coins;
           if (coins == null) throw new Error('No own balance');
           await world.adminApi.post(
@@ -382,6 +460,8 @@ for (const skip of [false, true]) {
           expect((await motionTrace(page)).announcements).toHaveLength(1);
 
           // A following accepted own roll folds this event; opening its text must not replay the draw.
+          if (info.project.name === 'phone')
+            await page.getByRole('button', { name: 'К ходу', exact: true }).click();
           await page.getByTestId('roll').click();
           await expect(page.getByTestId('offer')).toBeVisible();
           await page.getByText(historyLabel, { exact: true }).click();

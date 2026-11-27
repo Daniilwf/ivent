@@ -1,10 +1,11 @@
 import { m, useMotionValue, useReducedMotion, type animate } from 'motion/react';
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { wheelMotion } from '../design/motion';
 import { ru } from '../i18n/ru';
 import { MomentCard, Table } from '../ui/Surface';
 import { loadMotion } from './loadMotion';
 import { Motion } from './Motion';
-import { momentBudget, type MomentHandle, type MomentPhase } from './moment';
+import type { MomentHandle, MomentPhase } from './moment';
 
 const t = ru.moments.wheel;
 
@@ -29,12 +30,23 @@ const sectorFills = [
 
 type Stage = 'idle' | 'spinning' | 'miss' | 'done' | 'instant';
 
-/** The category wheel: only categories with free games are on it; it stops on each miss, says who completed that
- *  game, and spins on to the pick. Give it `key={roll.id}`: every roll is a fresh moment. */
+function spinTarget(from: number, target: number, duration: number, first: boolean) {
+  const lap = 360;
+  const remaining = (((from - target) % lap) + lap) % lap;
+  const maxAngle = (duration * wheelMotion.maxDegreesPerSecond) / wheelMotion.peakSlope;
+  if (remaining > maxAngle) return null;
+  // A rerotation stays within one turn, even when it stops on the same category again.
+  const limit = first ? 2 : remaining === 0 ? 1 : 0;
+  const turns = Math.min(limit, Math.floor((maxAngle - remaining) / lap));
+  return from - remaining - turns * lap;
+}
+
+/** The category wheel shows up to two misses before it lands on the saved result. Key it by `roll.id`. */
 export function WheelMoment({
   sectors,
   roll,
   onPhase,
+  onAnimatedResult,
   ref,
   announce = true,
   fill = false,
@@ -46,14 +58,15 @@ export function WheelMoment({
   sectors: string[];
   roll: WheelRoll | null;
   onPhase?: ((phase: MomentPhase) => void) | undefined;
+  onAnimatedResult?: (() => void) | undefined;
   ref?: Ref<MomentHandle> | undefined;
 }) {
   const reduce = useReducedMotion() ?? false;
   const sector = 360 / Math.max(sectors.length, 1);
-  const turn = (at: number, laps: number) => -(at * sector + sector / 2) - 360 * laps;
+  const turn = (at: number) => -(at * sector + sector / 2);
   const [stage, setStage] = useState<Stage>(roll ? (reduce ? 'instant' : 'spinning') : 'idle');
   const [missShown, setMissShown] = useState(0);
-  const rotation = useMotionValue(roll && reduce ? turn(roll.pick.sector, 6) : 0);
+  const rotation = useMotionValue(roll && reduce ? turn(roll.pick.sector) : 0);
   const running = useRef<ReturnType<typeof animate> | null>(null);
   const timer = useRef<number | undefined>(undefined);
   // The end is reported once, whether the wheel stops or the moment is skipped
@@ -63,6 +76,7 @@ export function WheelMoment({
     if (ended.current) return;
     ended.current = true;
     setStage('done');
+    onAnimatedResult?.();
     onPhase?.('done');
   });
   const showMiss = useEffectEvent((i: number) => {
@@ -78,7 +92,7 @@ export function WheelMoment({
     ended.current = true;
     running.current?.stop();
     window.clearTimeout(timer.current);
-    rotation.set(turn(roll.pick.sector, 6));
+    rotation.set(turn(roll.pick.sector));
     setStage('instant');
     onPhase?.('done');
   };
@@ -97,37 +111,46 @@ export function WheelMoment({
       };
     }
     let cancelled = false;
-    // Loading the motion renderer is part of the time the player waits for the result.
-    const deadline = window.setTimeout(reveal, momentBudget * 1000);
-    const stops = [...roll.misses.map((m) => m.sector), roll.pick.sector];
-    // The whole roll fits the moments' budget: the first spin, then for each miss a rest and a short spin
-    const firstSpin = 1.2;
-    const perMiss = Math.min(1.2, (momentBudget - firstSpin) / Math.max(roll.misses.length, 1));
-    const missRest = perMiss * 0.55;
-    const spinOnFor = perMiss * 0.45;
-    // The first stop takes a long spin, each next one a short one; a miss rests on screen for a second
+    const misses = roll.misses.slice(0, wheelMotion.visibleMisses);
+    const stops = [...misses.map((m) => m.sector), roll.pick.sector];
+    // The first spin includes the wait for Motion to load. Only shown misses extend the full reveal.
+    const started = performance.now();
+    const firstDeadline = window.setTimeout(reveal, wheelMotion.loadingBudgetSeconds * 1000);
+    const allSeconds =
+      wheelMotion.loadingBudgetSeconds +
+      misses.length * (wheelMotion.missPauseSeconds + wheelMotion.nextSpinSeconds);
+    const deadline = window.setTimeout(reveal, allSeconds * 1000);
     const stopped = () => cancelled || ended.current;
     const play = async () => {
       // Without the animation engine (its download failed) the wheel stands on the pick at once
       const motion = await loadMotion().catch(() => null);
       if (stopped()) return;
       if (!motion) {
-        window.clearTimeout(deadline);
         reveal();
         return;
       }
       const { animate } = motion;
-      for (let i = 0; i < stops.length; i++) {
-        running.current = animate(rotation, turn(stops[i] as number, 4 + i), {
-          duration: i === 0 ? firstSpin : spinOnFor,
-          ease: [0.12, 0.8, 0.2, 1],
-        });
+      for (const [i, stop] of stops.entries()) {
+        const duration =
+          i === 0
+            ? Math.min(
+                wheelMotion.firstSpinSeconds,
+                wheelMotion.loadingBudgetSeconds - (performance.now() - started) / 1000,
+              )
+            : wheelMotion.nextSpinSeconds;
+        const target = spinTarget(rotation.get(), turn(stop), duration, i === 0);
+        if (target === null || duration <= 0) {
+          reveal();
+          return;
+        }
+        running.current = animate(rotation, target, { duration, ease: wheelMotion.ease });
         await running.current;
         if (stopped()) return;
+        if (i === 0) window.clearTimeout(firstDeadline);
         if (i === stops.length - 1) break;
         showMiss(i);
         await new Promise<void>((resolve) => {
-          timer.current = window.setTimeout(resolve, missRest * 1000);
+          timer.current = window.setTimeout(resolve, wheelMotion.missPauseSeconds * 1000);
         });
         if (stopped()) return;
         spinOn();
@@ -140,6 +163,7 @@ export function WheelMoment({
       cancelled = true;
       running.current?.stop();
       window.clearTimeout(timer.current);
+      window.clearTimeout(firstDeadline);
       window.clearTimeout(deadline);
     };
     // The rotation and the turns are fixed for one roll: the component is keyed by it
@@ -149,6 +173,7 @@ export function WheelMoment({
   const playing = stage === 'spinning' || stage === 'miss';
   const showResult = stage === 'done' || stage === 'instant';
   const miss = roll?.misses[missShown];
+  const otherMisses = (roll?.misses.length ?? 0) - wheelMotion.visibleMisses;
   const size = 300;
   const r = size / 2;
   const missSays = (m: WheelRoll['misses'][number]) =>
@@ -180,7 +205,10 @@ export function WheelMoment({
               height={fill ? '100%' : undefined}
               aria-hidden
             >
-              <m.g style={{ rotate: rotation, originX: `${r}px`, originY: `${r}px` }}>
+              <m.g
+                data-wheel-disc=""
+                style={{ rotate: rotation, originX: `${r}px`, originY: `${r}px` }}
+              >
                 {sectors.map((name, i) => {
                   const a0 = ((i * sector - 90) * Math.PI) / 180;
                   const a1 = (((i + 1) * sector - 90) * Math.PI) / 180;
@@ -256,9 +284,9 @@ export function WheelMoment({
           {showResult && roll ? (
             <m.div
               className={over}
-              initial={stage === 'instant' ? false : { rotateY: 90, opacity: 0 }}
-              animate={{ rotateY: 0, opacity: 1 }}
-              transition={{ duration: 0.25 }}
+              initial={stage === 'instant' ? false : { y: wheelMotion.revealOffset, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={wheelMotion.reveal}
             >
               <MomentCard className="w-full max-w-105">
                 {roll.pick.game?.cover ? (
@@ -277,7 +305,9 @@ export function WheelMoment({
                   {t.category(sectors[roll.pick.sector] ?? '')}
                 </span>
                 {roll.misses.length > 0 ? (
-                  <span className="text-xs text-ink-soft">{t.missed(roll.misses.length)}</span>
+                  <span className="text-xs text-ink-soft">
+                    {otherMisses > 0 ? t.moreMisses(otherMisses) : t.missed(roll.misses.length)}
+                  </span>
                 ) : null}
               </MomentCard>
             </m.div>

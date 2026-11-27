@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { camera, mapLabel } from '../board/camera';
-import { eventDraw } from './motion';
+import { eventDraw, wheelMotion } from './motion';
 import { contrast, playerToken, tokenColors } from './players';
 
 // Read as a file: the tests do not process CSS
@@ -63,6 +63,12 @@ describe('design tokens', () => {
       `--duration-event-draw: ${String(eventDraw.transition.duration * 1000)}ms;`,
     );
     expect(css).toContain(`--ease-out: cubic-bezier(${eventDraw.transition.ease.join(', ')});`);
+  });
+
+  it('reveals a mobile roll result at the same pace as the wheel card', () => {
+    expect(css).toContain(
+      `--duration-wheel-result: ${String(wheelMotion.reveal.duration * 1000)}ms;`,
+    );
   });
 
   it('gives a player beyond 16 a colour again, from the start of the set', () => {

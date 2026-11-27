@@ -4,6 +4,7 @@ import { fillCompletionHere, rollAndStartHere, setUpSeason, signInHere } from '.
 
 const confetti = '[data-testid="finish-confetti"]';
 const motionBudget = 3_000;
+const completionResult = { timeout: 8_500 };
 
 type FinishTrace = {
   sawDice: boolean;
@@ -14,6 +15,9 @@ type FinishTrace = {
   drawSettledAt: number | null;
   overlapped: boolean;
   rolledDuringDraw: boolean;
+  finishPoint: { x: number; y: number } | null;
+  firstPaint: { x: number; y: number }[];
+  firstPaintView: { width: number; height: number; scroll: number } | null;
 };
 type FinishWindow = Window & { finishMotionTrace?: FinishTrace };
 
@@ -33,8 +37,44 @@ function observeFinish({
     drawSettledAt: null,
     overlapped: false,
     rolledDuringDraw: false,
+    finishPoint: null,
+    firstPaint: [],
+    firstPaintView: null,
   };
   (window as FinishWindow).finishMotionTrace = trace;
+  const canvasPrototype = CanvasRenderingContext2D.prototype;
+  const clearRect = Reflect.get(canvasPrototype, 'clearRect');
+  const translate = Reflect.get(canvasPrototype, 'translate');
+  let paintPasses = 0;
+  let canvasBounds: DOMRect | undefined;
+  canvasPrototype.clearRect = function (x, y, width, height) {
+    if (this.canvas.matches(selector)) paintPasses++;
+    clearRect.call(this, x, y, width, height);
+  };
+  canvasPrototype.translate = function (x, y) {
+    if (paintPasses === 1 && this.canvas.matches(selector)) {
+      if (trace.firstPaint.length === 0) {
+        trace.firstPaintView = { width: innerWidth, height: innerHeight, scroll: scrollY };
+        const finish = [...document.querySelectorAll<SVGTextElement>('g[data-cell] > text')].find(
+          (label) => label.textContent.trim() === 'Финиш',
+        );
+        const transform = finish?.getScreenCTM();
+        if (finish && transform) {
+          const point = new DOMPoint(
+            Number(finish.getAttribute('x')),
+            Number(finish.getAttribute('y')),
+          ).matrixTransform(transform);
+          trace.finishPoint = { x: point.x, y: point.y };
+        }
+      }
+      canvasBounds ??= this.canvas.getBoundingClientRect();
+      trace.firstPaint.push({
+        x: canvasBounds.x + (x * canvasBounds.width) / this.canvas.width,
+        y: canvasBounds.y + (y * canvasBounds.height) / this.canvas.height,
+      });
+    }
+    translate.call(this, x, y);
+  };
   let previous: Element | null = null;
   const sample = () => {
     const dice = document.querySelector('[data-testid="dice"]');
@@ -112,7 +152,10 @@ for (const motion of ['no-preference', 'reduce'] as const) {
         await page.getByTestId('complete-submit').click();
         const finish = page.getByTestId('my-finish');
         const canvas = page.locator(confetti);
-        await expect(finish).toContainText('Первое место — твоё, пока предварительно');
+        await expect(finish).toContainText(
+          'Первое место — твоё, пока предварительно',
+          completionResult,
+        );
         if (motion === 'no-preference') {
           await expect(canvas).toBeInViewport();
           await expect(canvas).toHaveAttribute('aria-hidden', 'true');
@@ -128,16 +171,37 @@ for (const motion of ['no-preference', 'reduce'] as const) {
           if (!start || trace.endedAt === null) throw new Error('The celebration did not finish.');
           expect(start.settled).toBe(true);
           expect(trace.endedAt - start.at).toBeLessThanOrEqual(motionBudget);
+          if (info.project.name === 'desktop') {
+            const finishPoint = trace.finishPoint;
+            if (!finishPoint) throw new Error('The painted finish cell was not found.');
+            expect(trace.firstPaint.length).toBe(70);
+            const centerX =
+              trace.firstPaint.reduce((sum, particle) => sum + particle.x, 0) /
+              trace.firstPaint.length;
+            const centerY =
+              trace.firstPaint.reduce((sum, particle) => sum + particle.y, 0) /
+              trace.firstPaint.length;
+            expect(Math.abs(centerX - finishPoint.x)).toBeLessThan(32);
+            expect(centerY - finishPoint.y).toBeGreaterThanOrEqual(-4);
+            expect(centerY - finishPoint.y).toBeLessThan(32);
+          }
         } else {
           await expect(canvas).toHaveCount(0);
           expect((await finishTrace(page)).starts).toHaveLength(0);
         }
+        await expect(finish.getByRole('heading', { name: 'Ты первый на финише!' })).toBeVisible();
 
         await page.reload();
         await expect(finish).toContainText('Первое место — твоё, пока предварительно');
         await expect(canvas).toHaveCount(0);
         expect((await finishTrace(page)).starts).toHaveLength(0);
       } finally {
+        await info.attach('finish-motion.json', {
+          body: JSON.stringify(
+            await page.evaluate(() => (window as FinishWindow).finishMotionTrace),
+          ),
+          contentType: 'application/json',
+        });
         await world.adminApi.dispose();
       }
     });
@@ -313,18 +377,19 @@ for (const motion of ['no-preference', 'reduce'] as const) {
           const event = page.getByTestId('drawn-event');
           const finish = page.getByTestId('my-finish');
           const canvas = page.locator(confetti);
-          await expect(finish).toContainText('Первое место — твоё, пока предварительно');
-          await expect(event).toContainText(eventName);
+          await expect(event).toContainText(eventName, completionResult);
           if (asksQuestion) await expect(page.getByTestId('event-choice')).toContainText(eventName);
           if (route === 'next roll') {
             await expect(page.getByTestId('wheel')).toBeVisible();
             await expect(page.getByTestId('offer').or(page.getByTestId('choice'))).toBeVisible();
+            await expect(finish).toContainText('Первое место — твоё, пока предварительно');
             const trace = await finishTrace(page);
             expect(trace.rolledDuringDraw).toBe(true);
             expect(trace.starts).toHaveLength(0);
             return;
           }
           if (motion === 'reduce') {
+            await expect(finish).toContainText('Первое место — твоё, пока предварительно');
             await expect(event).not.toHaveAttribute('data-drawing');
             await expect(canvas).toHaveCount(0);
             expect((await finishTrace(page)).starts).toHaveLength(0);
@@ -347,6 +412,7 @@ for (const motion of ['no-preference', 'reduce'] as const) {
           expect(start.settled).toBe(true);
           expect(start.at).toBeGreaterThanOrEqual(trace.drawSettledAt);
           await expect(event).not.toHaveAttribute('data-drawing');
+          await expect(finish).toContainText('Первое место — твоё, пока предварительно');
         } finally {
           await admin.dispose();
         }

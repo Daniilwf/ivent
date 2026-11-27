@@ -1,13 +1,15 @@
 import { act, render, screen } from '@testing-library/react';
-import { StrictMode, type ReactNode } from 'react';
+import { createRef, StrictMode, useImperativeHandle } from 'react';
 import { TokenMove } from './TokenMove';
+import type { MapViewProps } from './MapView';
+import type { MomentHandle } from './moment';
 import type { Board, Player, Point } from './types';
 
 type Animation = Promise<void> & { stop: () => void };
 type Animate = (
   from: number,
   to: number,
-  options: { onUpdate: (value: number) => void },
+  options: { duration: number; onUpdate: (value: number) => void },
 ) => Animation;
 type Features = { animate: Animate };
 
@@ -15,10 +17,19 @@ const motion = vi.hoisted(() => ({
   load: vi.fn<() => Promise<Features>>(),
   animate: vi.fn<Animate>(),
 }));
+const project = vi.hoisted(() => vi.fn<(point: Point) => Point | null>());
 
 vi.mock('./loadMotion', () => ({ loadMotion: () => motion.load() }));
 vi.mock('./MapView', () => ({
-  MapView: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  MapView: ({ children, ref }: Pick<MapViewProps, 'children' | 'ref'>) => {
+    useImperativeHandle(ref, () => ({
+      centerOn: vi.fn(),
+      planMove: () => ({}),
+      project,
+      reset: vi.fn(),
+    }));
+    return <div>{children}</div>;
+  },
   MapSticker: ({ at }: { at: Point }) => (
     <output data-testid="position">{`${at.x},${at.y}`}</output>
   ),
@@ -50,6 +61,7 @@ describe('TokenMove budget', () => {
     vi.useFakeTimers();
     motion.load.mockReset();
     motion.animate.mockReset();
+    project.mockReset();
     motion.animate.mockImplementation((_, to, { onUpdate }) => {
       onUpdate(to);
       return Object.assign(Promise.resolve(), { stop: vi.fn() });
@@ -118,6 +130,80 @@ describe('TokenMove budget', () => {
     expect(motion.animate).toHaveBeenCalledTimes(2);
     expect(phase).toHaveBeenCalledExactlyOnceWith('done');
     expect(screen.getByTestId('position')).toHaveTextContent('350,70');
+  });
+
+  it('reports the exact stage projection before the parent removes the settled path', async () => {
+    project.mockReturnValue({ x: 190, y: 240 });
+    const onPhase = vi.fn();
+    const onArrive = vi.fn();
+    render(
+      <TokenMove
+        board={board}
+        players={[player]}
+        mover={player}
+        path={path}
+        onPhase={onPhase}
+        onArrive={onArrive}
+      />,
+    );
+
+    await advance(0);
+
+    expect(project).toHaveBeenCalledExactlyOnceWith(board.cells[2]);
+    expect(onArrive).toHaveBeenCalledExactlyOnceWith({ x: 190, y: 240 });
+    expect(onArrive).toHaveBeenCalledBefore(onPhase);
+    expect(onPhase).toHaveBeenCalledExactlyOnceWith('done');
+  });
+
+  it('never reports an arrival projection when the move was skipped', async () => {
+    const ref = createRef<MomentHandle>();
+    const onPhase = vi.fn();
+    const onArrive = vi.fn();
+    render(
+      <TokenMove
+        ref={ref}
+        board={board}
+        players={[player]}
+        mover={player}
+        path={path}
+        onPhase={onPhase}
+        onArrive={onArrive}
+      />,
+    );
+
+    act(() => ref.current?.skip());
+    await advance(3500);
+
+    expect(project).not.toHaveBeenCalled();
+    expect(onArrive).not.toHaveBeenCalled();
+    expect(onPhase).toHaveBeenCalledExactlyOnceWith('done');
+  });
+
+  it('groups a long route into hops that take at least 0.2 seconds and fit the three-second path', async () => {
+    const route = Array.from({ length: 40 }, (_, i) => i + 1);
+    const longBoard: Board = {
+      ...board,
+      cells: route.map((id) => ({ id, kind: 'plain', x: id * 10, y: 70 })),
+    };
+    const phase = vi.fn();
+    render(
+      <TokenMove
+        board={longBoard}
+        players={[player]}
+        mover={player}
+        path={route}
+        onPhase={phase}
+      />,
+    );
+
+    await advance(0);
+
+    const durations = motion.animate.mock.calls.map(([, , options]) => options.duration);
+    expect(durations.length).toBeGreaterThan(1);
+    expect(durations.every((duration) => duration >= 0.2)).toBe(true);
+    expect(durations.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(3.000001);
+    expect(phase).toHaveBeenCalledExactlyOnceWith('done');
+    expect(screen.getByTestId('position')).toHaveTextContent('400,70');
   });
 
   it('stops an in-flight hop at the deadline and ignores any later updates', async () => {

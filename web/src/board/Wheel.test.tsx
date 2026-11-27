@@ -6,7 +6,15 @@ import { ru } from '../i18n/ru';
 import { WheelMoment, type WheelRoll } from './Wheel';
 
 // Every spin ends at once: the test counts the spins, not the frames
-const spins = vi.hoisted(() => ({ count: 0, loaderBlocked: false }));
+const spins = vi.hoisted(() => ({
+  count: 0,
+  loaderBlocked: false,
+  last: null as {
+    distance: number;
+    duration: number;
+    ease: [number, number, number, number];
+  } | null,
+}));
 vi.mock('./loadMotion', async (original) => {
   const loader = await original<typeof import('./loadMotion')>();
   return {
@@ -18,8 +26,13 @@ vi.mock('motion/react', async (original) => {
   return {
     ...motion,
     useReducedMotion: () => false,
-    animate: (value: MotionValue<number>, to: number) => {
+    animate: (
+      value: MotionValue<number>,
+      to: number,
+      { duration, ease }: { duration: number; ease: [number, number, number, number] },
+    ) => {
       spins.count++;
+      spins.last = { distance: Math.abs(to - value.get()), duration, ease };
       value.set(to);
       return Object.assign(Promise.resolve(), { stop: () => undefined });
     },
@@ -38,6 +51,31 @@ describe('the wheel moment', () => {
 
     for (const name of ['Action', 'Horror', 'RPG']) {
       expect(screen.getByText(name)).toBeInTheDocument();
+    }
+  });
+
+  it('spins to a distant result in 3.2 seconds without exceeding 720 degrees per second', async () => {
+    const phase = vi.fn();
+    render(
+      <WheelMoment
+        sectors={['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']}
+        roll={{ ...roll, misses: [], pick: { ...roll.pick, sector: 7 } }}
+        onPhase={phase}
+      />,
+    );
+    await waitFor(() => {
+      expect(phase).toHaveBeenCalledExactlyOnceWith('done');
+    });
+    const spin = spins.last;
+    if (!spin) throw new Error('The wheel did not turn');
+    expect(spin.duration).toBe(3.2);
+    const [x1, y1, x2, y2] = spin.ease;
+    const derivative = (t: number, a: number, b: number) =>
+      3 * ((1 - t) ** 2 * a + 2 * t * (1 - t) * (b - a) + t ** 2 * (1 - b));
+    for (let i = 0; i <= 100; i++) {
+      const t = i / 100;
+      const slope = derivative(t, y1, y2) / derivative(t, x1, x2);
+      expect((spin.distance / spin.duration) * slope).toBeLessThanOrEqual(720);
     }
   });
 
@@ -67,7 +105,42 @@ describe('the wheel moment', () => {
     expect(phase.mock.calls.filter(([p]) => p === 'done')).toHaveLength(1);
   });
 
-  it('shows the server pick within three seconds while motion is still downloading', async () => {
+  it('plays only the first two misses and counts the other misses in the result', async () => {
+    const skippedMisses = [
+      { sector: 1, game: { title: 'Third miss' }, by: 'Лиса' },
+      { sector: 1, game: { title: 'Fourth miss' }, by: 'Бобр' },
+    ];
+    spins.count = 0;
+    const phase = vi.fn();
+    vi.useFakeTimers();
+    try {
+      render(
+        <WheelMoment
+          sectors={['Action', 'Horror']}
+          roll={{
+            ...roll,
+            misses: [
+              ...roll.misses,
+              { sector: 1, game: { title: 'Second miss' }, by: 'Сова' },
+              ...skippedMisses,
+            ],
+          }}
+          onPhase={phase}
+        />,
+      );
+      await act(() => vi.advanceTimersByTimeAsync(2100));
+      expect(spins.count).toBe(3);
+      expect(phase).toHaveBeenCalledExactlyOnceWith('done');
+      expect(spins.last?.duration).toBe(1.4);
+      expect(spins.last?.distance).toBeLessThanOrEqual(360);
+      await act(() => vi.advanceTimersByTimeAsync(450));
+      expect(screen.getByText(/И ещё 2 промаха/u)).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the server pick by 3.5 seconds while motion is still downloading', async () => {
     const phase = vi.fn();
     spins.loaderBlocked = true;
     vi.useFakeTimers();
@@ -76,7 +149,7 @@ describe('the wheel moment', () => {
       expect(screen.queryByText('Silent Hill')).not.toBeInTheDocument();
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2990);
+        await vi.advanceTimersByTimeAsync(3490);
       });
 
       expect(screen.getByText('Silent Hill')).toBeVisible();

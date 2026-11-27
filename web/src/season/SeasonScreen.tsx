@@ -39,6 +39,7 @@ import { FeedPreview } from '../feed/FeedPreview';
 import { GlobalEventBanner } from '../globalEvents/GlobalEventBanner';
 import { MapView, type MapApi } from '../board/MapView';
 import type { MomentHandle } from '../board/moment';
+import type { Point } from '../board/types';
 import { WheelMoment, type WheelRoll } from '../board/Wheel';
 import { Button } from '../ui/Button';
 import { standaloneLink } from '../ui/buttonStyles';
@@ -83,6 +84,21 @@ type Walking = { sequence: number; legs: Legs; before: Season };
 
 /** The last completed run's dice line takes the focus when its moment ends */
 const lastDiceId = 'last-dice';
+const phoneMomentClass =
+  'fixed inset-x-4 bottom-20 z-20 grid max-h-[calc(100dvh-var(--spacing)*24)] gap-3 overflow-y-auto rounded-lg border-3 border-ink bg-card p-3 shadow-lift';
+
+function focusPhoneMoment(panel: HTMLDivElement | null) {
+  if (panel && document.activeElement === document.body)
+    panel.querySelector('button')?.focus({ preventScroll: true });
+}
+
+/** The latest completed run follows the checks, which come newest first. */
+function oldestUnsentProof(turn: Schemas['MyTurnView']) {
+  return [...(turn.checks ?? [])]
+    .reverse()
+    .concat(turn.lastCompleted ? [turn.lastCompleted] : [])
+    .find((run) => run.status === 'completed' && !run.proof);
+}
 
 /** Sends one game action; a new command id each time, so a retried request acts once (D-68). */
 function send(seasonId: string, command: Command) {
@@ -191,6 +207,8 @@ export function SeasonScreen({
   // Back to the season from another page of the site: the reader starts at its name
   const heading = usePageHeading(season !== null);
   const [pending, setPending] = useState(false);
+  const content = useRef<HTMLElement>(null);
+  const [scrollFloor, setScrollFloor] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [historyFold, setHistoryFold] = useState({ through: 0, version: 0 });
   // Answers may arrive out of order: never replace newer data with an older view of the log.
@@ -201,6 +219,7 @@ export function SeasonScreen({
   const wheel = useRef<MomentHandle>(null);
   // Desktop: the roll whose landed wheel still stands on the map's stage; and the result said to screen readers
   const [staged, setStaged] = useState<number | null>(null);
+  const [animatedRoll, setAnimatedRoll] = useState<number | null>(null);
   const [announced, setAnnounced] = useState('');
   // The last completed run and my cell of the last view shown; undefined until the first load. A new completed run
   // brings its dice and my token's move (H4); the one the page opened with is shown at once.
@@ -216,13 +235,23 @@ export function SeasonScreen({
   >(undefined);
   const [thrown, setThrown] = useState<Thrown | null>(null);
   const [walking, setWalking] = useState<Walking | null>(null);
+  const [movingRun, setMovingRun] = useState<string | null>(null);
+  const [rollBefore, setRollBefore] = useState<Season | null>(null);
+  const [drawBefore, setDrawBefore] = useState<Season | null>(null);
   const [celebration, setCelebration] = useState<'waiting' | 'playing' | null>(null);
+  const [finishRunId, setFinishRunId] = useState<string | null>(null);
+  const arrivedAt = useRef<Point | null>(null);
   const walk = useRef<MomentHandle>(null);
+  const skippedWalk = useRef<number | null>(null);
   // The season as the page showed it last: while the dice roll, the map and the leaderboard keep it (the moment owns
   // its result, H4 design review)
   const shownSeason = useRef<Season | null>(null);
   // The dice's result, shown big in the turn card once the token stands
-  const [thrownResult, setThrownResult] = useState<{ run: string; text: string } | null>(null);
+  const [thrownResult, setThrownResult] = useState<{
+    run: string;
+    text: string;
+    finishing: boolean;
+  } | null>(null);
   const desk = useDesk();
   const apply = useCallback(
     (loaded: Loaded) => {
@@ -237,8 +266,21 @@ export function SeasonScreen({
         const opened = loaded.season.me?.roll?.sequence ?? null;
         setLanded((landed) => (landed === undefined ? opened : landed));
         const view = loaded.season;
-        if (!view.me?.finish) setCelebration(null);
+        const previous = shownSeason.current;
+        if (previous && opened !== null && previous.me?.roll?.sequence !== opened)
+          setRollBefore(previous);
+        const draw = view.me?.lastEvent?.sequence;
+        if (previous && draw != null && previous.me?.lastEvent?.sequence !== draw)
+          setDrawBefore(previous);
         const last = view.me?.lastCompleted ?? null;
+        if (!view.me?.finish) {
+          setCelebration(null);
+          setFinishRunId(null);
+        } else if (!shownSeason.current?.me?.finish) {
+          // An open page sees the finishing run. On reload the turn has no finish run id, so use the oldest missing proof.
+          const run = shownSeason.current?.me ? last : (oldestUnsentProof(view.me) ?? last);
+          setFinishRunId(run?.id ?? null);
+        }
         const mine = view.players.find((p) => p.id === view.me?.playerId);
         const cell = mine?.cellId ?? null;
         const points = mine?.points ?? 0;
@@ -318,6 +360,12 @@ export function SeasonScreen({
     const drawBeforeCommand = season?.me?.lastEvent?.sequence ?? 0;
     // Starting a new action also skips any celebration still waiting for the previous card.
     setCelebration(null);
+    arrivedAt.current = null;
+    // Keep the current viewport reachable if this action replaces a tall form with a fixed moment.
+    if (content.current)
+      setScrollFloor(
+        Math.max(0, Math.ceil(window.innerHeight - content.current.getBoundingClientRect().top)),
+      );
     setPending(true);
     setMessage(null);
     try {
@@ -370,6 +418,8 @@ export function SeasonScreen({
     () => (walking ? seasonPicture(walking.before, chain) : null),
     [walking, chain],
   );
+  const rollHeld = useMemo(() => seasonPicture(rollBefore, chain), [rollBefore, chain]);
+  const drawHeld = useMemo(() => seasonPicture(drawBefore, chain), [drawBefore, chain]);
   // Worked out once per move: a new path in the middle of the walk would start the token over
   const walkingPath = useMemo(
     () => (walking ? legsPath(walking.legs, chain.cellNumber) : null),
@@ -385,6 +435,7 @@ export function SeasonScreen({
       ? chain.cellNumber.get(season.players.find((p) => p.id === season.me?.playerId)?.cellId ?? '')
       : undefined;
   useEffect(() => {
+    if (thrown || walking) return;
     // The choice made, the camera goes back to the map's own view, around my new cell
     if (forkCell === undefined) {
       camera.current?.reset();
@@ -395,45 +446,54 @@ export function SeasonScreen({
     requestAnimationFrame(() => {
       camera.current?.centerOn({ x: fork.x, y: fork.y + 140 }, 900);
     });
-  }, [desk, forkCell, chain, branchId]);
+  }, [desk, forkCell, chain, branchId, thrown, walking]);
   useEffect(() => {
+    if (thrown || walking) return;
     if (branchSeen.current !== undefined && branchId && branchId !== branchSeen.current)
       requestAnimationFrame(() => {
-        document.getElementById(branchTitle)?.focus();
+        document.getElementById(branchTitle)?.focus({ preventScroll: true });
       });
     if (season) branchSeen.current = branchId;
-  }, [branchId, season]);
+  }, [branchId, season, thrown, walking]);
   // An event drawn while the page is open is drawn on screen (a key moment); one drawn before it opened just stands
   // there. The first loaded view sets the base during render, so the new card mounts already knowing it is fresh.
   const drawnSequence = season?.me?.lastEvent?.sequence ?? null;
   const eventQuestionId = season?.me?.choice?.kind === 'effect' ? season.me.choice.id : null;
   const eventQuestionSeen = useRef<string | null | undefined>(undefined);
+  const [drawBase, setDrawBase] = useState<{ sequence: number | null } | null>(null);
+  const [shownDraws, setShownDraws] = useState<ReadonlySet<number>>(() => new Set());
+  const [settledDraw, setSettledDraw] = useState<number | null>(null);
+  const [readDraw, setReadDraw] = useState<number | null>(null);
+  const newDraw =
+    drawBase !== null && drawnSequence !== null && drawnSequence > (drawBase.sequence ?? 0);
+  const freshDraw = newDraw && !shownDraws.has(drawnSequence);
+  const drawPending = newDraw && settledDraw !== drawnSequence;
   useEffect(() => {
-    if (thrown || walking) return;
+    if (thrown || walking || drawPending) return;
     if (
       eventQuestionSeen.current !== undefined &&
       eventQuestionId &&
       eventQuestionId !== eventQuestionSeen.current
     )
       requestAnimationFrame(() =>
-        document.querySelector<HTMLElement>('[data-testid="event-choice"] h3')?.focus(),
+        document
+          .querySelector<HTMLElement>('[data-testid="event-choice"] h3')
+          ?.focus({ preventScroll: true }),
       );
     if (season) eventQuestionSeen.current = eventQuestionId;
-  }, [eventQuestionId, season, thrown, walking]);
-  const [drawBase, setDrawBase] = useState<{ sequence: number | null } | null>(null);
-  const [shownDraws, setShownDraws] = useState<ReadonlySet<number>>(() => new Set());
-  const [settledDraw, setSettledDraw] = useState<number | null>(null);
+  }, [eventQuestionId, season, thrown, walking, drawPending]);
   const noteDrawShown = useCallback((sequence: number) => {
     setShownDraws((shown) => (shown.has(sequence) ? shown : new Set([...shown, sequence])));
   }, []);
   if (season && drawBase === null) setDrawBase({ sequence: season.lastSequence });
-  const newDraw =
-    drawBase !== null && drawnSequence !== null && drawnSequence > (drawBase.sequence ?? 0);
-  const freshDraw = newDraw && !shownDraws.has(drawnSequence);
+  const skipDraw = () => {
+    if (!drawPending) return;
+    noteDrawShown(drawnSequence);
+    setSettledDraw(drawnSequence);
+  };
   // A difficulty event can arrive with a finish. Follow the current card until it turns face up,
   // including if the server replaces it or removes it before the celebration.
-  if (celebration === 'waiting' && (!newDraw || settledDraw === drawnSequence))
-    setCelebration('playing');
+  if (celebration === 'waiting' && !drawPending) setCelebration('playing');
   const [retrying, setRetrying] = useState(false);
 
   if (loadFailed && !season)
@@ -484,14 +544,13 @@ export function SeasonScreen({
       ? me.roll
       : null;
   const spin: WheelRoll | null = fresh ? wheelRoll(fresh, offer, choice) : null;
+  const rollRevealClass =
+    !desk && animatedRoll !== null && animatedRoll === me?.roll?.sequence
+      ? 'animate-wheel-result'
+      : undefined;
   const uncheckedBlocked = me?.unchecked != null && me.unchecked.count >= me.unchecked.limit;
   // At the check limit the one thing to do is a proof: of the oldest run waiting without one (checks come newest first)
-  const proofToSend = uncheckedBlocked
-    ? [...(me.checks ?? [])]
-        .reverse()
-        .concat(me.lastCompleted ? [me.lastCompleted] : [])
-        .find((run) => run.status === 'completed' && !run.proof)
-    : undefined;
+  const proofToSend = uncheckedBlocked ? oldestUnsentProof(me) : undefined;
   const { board, players, rows, cellNumber } = view;
   // A completion that came while the page is open throws its dice first; the rest of the turn waits for it
   const throwing =
@@ -504,9 +563,42 @@ export function SeasonScreen({
   const walked = !throwing && mine ? walkingPath : null;
   // A walk the page cannot draw (a cell it does not know) is not played
   const moving = walked ? walking : null;
+  const phoneDraw =
+    !desk &&
+    newDraw &&
+    !throwing &&
+    !moving &&
+    drawnSequence !== readDraw &&
+    drawnSequence > historyFold.through;
+  const closePhoneDraw =
+    phoneDraw && !drawPending ? (
+      <Button
+        variant="quiet"
+        className="justify-self-start"
+        onClick={() => {
+          setReadDraw(drawnSequence);
+        }}
+      >
+        {ru.moments.toTurn}
+      </Button>
+    ) : null;
   const shownPlayers =
     throwing && held ? held.players : moving && walkingHeld ? walkingHeld.players : players;
-  const shownRows = throwing && held ? held.rows : rows;
+  const beforeMoment =
+    (throwing ? thrown?.before : null) ??
+    moving?.before ??
+    (spin ? rollBefore : null) ??
+    (drawPending ? drawBefore : null);
+  const momentRows = throwing
+    ? held?.rows
+    : moving
+      ? walkingHeld?.rows
+      : spin && rollBefore
+        ? rollHeld.rows
+        : drawPending && drawBefore
+          ? drawHeld.rows
+          : null;
+  const shownRows = momentRows ?? rows;
   const shownMine = shownPlayers.find((p) => p.me);
   const myRow = shownRows.find((r) => r.player.me);
   const leader = shownRows[0];
@@ -530,6 +622,24 @@ export function SeasonScreen({
   const manualFirst = !stepFirst && me?.manualEffects.some((effect) => !effect.irl) === true;
   // The idle turn's main slot: a roll, or at the check limit the proof that opens it again
   const rollSlot = me?.phase === 'idle' && turnsOpen && !throwing && !me.choice && !moving;
+  const finishRun =
+    me?.lastCompleted?.id === finishRunId
+      ? me.lastCompleted
+      : checks.find((run) => run.id === finishRunId);
+  const finishProof =
+    me?.finish &&
+    !me.finish.frozen &&
+    !throwing &&
+    !moving &&
+    !drawPending &&
+    !me.choice &&
+    !manualFirst &&
+    (rollSlot || closing) &&
+    finishRun?.status === 'completed' &&
+    !finishRun.proof
+      ? finishRun
+      : undefined;
+  const mainProof = finishProof ?? (rollSlot ? proofToSend : undefined);
   /** Opens the proof form of a run on the card and puts the focus in it */
   const openProof = (runId: string) => {
     const fold = document.querySelector<HTMLDetailsElement>(`[data-proof-run="${runId}"]`);
@@ -586,7 +696,10 @@ export function SeasonScreen({
         {me.lastCompleted && (
           <div className="grid min-w-0 gap-2">
             {thrownResult?.run === me.lastCompleted.id ? (
-              <p data-testid="throw-result" className="font-display text-xl font-heavy">
+              <p
+                data-testid="throw-result"
+                className={cx(!thrownResult.finishing && 'font-display text-xl font-heavy')}
+              >
                 {thrownResult.text}
               </p>
             ) : null}
@@ -646,10 +759,11 @@ export function SeasonScreen({
                 resultNote={conditionResultNote(me.lastCompleted)}
               />
             ) : null}
-            {/* The proof form folds into one line: it is not a to-do that holds the roll (H3 design review) */}
             <details
+              id={`proof-${me.lastCompleted.id}`}
               data-testid="proof-details"
               data-proof-run={me.lastCompleted.id}
+              open={finishProof?.id === me.lastCompleted.id}
               className="grid gap-2"
             >
               <Summary className="font-bold">
@@ -712,8 +826,10 @@ export function SeasonScreen({
                     />
                   ) : (
                     <details
+                      id={`proof-${run.id}`}
                       data-testid="check-proof"
                       data-proof-run={run.id}
+                      open={finishProof?.id === run.id}
                       className="grid gap-2"
                     >
                       <Summary className="font-bold">
@@ -746,6 +862,9 @@ export function SeasonScreen({
             key={`${String(me.lastEvent.sequence)}:${String(historyFold.through >= me.lastEvent.sequence ? historyFold.version : 0)}`}
             drawn={me.lastEvent}
             fresh={freshDraw}
+            revealing={drawPending}
+            className={phoneDraw ? phoneMomentClass : undefined}
+            actions={closePhoneDraw}
             initiallyOpen={newDraw && me.lastEvent.sequence > historyFold.through}
             onShown={noteDrawShown}
             onSettled={newDraw ? setSettledDraw : undefined}
@@ -760,7 +879,6 @@ export function SeasonScreen({
   const onStage = spin ?? (staging ? wheelRoll(staging, offer, choice) : null);
   const stage = onStage ? (
     <div
-      ref={desk ? undefined : showStage}
       data-testid="wheel"
       className={
         desk
@@ -775,6 +893,9 @@ export function SeasonScreen({
         roll={onStage}
         announce={false}
         fill={desk}
+        onAnimatedResult={() => {
+          setAnimatedRoll(onStage.id);
+        }}
         onPhase={(phase) => {
           if (phase !== 'done') return;
           setLanded(onStage.id);
@@ -788,12 +909,14 @@ export function SeasonScreen({
             ),
           );
           requestAnimationFrame(() => {
-            document.getElementById(rollResultTitle)?.focus();
+            document.getElementById(rollResultTitle)?.focus({ preventScroll: true });
           });
         }}
       />
       {spin ? (
-        <Button onClick={() => wheel.current?.skip()}>{ru.moments.skip}</Button>
+        desk ? null : (
+          <Button onClick={() => wheel.current?.skip()}>{ru.moments.skip}</Button>
+        )
       ) : (
         <Button
           onClick={() => {
@@ -815,7 +938,8 @@ export function SeasonScreen({
   // A later finisher's token stands still: the dice give points only; the frozen first gets no points (free mode)
   const throwStays = mine ? throwFrom === mine.cell : false;
   const throwFree = me?.finish?.frozen === true;
-  const finishCell = board.cells.find((c) => c.id === mine?.cell)?.kind === 'finish';
+  const finishPoint = board.cells.find((cell) => cell.id === mine?.cell && cell.kind === 'finish');
+  const finishCell = finishPoint !== undefined;
   const myActualRow = rows.find((r) => r.player.me);
   const diceStage =
     throwing && thrown && mine ? (
@@ -842,9 +966,17 @@ export function SeasonScreen({
         from={throwFrom}
         to={mine.cell}
         fill={desk}
-        onDone={() => {
+        onMove={() => {
+          setMovingRun(throwing.id);
+        }}
+        onArrive={(position) => {
+          if (finishCell) arrivedAt.current = position;
+        }}
+        onDone={(skipped) => {
           setThrown(null);
-          if (finishCell && me?.finish && !thrown.before.me?.finish) setCelebration('waiting');
+          setMovingRun(null);
+          if (skipped) skipDraw();
+          else if (finishCell && me?.finish && !thrown.before.me?.finish) setCelebration('waiting');
           const at = throwFree
             ? ''
             : finishCell
@@ -858,6 +990,7 @@ export function SeasonScreen({
           const extra = throwing.challengeDice.map((d) => d.value);
           setThrownResult({
             run: throwing.id,
+            finishing: finishCell && Boolean(me?.finish) && !thrown.before.me?.finish,
             text: throwFree
               ? ru.moments.dice.afterFree
               : throwStays
@@ -880,7 +1013,7 @@ export function SeasonScreen({
           const active = document.activeElement;
           if (!active || active === document.body || active.closest('[data-testid="dice"]'))
             requestAnimationFrame(() => {
-              document.getElementById(lastDiceId)?.focus();
+              document.getElementById(lastDiceId)?.focus({ preventScroll: true });
             });
         }}
       />
@@ -900,6 +1033,9 @@ export function SeasonScreen({
           mover={{ ...mine, cell: walked.path[0] ?? mine.cell }}
           path={walked.path}
           jumps={walked.jumps}
+          onArrive={(position) => {
+            if (finishCell) arrivedAt.current = position;
+          }}
           className={cx('w-full', desk ? 'h-full' : 'h-90 rounded-lg border-3 border-ink')}
           onPhase={(phase) => {
             if (phase !== 'done') return;
@@ -908,7 +1044,8 @@ export function SeasonScreen({
               finishCell &&
               me?.finish &&
               !moving.before.me?.finish &&
-              me.lastMove?.sequence === moving.sequence
+              me.lastMove?.sequence === moving.sequence &&
+              skippedWalk.current !== moving.sequence
             )
               setCelebration('waiting');
             setAnnounced(ru.map.branch.announce(mine.cell));
@@ -916,7 +1053,11 @@ export function SeasonScreen({
         />
         <Button
           className={desk ? 'absolute bottom-4 left-1/2 z-10 -translate-x-1/2' : undefined}
-          onClick={() => walk.current?.skip()}
+          onClick={() => {
+            skippedWalk.current = moving.sequence;
+            skipDraw();
+            walk.current?.skip();
+          }}
         >
           {ru.moments.skip}
         </Button>
@@ -935,12 +1076,36 @@ export function SeasonScreen({
       />
     ) : null;
   const onMap = desk ? (stage ?? diceStage ?? walkStage) : null;
+  const phoneMoment = !desk ? (diceStage ?? walkStage) : null;
+  const visibleThrough = beforeMoment?.lastSequence ?? season.lastSequence;
 
   return (
-    <main className="mx-auto grid max-w-300 grid-cols-1 gap-4 px-4 pt-4 pb-28 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-6 desk:px-8 desk:pb-8">
-      {celebration === 'playing' && me?.finish && !finished ? (
+    <main
+      ref={content}
+      style={{
+        minHeight: scrollFloor > 0 ? scrollFloor : undefined,
+        overflowAnchor: pending || beforeMoment ? 'none' : undefined,
+      }}
+      className={cx(
+        'mx-auto grid max-w-300 grid-cols-1 gap-4 px-4 pt-4 pb-28 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-6 desk:px-8 desk:pb-8',
+        scrollFloor > 0 && 'content-start',
+      )}
+    >
+      {celebration === 'playing' && me?.finish && !finished && finishPoint ? (
         <Confetti
           overlay
+          origin={() => {
+            const current = camera.current?.project(finishPoint) ?? null;
+            if (
+              current &&
+              current.x >= 0 &&
+              current.x < window.innerWidth &&
+              current.y >= 0 &&
+              current.y < window.innerHeight
+            )
+              return current;
+            return arrivedAt.current;
+          }}
           onDone={() => {
             setCelebration(null);
           }}
@@ -1015,12 +1180,13 @@ export function SeasonScreen({
         {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
         {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
         {/* D-260: a finisher's season goes on; the card says where he stands and what his next runs give */}
-        {me?.finish && !finished ? (
+        {me?.finish && !finished && (!beforeMoment || beforeMoment.me?.finish) ? (
           <MyFinish
             finish={me.finish}
             first={rows.find((r) => r.player.me)?.isFirst === true}
             place={rows.find((r) => r.player.me)?.place ?? null}
             rollsOpen={turnsOpen}
+            proofPending={finishRun?.proof?.status === 'pending'}
           />
         ) : null}
         {/* A refusal is said at the top of the card, where the eye is after the action */}
@@ -1031,11 +1197,36 @@ export function SeasonScreen({
             {ru.turn.uncheckedBlocked(me.unchecked?.count ?? 0, me.unchecked?.limit ?? 0)}
           </Notice>
         ) : null}
-        {/* A phone scrolls the dice into view: the completion button was low on the screen */}
-        {!desk && diceStage ? <div ref={showStage}>{diceStage}</div> : null}
+        {phoneMoment ? (
+          <div
+            ref={focusPhoneMoment}
+            aria-label={ru.turn.title}
+            role="region"
+            className={phoneMomentClass}
+          >
+            {phoneMoment}
+          </div>
+        ) : null}
+        {desk && spin ? (
+          <div className="grid gap-2 justify-items-start">
+            <p data-testid="moment-status" role="status" className="text-ink-soft">
+              {ru.moments.wheel.spinning}
+            </p>
+            <Button variant="quiet" onClick={() => wheel.current?.skip()}>
+              {ru.moments.skip}
+            </Button>
+          </div>
+        ) : null}
         {desk && throwing ? (
-          <p data-testid="throwing" className="text-ink-soft">
-            {ru.turn.throwing(throwing.game.title)}
+          <p data-testid="throwing" role="status" className="text-ink-soft">
+            {movingRun === throwing.id
+              ? ru.moments.dice.moving(0)
+              : ru.turn.throwing(throwing.game.title)}
+          </p>
+        ) : null}
+        {drawPending && !throwing && !moving ? (
+          <p role="status" className="text-ink-soft">
+            {ru.moments.dice.drawing}
           </p>
         ) : null}
         {manualFirst && !throwing ? afterRun : null}
@@ -1045,34 +1236,32 @@ export function SeasonScreen({
             <Skeleton className="h-12 w-full" />
           </div>
         )}
-        {!desk && walkStage ? <div ref={showStage}>{walkStage}</div> : null}
         {branchCard ? (
           desk ? (
             <p data-testid="branch-hint" className="font-bold">
               {ru.map.branch.onMap}
             </p>
           ) : (
-            <div ref={showStage}>{branchCard}</div>
+            branchCard
           )
         ) : null}
-        {rollSlot && uncheckedBlocked && proofToSend ? (
-          // The main slot holds the first action that is really there, never a dead main button (DESIGN.md «Карточка
-          // хода»): at the check limit, the proof of the oldest run without one
+        {mainProof ? (
           <Button
             variant="main"
             data-testid="send-proof"
+            aria-controls={`proof-${mainProof.id}`}
             disabled={pending}
             onClick={() => {
-              openProof(proofToSend.id);
+              openProof(mainProof.id);
             }}
           >
-            {ru.turn.sendProof}
+            {finishProof ? ru.proof.submit : ru.turn.sendProof}
           </Button>
         ) : null}
         {rollSlot && !uncheckedBlocked && (
           <div className="grid gap-2">
             <Button
-              variant="main"
+              variant={finishProof || (drawPending && me.finish) ? 'quiet' : 'main'}
               data-testid="roll"
               loading={pending}
               disabled={pending}
@@ -1089,7 +1278,7 @@ export function SeasonScreen({
         )}
         {desk ? null : stage}
         {effectChoice && !throwing && !moving ? (
-          <div className="grid min-w-0 gap-3">
+          <div className={cx('grid min-w-0 gap-3', phoneDraw && phoneMomentClass)}>
             <EventChoice
               choice={effectChoice}
               busy={pending}
@@ -1111,11 +1300,13 @@ export function SeasonScreen({
                 void act({ kind: 'choose', choiceId: effectChoice.id, optionId })
               }
             />
+            {closePhoneDraw}
           </div>
         ) : null}
         {choice && !spin && (
           <ChoiceCard
             choice={choice}
+            className={rollRevealClass}
             eventsEnabled={me?.eventsEnabled === true}
             roll={me?.roll ?? null}
             price={me?.nextReroll ?? null}
@@ -1131,6 +1322,7 @@ export function SeasonScreen({
         {offer && !spin && (
           <OfferCard
             offer={offer}
+            className={rollRevealClass}
             eventsEnabled={me?.eventsEnabled === true}
             roll={me?.roll ?? null}
             price={me?.nextReroll ?? null}
@@ -1147,7 +1339,7 @@ export function SeasonScreen({
         </p>
         {/* A card drawn while the page is open is said once, when it is drawn on screen */}
         <p className="sr-only" aria-live="polite" data-testid="draw-announce">
-          {newDraw && !moving && !throwing && me?.lastEvent
+          {newDraw && !drawPending && !moving && !throwing && me?.lastEvent
             ? ru.events.announce(me.lastEvent.kind, me.lastEvent.name)
             : ''}
         </p>
@@ -1317,7 +1509,7 @@ export function SeasonScreen({
           {[...season.cells]
             .sort((a, b) => (cellNumber.get(a.id) ?? 0) - (cellNumber.get(b.id) ?? 0))
             .map((cell) => {
-              const here = season.players.filter((p) => p.cellId === cell.id);
+              const here = shownPlayers.filter((player) => player.cell === cellNumber.get(cell.id));
               return (
                 <li key={cell.id} data-testid={`cell-${cell.id}`}>
                   {cell.type === 'start'
@@ -1376,7 +1568,8 @@ export function SeasonScreen({
       {desk ? (
         <FeedPreview
           seasonId={seasonId}
-          version={season.lastSequence}
+          version={visibleThrough}
+          visibleThrough={visibleThrough}
           className="desk:col-start-1 desk:w-96"
         />
       ) : null}
@@ -1461,12 +1654,6 @@ function cellWords(
   ]
     .filter(Boolean)
     .join(', ');
-}
-
-/** A phone scrolls the wheel into view when it starts: the roll button may have been low on the screen */
-function showStage(node: HTMLDivElement | null) {
-  // jsdom has no scrolling
-  if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'center' });
 }
 
 /** The server's roll as the wheel plays it: each miss is a stop on the picked category, then the pick */

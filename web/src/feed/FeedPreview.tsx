@@ -21,10 +21,12 @@ const PREVIEW_LINES = 5;
 export function FeedPreview({
   seasonId,
   version,
+  visibleThrough,
   className,
 }: {
   seasonId: string;
   version: number;
+  visibleThrough?: number;
   className?: string;
 }) {
   // A failed refresh keeps the lines shown
@@ -40,11 +42,16 @@ export function FeedPreview({
     let left = PREVIEW_LINES;
     return all.flatMap((day) => {
       if (left <= 0) return [];
-      const items = day.items.slice(0, left);
+      const visible =
+        visibleThrough === undefined
+          ? day.items
+          : day.items.filter((item) => item.sequence <= visibleThrough);
+      const items = visible.slice(0, left);
+      if (items.length === 0) return [];
       left -= items.length;
       return [{ ...day, items }];
     });
-  }, [state]);
+  }, [state, visibleThrough]);
 
   return (
     <Panel title={ru.feed.preview} className={cx(className)} data-testid="feed-preview">

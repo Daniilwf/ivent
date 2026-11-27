@@ -3,6 +3,20 @@ import { ru } from '../i18n/ru';
 import { MyFinish } from './MyFinish';
 
 describe('MyFinish', () => {
+  it('uses a short first-finish headline and keeps the provisional explanation in the body', () => {
+    render(<MyFinish finish={{ order: 1, frozen: false }} first place={1} rollsOpen />);
+
+    const heading = screen.getByRole('heading', { name: 'Ты первый на финише!' });
+    expect(heading).not.toHaveTextContent('предварительно');
+    expect(screen.getByTestId('my-finish')).toHaveTextContent(ru.turn.myFinish.firstProvisional);
+  });
+
+  it('uses the current leaderboard place in the later-finisher headline', () => {
+    render(<MyFinish finish={{ order: 2, frozen: false }} first={false} place={4} rollsOpen />);
+
+    expect(screen.getByRole('heading', { name: 'Ты на финише, 4-е место' })).toBeVisible();
+  });
+
   it('keeps a confirmed frozen first place final after rolls close', () => {
     render(<MyFinish finish={{ order: 1, frozen: true }} first place={1} rollsOpen={false} />);
     const finish = screen.getByTestId('my-finish');

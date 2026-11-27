@@ -14,6 +14,7 @@ export function MyFinish({
   first: leads,
   place,
   rollsOpen,
+  proofPending = false,
 }: {
   finish: Schemas['MyFinishView'];
   /** The leaderboard says I hold the first place */
@@ -22,6 +23,7 @@ export function MyFinish({
   place: number | null;
   /** Rolls are still open: past the deadline the card does not invite to play on */
   rollsOpen: boolean;
+  proofPending?: boolean;
 }) {
   const t = ru.turn.myFinish;
   const first = leads || finish.frozen;
@@ -46,9 +48,12 @@ export function MyFinish({
         {first ? <Trophy size={20} /> : <Flag size={20} />}
       </span>
       <h3 id="my-finish-title" className="font-display font-heavy">
-        {t.title}
+        {first ? t.title : t.laterTitle(place)}
       </h3>
-      <p>{main}</p>
+      <p>
+        {main}
+        {proofPending ? <span className="block">{t.proofPending}</span> : null}
+      </p>
       <p className="text-sm text-ink-soft">
         {rollsOpen ? next : finish.frozen ? t.frozenClosedNext : t.closedNext}
       </p>

@@ -14,6 +14,7 @@ import {
   type Ref,
 } from 'react';
 import { playerToken } from '../design/players';
+import { moveMotion } from '../design/motion';
 import { ru } from '../i18n/ru';
 import { IconButton } from '../ui/Button';
 import { useDesk } from '../ui/useDesk';
@@ -583,16 +584,84 @@ function usePanZoom(
     setView(clamp({ w, cx: p.x, cy: p.y }));
   };
 
+  const planMove = (path: readonly Point[]): MoveCamera => {
+    const first = path[0];
+    if (!first) return {};
+    const padding = moveMotion.pathPadding;
+    const left = Math.min(...path.map((p) => p.x)) - padding;
+    const right = Math.max(...path.map((p) => p.x)) + padding;
+    const top = Math.min(...path.map((p) => p.y)) - padding;
+    const bottom = Math.max(...path.map((p) => p.y)) + padding;
+    if (
+      left >= view.cx - view.w / 2 &&
+      right <= view.cx + view.w / 2 &&
+      top >= view.cy - (view.w * ratio) / 2 &&
+      bottom <= view.cy + (view.w * ratio) / 2
+    )
+      return {};
+
+    const needed = Math.max(view.w, right - left, (bottom - top) / ratio);
+    const fits = needed <= Math.max(view.w, box.width / camera.readable);
+    const target = clamp(
+      fits
+        ? { w: needed, cx: (left + right) / 2, cy: (top + bottom) / 2 }
+        : { w: view.w, cx: first.x, cy: first.y },
+    );
+    const mix = (from: number, to: number, p: number) => from + (to - from) * p;
+    const plan: MoveCamera = {};
+    if (target.cx !== view.cx || target.cy !== view.cy || target.w !== view.w) {
+      plan.frame = (progress) => {
+        setView({
+          cx: mix(view.cx, target.cx, progress),
+          cy: mix(view.cy, target.cy, progress),
+          w: mix(view.w, target.w, progress),
+        });
+      };
+    }
+    if (!fits) {
+      // Follow with a fixed zoom and a velocity cap in viewport units, regardless of token speed.
+      let last = 0;
+      let at = target;
+      plan.follow = (point, seconds) => {
+        const dx = point.x - at.cx;
+        const dy = point.y - at.cy;
+        const distance = Math.hypot(dx, dy);
+        const limit =
+          Math.max(0, seconds - last) *
+          at.w *
+          Math.min(1, ratio) *
+          moveMotion.cameraScreensPerSecond;
+        last = seconds;
+        if (distance === 0 || limit === 0) return;
+        const fraction = Math.min(1, limit / distance);
+        at = clamp({ ...at, cx: at.cx + dx * fraction, cy: at.cy + dy * fraction });
+        setView(at);
+      };
+    }
+    return plan;
+  };
+
   // Back to the first view: the whole world, or around me — after a moment moved the camera
   const reset = () => {
     setView(null);
   };
 
   const viewBox = `${view.cx - view.w / 2} ${view.cy - (view.w * ratio) / 2} ${view.w} ${view.w * ratio}`;
-  return { viewBox, svg, handlers, zoomAt, centerOn, reset, pansUpDown };
+  return { viewBox, svg, handlers, zoomAt, centerOn, planMove, reset, pansUpDown };
 }
 
-export type MapApi = { centerOn: (p: Point, w?: number) => void; reset: () => void };
+type MoveCamera = {
+  frame?: (progress: number) => void;
+  follow?: (point: Point, seconds: number) => void;
+};
+
+export type MapApi = {
+  centerOn: (p: Point, w?: number) => void;
+  planMove: (path: readonly Point[]) => MoveCamera;
+  /** Projects board coordinates into viewport pixels using the current SVG transform. */
+  project: (p: Point) => Point | null;
+  reset: () => void;
+};
 
 export type MapViewProps = {
   board: Board;
@@ -627,7 +696,7 @@ export function MapView({
   const meAt = players.find((p) => p.me);
   // The cell whose players a tap named (K1M-7): a phone has no hover for the tokens' titles
   const [picked, setPicked] = useState<number | null>(null);
-  const { viewBox, svg, handlers, zoomAt, centerOn, reset, pansUpDown } = usePanZoom(
+  const { viewBox, svg, handlers, zoomAt, centerOn, planMove, reset, pansUpDown } = usePanZoom(
     board,
     start,
     meAt ? cellById(board, meAt.cell) : null,
@@ -637,7 +706,19 @@ export function MapView({
       setPicked(at === undefined || at === null ? null : Number(at));
     },
   );
-  useImperativeHandle(ref, () => ({ centerOn, reset }));
+  useImperativeHandle(ref, () => ({
+    centerOn,
+    planMove,
+    project: ({ x, y }) => {
+      const element = svg.current;
+      const matrix =
+        element && typeof element.getScreenCTM === 'function' ? element.getScreenCTM() : null;
+      return matrix
+        ? { x: matrix.a * x + matrix.c * y + matrix.e, y: matrix.b * x + matrix.d * y + matrix.f }
+        : null;
+    },
+    reset,
+  }));
   const props = useMemo(() => scenery(board), [board]);
   const signs = useMemo(() => signSpots(board), [board]);
   const zoneTheme = useMemo(() => new Map(board.zones.map((z) => [z.id, z.theme])), [board]);
