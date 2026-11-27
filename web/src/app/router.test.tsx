@@ -177,6 +177,27 @@ describe('router', () => {
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
   });
 
+  it('opens an unvisited fragment without jumping to the top and restores a saved position', async () => {
+    const scrolled = vi.spyOn(window, 'scrollTo');
+    try {
+      act(() => {
+        globalThis.history.replaceState(null, '', '/rules#rules-roll');
+        globalThis.dispatchEvent(new PopStateEvent('popstate'));
+      });
+      await nextFrame();
+      expect(scrolled).not.toHaveBeenCalled();
+
+      act(() => {
+        globalThis.history.replaceState({ scrollY: 640 }, '', '/rules#rules-roll');
+        globalThis.dispatchEvent(new PopStateEvent('popstate'));
+      });
+      await nextFrame();
+      expect(scrolled).toHaveBeenLastCalledWith(0, 640);
+    } finally {
+      scrolled.mockRestore();
+    }
+  });
+
   it('a reload keeps where the page was scrolled in its entry', () => {
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 2300 });
     globalThis.dispatchEvent(new Event('pagehide'));

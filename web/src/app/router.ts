@@ -150,6 +150,11 @@ function isReload(): boolean {
 function restoreEntryScroll() {
   const kept = entryState().scrollY;
   requestAnimationFrame(() => {
+    if (typeof kept !== 'number' && globalThis.location.hash) {
+      // With manual restoration, Forward to an anchor does not scroll it into view.
+      document.querySelector(':target')?.scrollIntoView({ block: 'start' });
+      return;
+    }
     globalThis.scrollTo(0, typeof kept === 'number' ? kept : 0);
   });
 }

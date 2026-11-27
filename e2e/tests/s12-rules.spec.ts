@@ -9,6 +9,55 @@ function dieOf(page: Page, difficulty: string) {
   return page.getByTestId('rules-dice').getByRole('row', { name: difficulty });
 }
 
+test('rules contents scroll to the selected section and Forward returns there', async ({
+  browser,
+}, testInfo) => {
+  const world = await setUpSeason({ players: ['Игрок'] });
+  const [player] = world.players;
+  if (!player) throw new Error('No player.');
+  const page = await signIn(browser, player);
+  await page.getByTestId('nav-rules').first().click();
+
+  const contents = page.getByRole('navigation', { name: 'На этой странице' });
+  const roll = contents.getByRole('link', { name: 'Ролл игры' });
+  const expectRollInView = async () => {
+    await expect(page).toHaveURL(/\/rules#rules-roll$/);
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => {
+                resolve();
+              }),
+            );
+          });
+          const header = document.querySelector('header.sticky')?.getBoundingClientRect();
+          const title = document.querySelector('#rules-roll-title')?.getBoundingClientRect();
+          return (
+            !!header &&
+            !!title &&
+            window.scrollY > 0 &&
+            title.top >= header.bottom &&
+            title.bottom <= window.innerHeight
+          );
+        }),
+      )
+      .toBe(true);
+  };
+
+  await roll.click();
+  await expectRollInView();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/rules$/);
+  await expect(roll).toBeInViewport();
+  await page.goForward();
+  await expectRollInView();
+  await page.reload();
+  await expectRollInView();
+  await page.screenshot({ path: testInfo.outputPath('rules-roll-anchor.png') });
+});
+
 test('rules: the page shows the config, then the admin’s new numbers and the change in the history', async ({
   browser,
 }) => {
