@@ -10,6 +10,7 @@ import {
 } from '../support/world.ts';
 
 const confetti = '[data-testid="finish-confetti"]';
+const confettiViewportInset = 24;
 const motionBudget = 3_000;
 const completionResult = { timeout: 8_500 };
 
@@ -220,7 +221,7 @@ test.describe('branch finish', () => {
 
   test('finishing after a branch celebrates once and a click still acts on the page', async ({
     page,
-  }) => {
+  }, info) => {
     const world = await setUpSeason({ players: ['Путник'], start: false });
     try {
       const traveler = world.players[0];
@@ -279,6 +280,23 @@ test.describe('branch finish', () => {
       const trace = await finishTrace(page);
       expect(trace.starts).toHaveLength(1);
       expect(trace.starts[0]?.settled).toBe(true);
+      if (info.project.name === 'phone') {
+        const viewport = trace.firstPaintView;
+        if (!viewport || !trace.firstPaint.length) {
+          throw new Error('The first burst was not recorded.');
+        }
+        const center = trace.firstPaint.reduce(
+          (sum, point) => ({
+            x: sum.x + point.x / trace.firstPaint.length,
+            y: sum.y + point.y / trace.firstPaint.length,
+          }),
+          { x: 0, y: 0 },
+        );
+        expect(
+          Math.min(center.x, viewport.width - center.x, center.y, viewport.height - center.y),
+          'The first confetti burst must appear inside the viewport, clear of the edges',
+        ).toBeGreaterThanOrEqual(confettiViewportInset);
+      }
 
       await rollHere(page);
       await expect(canvas).toHaveCount(0);
@@ -288,6 +306,10 @@ test.describe('branch finish', () => {
       );
       expect((await finishTrace(page)).starts).toHaveLength(1);
     } finally {
+      await info.attach('finish-motion.json', {
+        body: JSON.stringify(await page.evaluate(() => (window as FinishWindow).finishMotionTrace)),
+        contentType: 'application/json',
+      });
       await world.adminApi.dispose();
     }
   });

@@ -101,6 +101,16 @@ function focusPhoneMoment(panel: HTMLDivElement | null) {
     panel.querySelector('button')?.focus({ preventScroll: true });
 }
 
+function inViewport(point: Point | null): point is Point {
+  return (
+    point !== null &&
+    point.x >= 0 &&
+    point.x < window.innerWidth &&
+    point.y >= 0 &&
+    point.y < window.innerHeight
+  );
+}
+
 /** The latest completed run follows the checks, which come newest first. */
 function oldestUnsentProof(turn: Schemas['MyTurnView']) {
   return [...(turn.checks ?? [])]
@@ -512,6 +522,7 @@ export function SeasonScreen({
   const branchSeen = useRef<string | null | undefined>(undefined);
   // On a desktop the choice stands at the bottom of the map: the camera shows the fork and its branches above it
   const camera = useRef<MapApi>(null);
+  const mapFrame = useRef<HTMLDivElement>(null);
   const forkCell =
     branchId && season
       ? chain.cellNumber.get(season.players.find((p) => p.id === season.me?.playerId)?.cellId ?? '')
@@ -1288,16 +1299,20 @@ export function SeasonScreen({
         <Confetti
           overlay
           origin={() => {
+            const arrival = arrivedAt.current;
+            if (!desk && inViewport(arrival)) return arrival;
             const current = camera.current?.project(finishPoint) ?? null;
+            // A projected point can be inside the viewport while the finish itself is covered or clipped.
             if (
-              current &&
-              current.x >= 0 &&
-              current.x < window.innerWidth &&
-              current.y >= 0 &&
-              current.y < window.innerHeight
+              inViewport(current) &&
+              mapFrame.current
+                ?.querySelector('svg[role="application"]')
+                ?.contains(document.elementFromPoint(current.x, current.y))
             )
               return current;
-            return arrivedAt.current;
+            if (inViewport(arrival)) return arrival;
+            // Use the standard confetti origin when neither map point is visible.
+            return { x: window.innerWidth / 2, y: window.innerHeight * 0.4 };
           }}
           onDone={() => {
             setCelebration(null);
@@ -1738,7 +1753,7 @@ export function SeasonScreen({
         <h2 id="map-title" className="sr-only">
           {ru.map.title}
         </h2>
-        <div className="relative">
+        <div ref={mapFrame} className="relative">
           <MapView
             ref={camera}
             board={board}

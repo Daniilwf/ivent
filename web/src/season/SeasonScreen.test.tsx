@@ -1,5 +1,5 @@
 import { onDesktop } from '../test/desk';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
@@ -3158,6 +3158,52 @@ describe('SeasonScreen completion moment (H4)', () => {
     expect(ru.moments.dice.atFirst(true)).toContain(ru.moments.finish.provisional);
     expect(screen.getByTestId('roll-announce')).toHaveTextContent(ru.moments.dice.atFirst(true));
     expect(screen.getByTestId('throw-result')).toHaveTextContent(ru.moments.dice.atFirst(true));
+  });
+
+  it('launches mobile finish confetti from the last frame of the visible move', async () => {
+    vi.stubGlobal('innerWidth', 390);
+    vi.stubGlobal('innerHeight', 844);
+    vi.stubGlobal('devicePixelRatio', 1);
+    const translate = vi.fn<(x: number, y: number) => void>();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      restore: vi.fn(),
+      rotate: vi.fn(),
+      save: vi.fn(),
+      translate,
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const map = SVGSVGElement.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(map, 'getScreenCTM');
+    Object.defineProperty(map, 'getScreenCTM', {
+      configurable: true,
+      value(this: SVGSVGElement) {
+        // The main map's projection lies under the bottom bar. The move happens in the fixed panel.
+        const moving = this.closest('[data-testid="dice"]');
+        return { a: 0, b: 0, c: 0, d: 0, e: moving ? 177 : 190, f: moving ? 420 : 838 };
+      },
+    });
+    try {
+      serveCompletion(view(done, 6, 'finish', { finish: { order: 1, frozen: false } }));
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+      await complete();
+
+      await waitFor(
+        () => {
+          expect(translate).toHaveBeenCalled();
+        },
+        { timeout: 6000 },
+      );
+      const [x, y] = translate.mock.calls[0] ?? [];
+      expect(x).toBe(177);
+      expect(y).toBeGreaterThanOrEqual(420);
+      expect(y).toBeLessThan(450);
+    } finally {
+      if (descriptor) Object.defineProperty(map, 'getScreenCTM', descriptor);
+      else Reflect.deleteProperty(map, 'getScreenCTM');
+      vi.restoreAllMocks();
+    }
   });
 
   it('says a later finish reached by the dice with its order', async () => {
