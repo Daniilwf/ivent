@@ -1,5 +1,41 @@
 # Дизайн-ревью
 
+## Этап 7. Фокус формы и навигации (2026-11-27)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Выбран аккаунт с длинным именем | [Телефон](../test-artifacts/stage7-admin-ring-green/s7-add-player-focus-the-ad-33286-e-focus-while-accounts-load-phone/selected-account-identity.png) | [Десктоп](../test-artifacts/stage7-admin-ring-green/s7-add-player-focus-the-ad-33286-e-focus-while-accounts-load-desktop/selected-account-identity.png) |
+| Фокус в навигации админки | [Мобильная панель](../../ivent-stage7-acceptance/test-artifacts/stage7-admin-after-focus/attempt2/phone-sections-open.png) | [Первая ссылка](../test-artifacts/stage7-admin-ring-5329/s7-admin-sidebar-the-deskt-7e7cf-header-wraps-while-scrolled-desktop/sidebar-below-wrapped-header.png) · [Последняя ссылка](../test-artifacts/stage7-admin-ring-5329/s7-admin-sidebar-the-deskt-7e7cf-header-wraps-while-scrolled-desktop/sidebar-bottom-focus.png) |
+| Переход к разделу «Ролл игры» | [Телефон](../../ivent-stage7-whats-new/test-artifacts/stage7-rule-site-5331/e2e/s12-rules-rules-contents-s-089b9-n-and-Forward-returns-there-phone/rules-roll-anchor.png) | [Десктоп](../../ivent-stage7-whats-new/test-artifacts/stage7-rule-site-5331/e2e/s12-rules-rules-contents-s-089b9-n-and-Forward-returns-there-desktop/rules-roll-anchor.png) |
+
+При загрузке аккаунтов фокус остаётся на заголовке формы, следующий Tab ставит его в нативный список. У выбранного аккаунта видны полное имя и логин, на телефоне строка переносится. Боковая панель оставляет место для всех четырёх сторон обводки у первой и нижней ссылок. Мобильная панель возвращает фокус на кнопку «Разделы» при закрытии. Раздел правил открывается ниже шапки при выборе из оглавления, переходе «Вперёд» и перезагрузке.
+
+## Этап 7. Анимация финиша (2026-11-27)
+
+На обоих размерах конфетти появляется после остановки фишки. На телефоне отдельные частицы на короткое время пересекают текст. Очки, место и предварительный статус читаются сразу. Полотно исключено из дерева доступности и не закрывает действия от клика. Сценарий с выбором ветки подтверждает, что клик запускает выбранное действие и завершает эффект. [390×844](../test-artifacts/stage7-finish-motion-green/s7-finish-motion-no-prefer-022af-pects-the-motion-preference-phone/finish.png) · [1440×900](../test-artifacts/stage7-finish-motion-green/s7-finish-motion-no-prefer-022af-pects-the-motion-preference-desktop/finish.png) · [Playwright](../test-artifacts/stage7-finish-motion-green.log)
+
+## Этап 7. Мобильные формы и журнал (2026-11-27)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Переход к созданию после девяти архивов | [Телефон](../test-artifacts/stage7-mobile-season-screens/phone-entry.png) | [Десктоп](../test-artifacts/stage7-mobile-season-screens/desktop-entry.png) |
+| Создание сезона ниже закреплённой шапки | [Телефон](../test-artifacts/stage7-mobile-season-screens/phone-form.png) | [Десктоп](../test-artifacts/stage7-mobile-season-screens/desktop-form.png) |
+| Открытие редактора контента | [Телефон](../test-artifacts/stage7-mobile-content-screens/phone-editor.png) | [Десктоп](../test-artifacts/stage7-mobile-content-screens/desktop-editor.png) |
+| Длинный комментарий в журнале | [Телефон](../test-artifacts/stage7-mobile-motion-verified/s7-mobile-log-a-long-adjus-8d4ca-o-dialog-controls-reachable-phone/log.png) | [Десктоп](../test-artifacts/stage7-mobile-motion-verified/s7-mobile-log-a-long-adjus-8d4ca-o-dialog-controls-reachable-desktop/log.png) |
+| Подтверждение отката | [Телефон](../test-artifacts/stage7-mobile-motion-verified/s7-mobile-log-a-long-adjus-8d4ca-o-dialog-controls-reachable-phone/undo.png) | [Десктоп](../test-artifacts/stage7-mobile-motion-verified/s7-mobile-log-a-long-adjus-8d4ca-o-dialog-controls-reachable-desktop/undo.png) |
+| Ошибка пустого комментария | [Телефон](../test-artifacts/stage7-mobile-motion-verified/s7-mobile-log-a-long-adjus-8d4ca-o-dialog-controls-reachable-phone/undo-comment.png) | [Десктоп](../test-artifacts/stage7-mobile-motion-verified/s7-mobile-log-a-long-adjus-8d4ca-o-dialog-controls-reachable-desktop/undo-comment.png) |
+
+Независимое ревью проверило три изменения на обоих размерах. Переход из списка архивов и открытие редактора оставляют заголовки в фокусе и ниже шапки. В окне отката сначала читаются последствия, длинный комментарий переносится. Заголовок и кнопки видны при прокрутке средней части. Tab показывает поле, Escape возвращает фокус к кнопке открытия. Ошибка пустого комментария видна под полем, а действия остаются на экране. На телефоне кнопки идут двумя рядами справа. [Прогон Playwright](../test-artifacts/stage7-mobile-motion-verified.log)
+
+## Этап 7. Сезон по образцу (2026-11-26)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Форма с длинным названием образца | [Телефон](../test-artifacts/stage7-template-screens/phone-form.png) | [Десктоп](../test-artifacts/stage7-template-screens/desktop-form.png) |
+| Открытый черновик | [Телефон](../test-artifacts/stage7-template-screens/phone-created.png) | [Десктоп](../test-artifacts/stage7-template-screens/desktop-created.png) |
+
+Нативный список помещается на телефоне, полное название выбранного сезона читается под ним. При несовместимом пакете форма предлагает другой образец. На обоих размерах после создания фокус переходит на заголовок видимого черновика ниже закреплённой шапки. Playwright проверяет это без прокрутки в самом тесте. Быстрый переход к форме при длинном списке сезонов отложен до мобильного обхода 7.3. [Браузерный прогон](../test-artifacts/stage7-template-site-5187/playwright-final.log)
+
 ## Этап 6. Итоговое голосование и архив номинаций (2026-11-20)
 
 | Состояние | 390×844 | 1440×900 |

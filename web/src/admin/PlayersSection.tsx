@@ -505,8 +505,9 @@ function AddPlayer({
   onDone: (message: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
   return (
-    <Panel title={t.addTitle}>
+    <Panel title={t.addTitle} titleRef={heading}>
       {open ? (
         <AddPlayerForm
           seasonId={seasonId}
@@ -523,6 +524,8 @@ function AddPlayer({
             icon={<UserPlus size={20} aria-hidden />}
             data-testid="add-player-open"
             onClick={() => {
+              heading.current?.focus({ preventScroll: true });
+              heading.current?.scrollIntoView({ block: 'center' });
               setOpen(true);
             }}
           >
@@ -566,6 +569,7 @@ function AddPlayerForm({
         const inSeason = new Set(players.map((p) => p.userId));
         const free = all.filter((a) => a.role === 'player' && !a.isDeleted && !inSeason.has(a.id));
         if (free.length === 0) return <p className="text-ink-soft">{t.nobodyToAdd}</p>;
+        const selectedAccount = free.find((a) => a.id === userId);
 
         async function submit(e: SyntheticEvent) {
           e.preventDefault();
@@ -590,8 +594,7 @@ function AddPlayerForm({
                 coins: purse ?? 0,
               },
             });
-            const name = free.find((a) => a.id === userId)?.name ?? '';
-            if (answer.data) onDone(t.added(name));
+            if (answer.data) onDone(t.added(selectedAccount?.name ?? ''));
             else setErrors({ form: refusal(answer) });
           } catch {
             setErrors({ form: ru.admin.failed });
@@ -609,8 +612,10 @@ function AddPlayerForm({
           >
             <Select
               label={t.account}
+              hint={selectedAccount ? `${selectedAccount.name} (${selectedAccount.login})` : ''}
               value={userId}
               error={errors.account}
+              className="wrap-anywhere"
               data-testid="add-player-account"
               onChange={(e) => {
                 setUserId(e.target.value);

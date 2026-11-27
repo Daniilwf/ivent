@@ -73,6 +73,9 @@ public static class RejectionCodes
     public const string PlayerFinished = "player.finished";
     public const string FinishNothingToRecalculate = "finish.nothingToRecalculate";
     public const string SeasonAlreadyCreated = "season.alreadyCreated";
+    public const string SeasonTemplateUnknown = "season.templateUnknown";
+    public const string SeasonTemplateUnavailable = "season.templateUnavailable";
+    public const string SeasonTemplateForbidden = "season.templateForbidden";
     public const string PlayerUnknown = "player.unknown";
     public const string PlayerAlreadyAdded = "player.alreadyAdded";
     public const string PlayerNameTaken = "player.nameTaken";

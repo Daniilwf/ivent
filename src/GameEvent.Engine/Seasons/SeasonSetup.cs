@@ -1,3 +1,4 @@
+using GameEvent.Engine.Content;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
 using GameEvent.Engine.Rulesets;
@@ -11,6 +12,9 @@ namespace GameEvent.Engine.Seasons;
 /// </summary>
 public sealed record CreateSeason(
     Guid SeasonId, string Name, Ruleset Ruleset, DateTimeOffset? Deadline = null, MapGraph? Map = null) : ICommand;
+
+/// <summary>Create a draft from the current settings of a completed season supplied by the queue.</summary>
+public sealed record CreateSeasonFromTemplate(Guid SeasonId, string Name, Guid SourceSeasonId, DateTimeOffset? Deadline = null) : ICommand;
 
 /// <summary>Move the season along its lifecycle. Only the next status is allowed (SE1).</summary>
 public sealed record ChangeSeasonStatus(SeasonStatus To) : ICommand;
@@ -52,7 +56,45 @@ internal static class SeasonSetup
     public const int FirstRulesetVersion = 1;
     public const int MaxNameLength = 100;
 
-    public static Decision Decide(SeasonState state, CreateSeason command)
+    public static Decision Decide(SeasonState state, CreateSeason command) => CreateDraft(state, command, publishedLinearMap: null);
+
+    public static Decision Decide(SeasonState state, CreateSeasonFromTemplate command, EngineContext context)
+    {
+        if (context.TemplateSeason is not { IsCreated: true } source || source.SeasonId != command.SourceSeasonId)
+        {
+            return Decision.Reject(RejectionCodes.SeasonTemplateUnknown, "The template season does not exist.");
+        }
+
+        if (source.Status is not (SeasonStatus.Finished or SeasonStatus.Archived) || source.SeasonId == command.SeasonId)
+        {
+            return Decision.Reject(RejectionCodes.SeasonTemplateUnavailable, "The template must be another completed or archived season.");
+        }
+
+        var linear = source.Rules.Features.MapMode == MapMode.Linear;
+        var creation = CreateDraft(state,
+            new CreateSeason(command.SeasonId, command.Name, source.Rules, command.Deadline, linear ? null : source.Map),
+            publishedLinearMap: linear ? source.Map : null);
+        if (!creation.IsAccepted)
+        {
+            return creation;
+        }
+
+        var pack = new ContentPack
+        {
+            Objects = [.. source.Catalog.Objects.Values.Where(entry => !entry.Deleted).Select(entry => entry.Definition)],
+            Wheels = [.. source.Catalog.Wheels.Values],
+        };
+        if (pack.Objects.Count == 0 && pack.Wheels.Count == 0)
+        {
+            return creation;
+        }
+
+        var created = (SeasonCreated)creation.Events.Single();
+        var publication = ContentPublishing.Decide(Apply(state, created), new PublishContent(pack, source.Name));
+        return publication.IsAccepted ? Decision.Accept([created, .. publication.Events]) : publication;
+    }
+
+    private static Decision CreateDraft(SeasonState state, CreateSeason command, MapGraph? publishedLinearMap)
     {
         if (state.IsCreated)
         {
@@ -77,7 +119,8 @@ internal static class SeasonSetup
                 return Decision.Reject(RejectionCodes.MapNotInLinearMode, "A linear season generates its map from map.linearLength.");
             }
 
-            map = LinearMap.Generate(command.Ruleset.Map.LinearLength);
+            // Linear settings can have changed since this map was first published.
+            map = publishedLinearMap ?? LinearMap.Generate(command.Ruleset.Map.LinearLength);
         }
         else if (command.Map is null)
         {

@@ -27,7 +27,7 @@ const sectorFills = [
   'var(--color-zone-mountains)',
 ];
 
-type Stage = 'idle' | 'spinning' | 'miss' | 'done';
+type Stage = 'idle' | 'spinning' | 'miss' | 'done' | 'instant';
 
 /** The category wheel: only categories with free games are on it; it stops on each miss, says who completed that
  *  game, and spins on to the pick. Give it `key={roll.id}`: every roll is a fresh moment. */
@@ -51,12 +51,11 @@ export function WheelMoment({
   const reduce = useReducedMotion() ?? false;
   const sector = 360 / Math.max(sectors.length, 1);
   const turn = (at: number, laps: number) => -(at * sector + sector / 2) - 360 * laps;
-  const [stage, setStage] = useState<Stage>(roll ? (reduce ? 'done' : 'spinning') : 'idle');
+  const [stage, setStage] = useState<Stage>(roll ? (reduce ? 'instant' : 'spinning') : 'idle');
   const [missShown, setMissShown] = useState(0);
   const rotation = useMotionValue(roll && reduce ? turn(roll.pick.sector, 6) : 0);
   const running = useRef<ReturnType<typeof animate> | null>(null);
   const timer = useRef<number | undefined>(undefined);
-  const cancelled = useRef(false);
   // The end is reported once, whether the wheel stops or the moment is skipped
   const ended = useRef(false);
 
@@ -77,13 +76,13 @@ export function WheelMoment({
   const finish = () => {
     if (!roll || ended.current) return;
     ended.current = true;
-    cancelled.current = true;
     running.current?.stop();
     window.clearTimeout(timer.current);
     rotation.set(turn(roll.pick.sector, 6));
-    setStage('done');
+    setStage('instant');
     onPhase?.('done');
   };
+  const reveal = useEffectEvent(finish);
   useImperativeHandle(ref, () => ({ skip: finish }));
 
   // One roll per mount (the parent keys the wheel by it): a page refresh hands in an equal roll as a new object,
@@ -92,13 +91,14 @@ export function WheelMoment({
   useEffect(() => {
     if (!roll) return;
     if (reduce) {
-      // Reduced motion: the wheel already stands on the pick; the end is reported at once
-      const id = window.setTimeout(land, 0);
+      const id = window.setTimeout(reveal, 0);
       return () => {
         window.clearTimeout(id);
       };
     }
-    cancelled.current = false;
+    let cancelled = false;
+    // Loading the motion renderer is part of the time the player waits for the result.
+    const deadline = window.setTimeout(reveal, momentBudget * 1000);
     const stops = [...roll.misses.map((m) => m.sector), roll.pick.sector];
     // The whole roll fits the moments' budget: the first spin, then for each miss a rest and a short spin
     const firstSpin = 1.2;
@@ -106,14 +106,14 @@ export function WheelMoment({
     const missRest = perMiss * 0.55;
     const spinOnFor = perMiss * 0.45;
     // The first stop takes a long spin, each next one a short one; a miss rests on screen for a second
-    const stopped = () => cancelled.current;
+    const stopped = () => cancelled || ended.current;
     const play = async () => {
       // Without the animation engine (its download failed) the wheel stands on the pick at once
       const motion = await loadMotion().catch(() => null);
       if (stopped()) return;
       if (!motion) {
-        rotation.set(turn(roll.pick.sector, 6));
-        land();
+        window.clearTimeout(deadline);
+        reveal();
         return;
       }
       const { animate } = motion;
@@ -132,19 +132,22 @@ export function WheelMoment({
         if (stopped()) return;
         spinOn();
       }
+      window.clearTimeout(deadline);
       land();
     };
     void play();
     return () => {
-      cancelled.current = true;
+      cancelled = true;
       running.current?.stop();
       window.clearTimeout(timer.current);
+      window.clearTimeout(deadline);
     };
     // The rotation and the turns are fixed for one roll: the component is keyed by it
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rollId, reduce]);
 
   const playing = stage === 'spinning' || stage === 'miss';
+  const showResult = stage === 'done' || stage === 'instant';
   const miss = roll?.misses[missShown];
   const size = 300;
   const r = size / 2;
@@ -250,10 +253,10 @@ export function WheelMoment({
               </MomentCard>
             </m.div>
           ) : null}
-          {stage === 'done' && roll ? (
+          {showResult && roll ? (
             <m.div
               className={over}
-              initial={reduce ? false : { rotateY: 90, opacity: 0 }}
+              initial={stage === 'instant' ? false : { rotateY: 90, opacity: 0 }}
               animate={{ rotateY: 0, opacity: 1 }}
               transition={{ duration: 0.25 }}
             >
@@ -282,7 +285,7 @@ export function WheelMoment({
         </Table>
         {/* The card shows the result; the words are for screen readers */}
         <p className="sr-only" aria-live={announce ? 'polite' : 'off'}>
-          {announce && stage === 'done' && roll
+          {announce && showResult && roll
             ? [
                 ...roll.misses.map((miss) => `${missedLine(miss)}.`),
                 `${t.category(sectors[roll.pick.sector] ?? '')}. ${picked(roll.pick)}`,

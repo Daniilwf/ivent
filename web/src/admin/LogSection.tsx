@@ -1,5 +1,5 @@
 import { History, Undo2 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
@@ -21,7 +21,7 @@ const step = 50;
 const most = 500;
 
 // Neither the season's creation nor an undo can be undone (undo.notUndoable)
-const final = new Set(['CreateSeason', 'UndoCommand']);
+const final = new Set(['CreateSeason', 'CreateSeasonFromTemplate', 'UndoCommand']);
 
 /** Whom and what a command touched: «Волк, «Celeste»», or nothing (K1A) */
 function subjectOf(command: Command): string {
@@ -50,7 +50,7 @@ export function LogSection({ seasonId, version }: { seasonId: string; version: n
   return (
     <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
       {(commands, reload) => (
-        <div className="grid gap-4" data-testid="admin-log">
+        <div className="grid min-w-0 gap-4" data-testid="admin-log">
           {done ? <Notice tone="success">{done}</Notice> : null}
           {commands.length === 0 ? (
             <EmptyState
@@ -62,7 +62,7 @@ export function LogSection({ seasonId, version }: { seasonId: string; version: n
           ) : (
             <ol className="grid gap-2">
               {commands.map((c) => (
-                <li key={c.commandId}>
+                <li key={c.commandId} className="min-w-0">
                   <LogRow
                     seasonId={seasonId}
                     command={c}
@@ -111,13 +111,23 @@ function LogRow({
   const [error, setError] = useState<string>();
   const [dependents, setDependents] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const commentInput = useRef<HTMLTextAreaElement>(null);
+  const response = useRef<HTMLDivElement>(null);
   const label = commandLabel(command.commandType);
   const subject = subjectOf(command);
+
+  useEffect(() => {
+    if (commentError || error) response.current?.scrollIntoView({ block: 'nearest' });
+  }, [commentError, error]);
 
   async function undo() {
     const problem = commentProblem(comment);
     setCommentError(problem);
-    if (problem) return;
+    if (problem) {
+      commentInput.current?.focus();
+      response.current?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
     setBusy(true);
     setError(undefined);
     setDependents([]);
@@ -147,13 +157,13 @@ function LogRow({
 
   return (
     <article
-      className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-card px-4 py-3"
+      className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-card px-4 py-3 wrap-anywhere"
       data-testid={`command-${command.commandId}`}
     >
       <div className="mr-auto grid min-w-0 gap-1">
         <p className="flex flex-wrap items-center gap-2 font-bold">
           {label}
-          {subject ? <span className="font-medium break-words">{subject}</span> : null}
+          {subject ? <span className="font-medium">{subject}</span> : null}
           {command.undone ? (
             <Badge tone="muted" icon={<Undo2 size={12} aria-hidden />}>
               {t.undone}
@@ -167,9 +177,7 @@ function LogRow({
             t.events(command.events.length),
           ].join(', ')}
         </p>
-        {command.comment ? (
-          <p className="text-sm break-words">{t.comment(command.comment)}</p>
-        ) : null}
+        {command.comment ? <p className="text-sm">{t.comment(command.comment)}</p> : null}
       </div>
       {command.undone || final.has(command.commandType) ? null : (
         <ConfirmDanger
@@ -189,27 +197,30 @@ function LogRow({
           }
           title={t.undoTitle(label)}
           consequences={[
+            ...t.undoConsequences(command.events.length),
             ...(subject ? [t.about(subject)] : []),
             ...(command.comment ? [t.comment(command.comment)] : []),
-            ...t.undoConsequences(command.events.length),
           ]}
           confirm={t.undoConfirm}
           busy={busy}
           onConfirm={() => void undo()}
         >
-          <TextArea
-            label={ru.admin.comment}
-            hint={t.undoCommentHint}
-            rows={2}
-            maxLength={500}
-            value={comment}
-            error={commentError}
-            data-testid="undo-comment"
-            onChange={(e) => {
-              setComment(e.target.value);
-            }}
-          />
-          {error ? <Notice tone="danger">{error}</Notice> : null}
+          <div ref={response} className="grid gap-4">
+            <TextArea
+              ref={commentInput}
+              label={ru.admin.comment}
+              hint={t.undoCommentHint}
+              rows={2}
+              maxLength={500}
+              value={comment}
+              error={commentError}
+              data-testid="undo-comment"
+              onChange={(e) => {
+                setComment(e.target.value);
+              }}
+            />
+            {error ? <Notice tone="danger">{error}</Notice> : null}
+          </div>
           {dependents.length > 0 ? (
             <div className="grid gap-1" data-testid="undo-dependents">
               <p className="font-bold">{t.dependents}</p>

@@ -5,6 +5,34 @@
 Статус: ⬜ теста нет, 🟥 тест есть и падает (ждёт реализации), 🟨 часть правила покрыта зелёными тестами (остальное — в указанной задаче плана), ✅ тест зелёный, ➖ не относится к этапу 1 (указан этап).
 Пути тестов: `Engine.Tests/<Механика>/…`, `Web.Tests/…`, `web/src/…` (Vitest), `e2e/…` (Playwright). Имена — план, уточняются при написании.
 
+## Правила этапа 7 (полировка и удобство админа)
+
+### Сезон по образцу (7.1, D-936)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| STP1 | Завершённый или архивный образец даёт черновик с опубликованной картой, правилами и действующим пакетом. История и участники остаются в исходном сезоне | `Web.Tests/Api/SeasonTemplateApiTests.An_admin_creates_an_empty_draft_with_the_sources_published_map_rules_and_live_content` | ✅ |
+| STP2 | Линейная карта сохраняется при изменении её длины в правилах. Новый журнал воспроизводится независимо. Дедлайн вводится отдельно | `Engine.Tests/Seasons/SeasonTemplateTests.A_draft_replays_from_its_own_events_without_the_source_season`, `Web.Tests/Api/SeasonTemplateApiTests.A_linear_season_with_no_content_can_be_copied_without_inheriting_a_deadline` | ✅ |
+| STP3 | Повтор запроса однократен. Иное тело с тем же ID и параллельная попытка создать сезон с тем же именем отклоняются | `Web.Tests/Api/SeasonTemplateApiTests.A_retry_after_the_template_is_archived_has_one_effect_and_a_changed_request_conflicts`, `Concurrent_requests_with_equivalent_names_create_only_one_draft` | ✅ |
+| STP4 | Несовместимый пакет отклоняет всю команду. Несуществующий, незавершённый или другой снимок отклоняется | `Engine.Tests/Seasons/SeasonTemplateTests.A_snapshot_of_a_different_season_cannot_be_used`, `Web.Tests/Api/SeasonTemplateApiTests.An_incompatible_archived_pack_refuses_the_whole_clone_and_preserves_the_source`, `An_unknown_source_returns_not_found_without_creating_the_draft`, `An_unfinished_source_is_refused_without_creating_the_draft`, `An_empty_source_id_or_using_the_draft_as_its_own_source_is_invalid` | ✅ |
+| STP5 | Создаёт только админ. Выключение настройки скрывает действие, обычное создание доступно | `Web.Tests/Api/SeasonTemplateApiTests.A_non_admin_cannot_create_from_a_template`, `Templates_are_opt_in_and_the_default_create_path_remains_available`, `web/src/admin/SeasonSection.test.tsx` | ✅ |
+| STP6 | После создания выбран новый черновик с указанным дедлайном. Заголовок в области просмотра и в фокусе. Журнал показывает создание по образцу | `e2e/tests/s7-season-template.spec.ts` | ✅ |
+
+### Мобильная вёрстка и анимации (7.3–7.4)
+
+| ID | Правило | Тесты | Статус |
+| --- | --- | --- | --- |
+| MB1 | Из первого экрана админки можно попасть к форме создания сезона при длинном списке архивов. Заголовок формы виден и получает фокус | `web/src/admin/SeasonSection.test.tsx`, `e2e/tests/s7-season-template.spec.ts` | ✅ |
+| MB2 | Длинный комментарий помещается в журнале и подтверждении отката. Обе кнопки видны, Tab показывает поле комментария, Escape возвращает фокус. Ошибка пустого комментария видна сразу после попытки отката | `e2e/tests/s7-mobile-log.spec.ts`, `e2e/tests/s07-undo.spec.ts` | ✅ |
+| MB3 | При открытии редактора контента заголовок в фокусе и виден ниже закреплённой шапки. Tab переводит фокус на видимую кнопку закрытия | `e2e/tests/content.spec.ts` | ✅ |
+| MB4 | При раскрытии формы добавления игрока фокус остаётся на видимом заголовке, пока загружаются аккаунты. Следующий Tab попадает в выбор аккаунта. Полное имя и логин выбранного аккаунта читаются на телефоне без горизонтальной прокрутки | `web/src/admin/PlayersSection.test.tsx`, `e2e/tests/s7-add-player-focus.spec.ts` | ✅ |
+| MB5 | На десктопе боковая админка остаётся ниже шапки, если та становится двухрядной после загрузки навигации. Заголовок и ссылка в фокусе видны при прокрутке | `e2e/tests/s7-admin-sidebar.spec.ts` | ✅ |
+| MB6 | В прокручиваемой боковой панели рамка клавиатурного фокуса полностью видна у первого и последнего разделов | `e2e/tests/s7-admin-sidebar.spec.ts` | ✅ |
+| MOT1 | Колесо показывает готовое предложение сервера за три секунды, включая ожидание загрузки Motion. StrictMode не повторяет прокрутку | `web/src/board/Wheel.test.tsx`, `e2e/tests/s7-wheel-motion.spec.ts` | ✅ |
+| MOT2 | Фишка встаёт на конечную клетку в пределах отведённого времени при задержке загрузки или остановке кадра. Повтор эффекта и новое чтение того же хода не запускают лишние шаги | `web/src/board/TokenMove.test.tsx`, `web/src/season/CompletionMoment.motion.test.tsx`, `e2e/tests/s5-event-motion.spec.ts` | ✅ |
+| MOT3 | При новом собственном финише после остановки фишки видно конфетти до трёх секунд, в том числе после выбора ветки. Клик прерывает эффект и выполняет действие нажатой кнопки. При reduced motion и перезагрузке результат виден без повтора | `e2e/tests/s7-finish-motion.spec.ts`, `e2e/tests/s05-finish.spec.ts` | ✅ |
+| MOT4 | В броске с десятью кубиками сохранённые грани видны к показу суммы, даже если Motion ещё загружается. Пропуск и reduced motion показывают тот же результат | `web/src/board/Dice.motion.test.tsx`, `web/src/season/CompletionMoment.motion.test.tsx` | ✅ |
+
 ## Правила этапа 6 (социальное и итоги)
 
 ### Реакции на отзывы (6.1)

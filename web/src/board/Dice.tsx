@@ -5,9 +5,12 @@ import './board.css';
 import { cx } from '../ui/cx';
 import { Table } from '../ui/Surface';
 import { Motion } from './Motion';
-import type { MomentHandle, MomentPhase } from './moment';
+import { diceSettleSeconds, type MomentHandle, type MomentPhase } from './moment';
 
 const t = ru.moments.dice;
+const faceSpinSeconds = 1.2;
+// Leave a frame between the last face settling and the total appearing.
+const staggerBudget = diceSettleSeconds - faceSpinSeconds - 0.03;
 
 /** The server's throw: every die's value; the last `challenge` of them are the challenge dice; `sides` of each die
  *  (a d6 without it) */
@@ -93,12 +96,14 @@ function Face({
 export function Die({
   value,
   index = 0,
+  delay = 0,
   thrown = false,
   challenge = false,
   sides = 6,
 }: {
   value: number;
   index?: number;
+  delay?: number;
   thrown?: boolean;
   challenge?: boolean;
   /** Not a d6 (a d2, a d4…): every face shows the number, and the die says its sides */
@@ -106,7 +111,7 @@ export function Die({
 }) {
   const numeric = sides !== 6 || !(value in pips);
   const [x, y] = numeric ? [0, 0] : (faceTurn[value] ?? [0, 0]);
-  const delay = index * 0.09;
+  const spin = thrown ? 720 : 0;
   return (
     <Motion>
       <span className="inline-grid justify-items-center gap-2" data-die={value}>
@@ -123,9 +128,11 @@ export function Die({
           <m.span
             className="relative block size-16 transform-3d"
             initial={thrown ? { rotateX: 0, rotateY: 0 } : false}
-            animate={{ rotateX: x + 720, rotateY: y + 720 }}
+            animate={{ rotateX: x + spin, rotateY: y + spin }}
             transition={
-              thrown ? { duration: 1.2, delay, ease: [0.2, 0.7, 0.3, 1] } : { duration: 0 }
+              thrown
+                ? { duration: faceSpinSeconds, delay, ease: [0.2, 0.7, 0.3, 1] }
+                : { duration: 0 }
             }
           >
             {faces.map((f) => (
@@ -176,7 +183,6 @@ export function DiceMoment({
 }) {
   const reduce = useReducedMotion() ?? false;
   const [shown, setShown] = useState(roll === null);
-  const [skipped, setSkipped] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   // The end is reported once, whether the dice settle or the moment is skipped
   const ended = useRef(false);
@@ -191,7 +197,6 @@ export function DiceMoment({
     if (ended.current || !roll) return;
     ended.current = true;
     window.clearTimeout(timer.current);
-    setSkipped(true);
     setShown(true);
     onPhase?.('done');
   };
@@ -199,7 +204,7 @@ export function DiceMoment({
 
   useEffect(() => {
     if (!roll) return;
-    timer.current = window.setTimeout(settle, reduce ? 0 : 1500);
+    timer.current = window.setTimeout(settle, reduce ? 0 : diceSettleSeconds * 1000);
     return () => {
       window.clearTimeout(timer.current);
     };
@@ -210,16 +215,19 @@ export function DiceMoment({
   const extra = roll?.challenge ?? 0;
   const plain = values.slice(0, values.length - extra);
   const challenge = values.slice(values.length - extra);
-  const thrown = roll !== null && !skipped && !reduce;
+  const thrown = roll !== null && !shown && !reduce;
+  const stagger = Math.min(0.09, staggerBudget / Math.max(1, values.length - 1));
 
   const content = (
     <Motion>
       <div className="flex flex-wrap items-start justify-center gap-3">
         {values.map((v, i) => (
           <Die
-            key={`${skipped ? 's' : 'r'}-${i}`}
+            // Mount the saved face directly, even if Motion could not finish the throw.
+            key={`${thrown ? 'rolling' : 'settled'}-${i}`}
             value={v}
             index={i}
+            delay={i * stagger}
             thrown={thrown}
             challenge={i >= values.length - extra}
             sides={roll?.sides?.[i] ?? 6}
@@ -229,8 +237,8 @@ export function DiceMoment({
       {shown && roll && mode !== 'free' ? (
         <m.span
           className="rounded-full border-3 border-ink bg-card px-6 font-display text-3xl font-heavy"
-          initial={reduce ? false : { scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
+          initial={reduce ? false : { scale: 0.5 }}
+          animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 400, damping: 18 }}
         >
           +{total}

@@ -644,6 +644,16 @@ public static class SeasonEndpoints
         Guid seasonId, Guid commandId, ICommand command, Guid? authorId, CommandBus bus, CancellationToken ct)
     {
         var outcome = await bus.SendAsync(new CommandEnvelope(commandId, seasonId, command, authorId), ct);
+        if (outcome.Rejection is { Code: RejectionCodes.SeasonTemplateUnknown })
+        {
+            return TypedResults.NotFound();
+        }
+
+        if (outcome.Rejection is { Code: RejectionCodes.SeasonTemplateForbidden })
+        {
+            return TypedResults.Forbid();
+        }
+
         if (!outcome.IsAccepted)
         {
             return TypedResults.Problem(
