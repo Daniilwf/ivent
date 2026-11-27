@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { onDesktop } from '../test/desk';
 import userEvent from '@testing-library/user-event';
+import { easeInOut } from 'motion/react';
 import { createRef } from 'react';
 import { ru } from '../i18n/ru';
 import { graphBoard } from './graphBoard';
@@ -146,6 +147,7 @@ const hopSeconds = 0.32;
 
 function moveFraming(path: readonly Point[]): MoveFraming {
   return {
+    easeInOut,
     hops: path
       .slice(1)
       .map((_, start) => ({ start, finish: start + 1, height: 22, duration: hopSeconds })),

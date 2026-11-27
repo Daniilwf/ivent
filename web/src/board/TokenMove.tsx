@@ -1,4 +1,4 @@
-import { easeInOut, useReducedMotion, type animate } from 'motion/react';
+import { useReducedMotion, type animate } from 'motion/react';
 import {
   useEffect,
   useEffectEvent,
@@ -120,7 +120,7 @@ export function TokenMove({
         arrive(false);
         return;
       }
-      const { animate } = motion;
+      const { animate, easeInOut } = motion;
       const points = path.map((id) => cellById(board, id));
       const radius = size / 2;
       const circle = radius + (mover.me ? 9 : 5);
@@ -137,10 +137,10 @@ export function TokenMove({
         Math.max(0, budget - moveMotion.minHopSeconds),
       );
       let hops = moveHops(points, jumps, Math.min(movePathSeconds, budget));
-      let plan = camera.current?.planMove(points, { hops, sticker });
+      let plan = camera.current?.planMove(points, { easeInOut, hops, sticker });
       if (plan?.frame && frameSeconds > 0) {
         hops = moveHops(points, jumps, Math.min(movePathSeconds, budget - frameSeconds));
-        plan = camera.current?.planMove(points, { hops, sticker });
+        plan = camera.current?.planMove(points, { easeInOut, hops, sticker });
         if (plan?.frame) {
           controls.current = animate(0, 1, {
             duration: frameSeconds,

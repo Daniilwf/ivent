@@ -1,5 +1,4 @@
 import type { Board, Point } from './types';
-import { easeInOut } from 'motion/react';
 import { moveMotion } from '../design/motion';
 
 // The map's camera and the places of the stickers on a cell: pure geometry, apart from MapView for its tests
@@ -122,6 +121,7 @@ export function moveHops(points: readonly Point[], jumps: readonly number[], bud
 
 export type MoveFraming = {
   hops: readonly MoveHop[];
+  easeInOut: (time: number) => number;
   /** Bounds of the sticker relative to the ground point before adding the hop. */
   sticker: Bounds;
 };
@@ -143,7 +143,7 @@ export function moveView(view: View, box: Box, path: readonly Point[], framing: 
   const from = path[0];
   const to = path.at(-1);
   if (!from || !to) return;
-  const { hops, sticker } = framing;
+  const { easeInOut, hops, sticker } = framing;
   const ratio = box.height / box.width;
   const footprint = (p: Point): Bounds => ({
     x0: p.x + sticker.x0,
