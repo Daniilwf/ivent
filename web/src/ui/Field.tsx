@@ -270,7 +270,7 @@ export function ChoiceGroup<T extends string>({
                   : 'whitespace-nowrap',
                 'has-[:disabled]:cursor-default',
                 !readOnly && 'has-[:disabled]:opacity-50',
-                picked ? 'bg-ink text-card' : 'bg-card text-ink',
+                picked ? 'bg-selected text-on-selected' : 'bg-card text-ink',
                 !picked && !readOnly && 'is-hover:bg-page',
                 force?.includes('focus') && picked ? 'focus-ring' : undefined,
               )}

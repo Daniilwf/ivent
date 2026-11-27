@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { PNG } from 'pngjs';
 import type { Schemas } from '../support/api.ts';
 import {
   apiOf,
@@ -112,6 +113,17 @@ test('only a participant opens their own season recap and downloads it as PNG', 
       ]),
     );
     await captions.dispose();
+    // The card follows the sender's theme (D-940): light in the light theme, dark after «Тёмная»
+    expect(cardLightness(png)).toBeGreaterThan(0.8);
+    await ownerPage.evaluate(() => {
+      localStorage.setItem('ge.theme', 'dark');
+    });
+    await ownerPage.reload();
+    const darkPng = await downloadCard(ownerPage);
+    expect(cardLightness(darkPng)).toBeLessThan(0.25);
+    await ownerPage.evaluate(() => {
+      localStorage.removeItem('ge.theme');
+    });
 
     await spectatorPage.goto(profilePath);
     await expect(spectatorPage.getByRole('heading', { name: player.name })).toBeVisible();
@@ -136,3 +148,22 @@ test('only a participant opens their own season recap and downloads it as PNG', 
     await world.adminApi.dispose();
   }
 });
+
+/** Downloads the chat card of the open recap page */
+async function downloadCard(page: Page): Promise<Buffer> {
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Скачать картинку для чата' }).click(),
+  ]);
+  const path = await download.path();
+  if (!path) throw new Error('No download path.');
+  return readFile(path);
+}
+
+/** The lightness (0–1) of the card's own background, just inside its outline at the top left */
+function cardLightness(file: Buffer): number {
+  const png = PNG.sync.read(file);
+  const at = (png.width * 24 + 24) * 4;
+  const [r = 0, g = 0, b = 0] = png.data.subarray(at, at + 3);
+  return (r + g + b) / (3 * 255);
+}

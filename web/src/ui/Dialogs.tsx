@@ -6,7 +6,7 @@ import { ru } from '../i18n/ru';
 import { Button, IconButton } from './Button';
 import { cx } from './cx';
 
-const overlay = 'fixed inset-0 z-20 bg-ink/40';
+const overlay = 'fixed inset-0 z-20 bg-scrim';
 
 type ConfirmProps = {
   trigger?: ReactNode;

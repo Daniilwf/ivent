@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
+import { setThemeChoice, type Theme } from '../design/theme';
 import { ru } from '../i18n/ru';
 import { MapCanvas, overviewMinZoom, readableMinZoom } from './MapCanvas';
 import type { Draft } from './mapDraft';
@@ -8,6 +9,7 @@ import type { Draft } from './mapDraft';
 // jsdom does not lay React Flow out, so the canvas is replaced by what it was told: its zoom limits and the fit the
 // buttons ask for (MP-2)
 interface CanvasProps {
+  colorMode?: Theme;
   minZoom?: number;
   fitViewOptions?: { minZoom?: number };
   children?: ReactNode;
@@ -56,6 +58,22 @@ function canvas() {
     />,
   );
 }
+
+it('sets React Flow to the app theme rather than its own system preference', () => {
+  setThemeChoice('light');
+  try {
+    canvas();
+    expect(flow.props.colorMode).toBe('light');
+    act(() => {
+      setThemeChoice('dark');
+    });
+    expect(flow.props.colorMode).toBe('dark');
+  } finally {
+    act(() => {
+      setThemeChoice('system');
+    });
+  }
+});
 
 describe('MapCanvas zoom (MP-2)', () => {
   it('opens readable, but lets «Показать всю карту» shrink the whole map into the frame', async () => {

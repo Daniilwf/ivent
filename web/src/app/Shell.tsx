@@ -7,8 +7,11 @@ import {
   LogOut,
   Map as MapIcon,
   MessagesSquare,
+  Monitor,
+  Moon,
   Newspaper,
   ShieldCheck,
+  Sun,
   Trophy,
   UserRound,
   UsersRound,
@@ -19,6 +22,7 @@ import { connectionStatus } from '../api/connection';
 import { useWaitingProofs } from '../admin/waitingProofs';
 import type { Schemas } from '../api/client';
 import { userToken } from '../design/players';
+import { setThemeChoice, themeChoices, useTheme, type ThemeChoice } from '../design/theme';
 import { ru } from '../i18n/ru';
 import { cx } from '../ui/cx';
 import { CountBadge } from '../ui/Marks';
@@ -28,6 +32,12 @@ import { Sticker } from '../ui/Sticker';
 import { BugReportButton } from './BugReportButton';
 import { Link } from './Link';
 import { navigate, paths, routeOf, usePath, type Route } from './router';
+
+const themeIcons: Record<ThemeChoice, ReactNode> = {
+  light: <Sun size={18} aria-hidden />,
+  dark: <Moon size={18} aria-hidden />,
+  system: <Monitor size={18} aria-hidden />,
+};
 
 const sections: { kind: Route['kind'] & keyof typeof ru.nav; to: string; icon: ReactNode }[] = [
   { kind: 'season', to: paths.season(), icon: <MapIcon size={18} aria-hidden /> },
@@ -103,7 +113,7 @@ function SiteNav({
                   navControl,
                   'scroll-mx-2',
                   // The current section: filled, not by colour alone
-                  current ? 'bg-ink text-on-color' : 'text-ink is-hover:bg-muted',
+                  current ? 'bg-selected text-on-selected' : 'text-ink is-hover:bg-muted',
                 )}
               >
                 <span className="hidden desk:contents">{section.icon}</span>
@@ -123,7 +133,7 @@ function SiteNav({
                 navControl,
                 'shrink-0 cursor-pointer is-focus:focus-ring',
                 seasonal.some((section) => section.kind === route.kind)
-                  ? 'bg-ink text-on-color'
+                  ? 'bg-selected text-on-selected'
                   : 'text-ink is-hover:bg-muted data-[state=open]:bg-muted',
               )}
             >
@@ -187,6 +197,7 @@ export function Shell({
   const shownWaiting = admin && waiting > 0 ? waiting : 0;
   const live = useSyncExternalStore(connectionStatus.subscribe, connectionStatus.get) === 'online';
   const online = offline === undefined ? live : !offline;
+  const theme = useTheme();
   const frame = useRef<HTMLDivElement>(null);
   const header = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -297,6 +308,20 @@ export function Shell({
                 icon: <Newspaper size={18} aria-hidden />,
                 onSelect: () => {
                   navigate(paths.whatsNew());
+                },
+              },
+              {
+                kind: 'choice',
+                label: ru.shell.theme,
+                value: theme.choice,
+                options: themeChoices.map((value) => ({
+                  value,
+                  label: ru.shell.themes[value],
+                  icon: themeIcons[value],
+                  testId: `theme-${value}`,
+                })),
+                onChange: (value) => {
+                  setThemeChoice(value as ThemeChoice);
                 },
               },
               {

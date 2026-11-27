@@ -673,7 +673,7 @@ export function UseItemDialog({
                     data-testid={`target-${t.playerId}`}
                     className={cx(
                       'flex min-h-12 cursor-pointer items-center gap-3 rounded-md border-2 border-ink px-3 font-medium transition duration-(--duration-fast) select-none has-[:focus-visible]:focus-ring',
-                      picked ? 'bg-ink text-card' : 'bg-card text-ink is-hover:bg-page',
+                      picked ? 'bg-selected text-on-selected' : 'bg-card text-ink is-hover:bg-page',
                     )}
                   >
                     <input

@@ -323,6 +323,30 @@ describe('the camera of the map', () => {
 });
 
 describe('the players on the map', () => {
+  it.each(['event', 'checkpoint'] as const)('keeps the %s icon in dark ink on my cell', (kind) => {
+    const board: Board = {
+      ...movingBoard,
+      cells: [{ id: 2, kind, x: 435, y: 200 }],
+    };
+    render(<MapView board={board} players={crowd(1, 2)} />);
+    expect(document.querySelector('[data-cell="2"] svg')).toHaveAttribute(
+      'stroke',
+      'var(--color-on-bright)',
+    );
+  });
+
+  it('uses the themed label on my fork card', () => {
+    const board: Board = {
+      ...movingBoard,
+      cells: [{ id: 2, kind: 'fork', x: 435, y: 200 }],
+    };
+    render(<MapView board={board} players={crowd(1, 2)} />);
+    expect(document.querySelector('[data-cell="2"] text')).toHaveAttribute(
+      'fill',
+      'var(--color-on-current-fork)',
+    );
+  });
+
   it('names the player of a tapped token (K1M-7)', () => {
     render(<MapView board={dev()} players={crowd(2, 5)} focus={5} />);
     expect(screen.queryByTestId('map-picked')).toBeNull();

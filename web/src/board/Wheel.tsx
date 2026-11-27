@@ -250,7 +250,7 @@ export function WheelMoment({
                         className="font-display text-xs font-bold"
                         textAnchor="middle"
                         dominantBaseline="central"
-                        fill="var(--color-ink)"
+                        fill="var(--color-on-bright)"
                       >
                         {kind === 'game' && name.length > 16 ? `${name.slice(0, 15)}…` : name}
                       </text>

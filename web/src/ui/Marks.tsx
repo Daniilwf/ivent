@@ -35,7 +35,7 @@ export function Chip({
 }
 
 const badgeTones = {
-  gold: 'bg-gold text-ink',
+  gold: 'bg-gold text-on-bright',
   ink: 'bg-ink text-on-color tabular-nums',
   me: 'bg-me text-on-color',
   muted: 'bg-muted text-ink',

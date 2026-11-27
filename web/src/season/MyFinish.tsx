@@ -42,7 +42,7 @@ export function MyFinish({
         aria-hidden
         className={cx(
           'row-span-3 grid size-10 place-items-center rounded-full border-2 border-ink',
-          first ? 'bg-gold' : 'bg-card',
+          first ? 'bg-gold text-on-bright' : 'bg-card',
         )}
       >
         {first ? <Trophy size={20} /> : <Flag size={20} />}

@@ -1,6 +1,7 @@
 /* The design system's tokens (G3, docs/DESIGN.md): the only place in the frontend with colours, type sizes,
    radii, shadows and durations. Direction C «Компания», palette «Кухонный стол» (D-130, D-131): a wooden
-   table under a lamp, colourful meeples. Tailwind's own palette and scales are switched off, so a class
+   table under a lamp, colourful meeples. The dark theme (D-940, palette A «Спокойный графит»,
+   docs/proposals/DARK_THEME.md) gives the same tokens other values below the theme. Tailwind's own palette and scales are switched off, so a class
    outside these tokens produces nothing; the linters forbid values outside them (eslint-rules, stylelint). */
 
 @import 'tailwindcss';
@@ -13,7 +14,14 @@
   --color-ink: #1e2030; /* text and every outline: 14.3:1 on the page */
   --color-ink-soft: #545870; /* secondary text: 6.2:1 on the page, 7:1 on a card */
   --color-on-color: #ffffff; /* text on the action, «me» and danger fills */
+  --color-on-bright: #1e2030; /* text and marks on gold and on the zone colours: dark in both themes */
+  /* My fork label on the card fill. */
+  --color-on-current-fork: var(--color-on-color);
   --color-muted: #dfe5ee; /* quiet fills on a card or the page: tags, skeletons, empty bars */
+  --color-selected: #1e2030; /* a picked option, the current section */
+  --color-on-selected: #ffffff;
+  --color-scrim: rgb(30 32 48 / 40%); /* the page under an open dialog */
+  --color-shadow: #1e2030; /* the hard offset shadow of a cardboard piece */
 
   /* ---- Colour: the one main action and the player's own things ---- */
   --color-action: #2f6be4; /* a blue meeple: the main button, 4.8:1 with white */
@@ -63,6 +71,9 @@
   --color-token-14: #8f3f00;
   --color-token-15: #8c4a73;
   --color-token-16: #8a8a8a;
+  /* The 16 fills stay the same; the dark theme uses a deeper dark letter (DT-1). */
+  --color-on-token-dark: #1e2030;
+  --color-on-token-light: #ffffff;
 
   /* ---- Type: two faces with full Cyrillic, served from our own server (woff2) ---- */
   --font-*: initial;
@@ -101,6 +112,11 @@
   --spacing-gallery-photo: 50dvh;
   /* The smallest label on the map, in frame pixels: the camera opens closer rather than show one smaller (camera.ts) */
   --map-label-min: 9px;
+  /* An uploaded map picture is a bright raster: the dark theme dims it to sit on the dark page */
+  --map-picture-filter: none;
+  /* A disabled control: half opacity in both themes; the dark theme also greys it, so a light fill on the dark page
+     does not read as a live button (DT-6) */
+  --disabled-filter: none;
 
   /* ---- Radii by level: a tag, a row, a card, a pill ---- */
   --radius-*: initial;
@@ -111,10 +127,10 @@
 
   /* ---- Shadows: a hard offset like a cardboard piece, only on the main action and the moments' cards ---- */
   --shadow-*: initial;
-  --shadow-press: 0 4px 0 var(--color-ink);
-  --shadow-press-up: 0 5px 0 var(--color-ink);
-  --shadow-press-down: 0 1px 0 var(--color-ink);
-  --shadow-lift: 0 6px 0 var(--color-ink);
+  --shadow-press: 0 4px 0 var(--color-shadow);
+  --shadow-press-up: 0 5px 0 var(--color-shadow);
+  --shadow-press-down: 0 1px 0 var(--color-shadow);
+  --shadow-lift: 0 6px 0 var(--color-shadow);
 
   /* ---- Motion: 150–250 ms outside the main moments ---- */
   --ease-*: initial;
@@ -146,6 +162,138 @@
 
   --breakpoint-*: initial;
   --breakpoint-desk: 900px;
+}
+
+/* ---- The dark theme (D-940): the same tokens, palette A «Спокойный графит». `ink` is light (text and outlines),
+   `on-color` dark (text on the strong fills), the strong fills light; gold and the zones stay bright under the dark
+   `on-bright` (D-940, design review DT-3, DT-4); a selected option is a quiet tint, not a glaring light fill (DT-7).
+   The 16 token fills stay. It applies when the user picked «Тёмная» (data-theme="dark"),
+   and when they keep «Как в системе» (no data-theme) on a system set to dark; tokens.test.ts keeps both blocks equal. */
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-page: #1a1c22;
+  --color-card: #272b34;
+  --color-ink: #e8eaf0;
+  --color-ink-soft: #a7acbb;
+  --color-on-color: #14161b;
+  --color-on-bright: #14161b;
+  --color-on-current-fork: var(--color-ink);
+  --color-on-token-dark: #14161b;
+  --color-muted: #353944;
+  --color-selected: #34405a;
+  --color-on-selected: #e8eaf0;
+  --color-scrim: rgb(0 0 0 / 60%);
+  --color-shadow: #434856;
+  --color-action: #7ea6f8;
+  --color-action-strong: #a3c0fb;
+  --color-me: #b89cf5;
+  --color-gold: #f0b43a;
+  --color-danger: #f2685a;
+  --color-danger-soft: #45201f;
+  --color-success: #7fd19e;
+  --color-success-soft: #1e3427;
+  --color-warning: #f0b968;
+  --color-warning-soft: #3d3216;
+  --color-info: #86c1ec;
+  --color-info-soft: #1c2f3e;
+  --color-table: #6b5139;
+  --color-table-dots: #765b41;
+  --color-table-deep: #5a4430;
+  --color-route: #cfc7bc;
+  --color-zone-meadow: #8cc46a;
+  --color-zone-forest: #5aa878;
+  --color-zone-mountains: #b0a89c;
+  --color-zone-swamp: #6fb3ad;
+  --color-zone-city: #e89a58;
+  --color-zone-castle: #a898e6;
+  --color-snow: #e8eaf0;
+  --map-picture-filter: brightness(0.62) saturate(0.85);
+  --disabled-filter: grayscale(1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --color-page: #1a1c22;
+    --color-card: #272b34;
+    --color-ink: #e8eaf0;
+    --color-ink-soft: #a7acbb;
+    --color-on-color: #14161b;
+    --color-on-bright: #14161b;
+    --color-on-current-fork: var(--color-ink);
+    --color-on-token-dark: #14161b;
+    --color-muted: #353944;
+    --color-selected: #34405a;
+    --color-on-selected: #e8eaf0;
+    --color-scrim: rgb(0 0 0 / 60%);
+    --color-shadow: #434856;
+    --color-action: #7ea6f8;
+    --color-action-strong: #a3c0fb;
+    --color-me: #b89cf5;
+    --color-gold: #f0b43a;
+    --color-danger: #f2685a;
+    --color-danger-soft: #45201f;
+    --color-success: #7fd19e;
+    --color-success-soft: #1e3427;
+    --color-warning: #f0b968;
+    --color-warning-soft: #3d3216;
+    --color-info: #86c1ec;
+    --color-info-soft: #1c2f3e;
+    --color-table: #6b5139;
+    --color-table-dots: #765b41;
+    --color-table-deep: #5a4430;
+    --color-route: #cfc7bc;
+    --color-zone-meadow: #8cc46a;
+    --color-zone-forest: #5aa878;
+    --color-zone-mountains: #b0a89c;
+    --color-zone-swamp: #6fb3ad;
+    --color-zone-city: #e89a58;
+    --color-zone-castle: #a898e6;
+    --color-snow: #e8eaf0;
+    --map-picture-filter: brightness(0.62) saturate(0.85);
+    --disabled-filter: grayscale(1);
+  }
+}
+
+/* The dark map editor (@xyflow/react) on our tokens. The light editor uses React Flow's defaults. */
+.react-flow.dark {
+  --xy-background-color: var(--color-page);
+  --xy-background-pattern-color: var(--color-muted);
+  --xy-edge-stroke: var(--color-ink);
+  --xy-edge-stroke-selected: var(--color-action);
+  --xy-connectionline-stroke: var(--color-ink);
+  --xy-edge-label-background-color: var(--color-card);
+  --xy-edge-label-color: var(--color-ink);
+  --xy-node-background-color: var(--color-card);
+  --xy-node-color: var(--color-ink);
+  --xy-node-border: 2px solid var(--color-ink);
+  --xy-handle-background-color: var(--color-ink);
+  --xy-handle-border-color: var(--color-card);
+  --xy-selection-background-color: var(--color-muted);
+  --xy-selection-border: 1px dotted var(--color-ink);
+  --xy-controls-button-background-color: var(--color-card);
+  --xy-controls-button-background-color-hover: var(--color-muted);
+  --xy-controls-button-color: var(--color-ink);
+  --xy-controls-button-color-hover: var(--color-ink);
+  --xy-controls-button-border-color: var(--color-muted);
+  --xy-minimap-background-color: var(--color-card);
+  --xy-minimap-mask-background-color: var(--color-scrim);
+  --xy-minimap-node-background-color: var(--color-muted);
+  --xy-attribution-background-color: var(--color-card);
+}
+
+/* A disabled control's colour, on top of its half opacity */
+@utility disabled-look {
+  filter: var(--disabled-filter);
+}
+
+/* An uploaded map picture under the cells (the players' map and the editor) */
+@utility map-picture {
+  filter: var(--map-picture-filter);
 }
 
 /* Every state a component has can also be forced with data-force="hover focus active", so the styleguide shows
