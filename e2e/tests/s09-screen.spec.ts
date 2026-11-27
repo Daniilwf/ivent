@@ -1,6 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { fingerDrag, mapView, pinchOut } from '../support/touch.ts';
-import { rollAndStartHere, setUpSeason, signIn } from '../support/world.ts';
+import {
+  apiOf,
+  fillCompletionHere,
+  live,
+  rollAndStartHere,
+  seasonOf,
+  setUpSeason,
+  signIn,
+} from '../support/world.ts';
 
 // TESTING.md scenario 9 «Экран телефона 390×844: главная, прохождение, карта с зумом». The phone project plays it at
 // 390×844 with touch — the map zooms with two fingers; the desktop project checks the same screens at 1440×900 with a
@@ -118,4 +127,62 @@ test('screen: the main page, the run and the map zoom on this device', async ({
   }
   await expect.poll(() => mapCentre(mapSurface)).toBeGreaterThan(centre);
   await noSidewaysScroll(page);
+});
+
+test('screen: the rating screenshot is ready for the player to send as proof', async ({
+  browser,
+}, testInfo) => {
+  const world = await setUpSeason({ players: ['Вася', 'Петя'] });
+  const [player] = world.players;
+  if (!player) throw new Error('No player.');
+  const page = await signIn(browser, player);
+  const api = await apiOf(player);
+  await rollAndStartHere(page);
+  await fillCompletionHere(page);
+
+  const form = page.getByTestId('complete-form');
+  await form.getByText('Отзыв и скрин — по желанию').click();
+  await form.getByLabel('Оценка игры').selectOption('7');
+  await form.getByLabel('Добавить скрин для пруфа').setInputFiles({
+    name: 'credits.png',
+    mimeType: 'image/png',
+    buffer: readFileSync(new URL('../../content/map.demo.background.png', import.meta.url)),
+  });
+  const preview = form.getByRole('img', { name: 'Скрин 1' });
+  await expect(preview).toBeVisible(live);
+  const thumbnail = await preview.getAttribute('src');
+  if (!thumbnail) throw new Error('The file has no thumbnail.');
+  await preview.scrollIntoViewIfNeeded();
+  await noSidewaysScroll(page);
+  await page.screenshot({
+    path: testInfo.outputPath('completion-with-screenshot.png'),
+    scale: 'css',
+  });
+
+  await form.getByTestId('complete-submit').click();
+  const proof = page.getByTestId('proof-details');
+  const summary = proof.locator(':scope > summary');
+  await expect(summary).toContainText('Скрин для пруфа готов', live);
+  const run = (await seasonOf(api, world.seasonId)).me?.lastCompleted;
+  expect(run?.review?.rating).toBe(7);
+  expect(run?.proof ?? null).toBeNull();
+
+  await summary.click();
+  const shot = proof.getByRole('img', { name: 'Скрин 1' });
+  const submit = proof.getByRole('button', { name: 'Отправить пруф' });
+  await expect(shot).toBeVisible();
+  await expect(shot).toHaveAttribute('src', thumbnail);
+  await expect(shot).toBeInViewport({ ratio: 1 });
+  await expect(submit).toBeInViewport({ ratio: 1 });
+  await expect(proof.getByText('Скрина достаточно, чтобы отправить пруф.')).toBeVisible();
+  await expect(proof.getByTestId('proof-link')).toBeHidden();
+  await noSidewaysScroll(page);
+  await page.screenshot({ path: testInfo.outputPath('prepared-proof.png'), scale: 'css' });
+
+  await submit.click();
+  await expect(proof.getByTestId('proof-status')).toContainText(
+    'Пруф ждёт проверки админом.',
+    live,
+  );
+  await expect(proof.getByTestId('proof-files').getByRole('link')).toHaveCount(1);
 });

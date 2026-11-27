@@ -1,5 +1,5 @@
 import { CalendarClock, Coins, Flag, Swords, Trophy } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { newCommandId } from '../api/commands';
 import { Link } from '../app/Link';
@@ -12,6 +12,7 @@ import { CompleteForm, type Completion } from './CompleteForm';
 import { ChoiceCard, OfferCard, RollGenre, rollGameButton, rollResultTitle } from './RollResult';
 import { CompletionMoment } from './CompletionMoment';
 import { ProofSection } from './ProofForm';
+import type { ProofShot } from './proofAttachments';
 import { DrawnEventHistory } from './DrawnEventHistory';
 import { EventChoice } from './EventChoice';
 import { WaitingEvents } from './WaitingEvents';
@@ -77,6 +78,10 @@ type Command =
   | { kind: 'resolveEffect'; effectId: string; outcome: EffectOutcome; comment: string | null }
   | { kind: 'irlProof'; effectId: string; files: string[]; link: string | null };
 type Loaded = { kind: 'season'; season: Season } | { kind: 'signedOut' } | { kind: 'failed' };
+function runDraftKey(season: Season | null, runId: string) {
+  return `${season?.id ?? ''}:${season?.me?.playerId ?? ''}:${runId}`;
+}
+
 /** The legs of one move of my token, as the server walked them (the graph map) */
 type Legs = Schemas['MoveLegView'][];
 /** A completion that came while the page is open: its run, the cell my token left and, on the graph, its legs */
@@ -217,6 +222,9 @@ export function SeasonScreen({
   const heading = usePageHeading(season !== null);
   const [pending, setPending] = useState(false);
   const [completionDraftRun, setCompletionDraftRun] = useState<string | null>(null);
+  const [preparedShots, setPreparedShots] = useState<ReadonlyMap<string, ProofShot>>(
+    () => new Map(),
+  );
   const completionOpener = useRef<HTMLButtonElement>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   const legendOpener = useRef<HTMLButtonElement>(null);
@@ -285,7 +293,10 @@ export function SeasonScreen({
         setSeason(loaded.season);
         // The roll the page opened with is shown at once; only a roll that comes while it is open spins (D-136)
         const view = loaded.season;
-        setCompletionDraftRun((draft) => (draft === view.me?.activeRun?.id ? draft : null));
+        const activeRunId = view.me?.activeRun?.id;
+        setCompletionDraftRun((draft) =>
+          activeRunId && draft === runDraftKey(view, activeRunId) ? draft : null,
+        );
         const roll = view.me?.roll;
         const opened = roll?.sequence ?? null;
         const continued = alreadyPlayedRoll.current;
@@ -405,6 +416,17 @@ export function SeasonScreen({
     };
   }, [seasonId, apply, version]);
 
+  function setPreparedShot(runId: string, shot?: ProofShot) {
+    const key = runDraftKey(season, runId);
+    setPreparedShots((previous) => {
+      if (!shot && !previous.has(key)) return previous;
+      const next = new Map(previous);
+      if (shot) next.set(key, shot);
+      else next.delete(key);
+      return next;
+    });
+  }
+
   async function act(command: Command) {
     const drawBeforeCommand = season?.me?.lastEvent?.sequence ?? 0;
     if (command.kind === 'alreadyPlayed' && season?.me?.roll) {
@@ -433,11 +455,13 @@ export function SeasonScreen({
         const code = rejectionCode(result.error);
         setMessage((code && ru.rejection[code]) ?? ru.rejection.unknown);
       }
-      if (result.response.ok && !result.error)
+      if (result.response.ok && !result.error) {
         setHistoryFold((previous) => ({
           through: Math.max(previous.through, drawBeforeCommand),
           version: previous.version + 1,
         }));
+        if (command.kind === 'proof') setPreparedShot(command.runId);
+      }
       apply(await fetchSeason(seasonId));
       return result.response.ok && !result.error;
     } catch {
@@ -595,7 +619,8 @@ export function SeasonScreen({
     turnsOpen && !effectChoice && me?.phase === 'playing' && !me.isCoopPartner
       ? me.activeRun
       : null;
-  const completing = completableRun !== null && completableRun.id === completionDraftRun;
+  const completionKey = completableRun ? runDraftKey(season, completableRun.id) : null;
+  const completing = completionKey !== null && completionKey === completionDraftRun;
   const choice =
     turnsOpen && me?.phase === 'rolling' && me.choice?.kind === 'game' ? me.choice : null;
   // A branch choice is part of a throw made before the deadline: it is answered after it too (D-305)
@@ -714,13 +739,28 @@ export function SeasonScreen({
       ? finishRun
       : undefined;
   const mainProof = finishProof ?? (rollSlot ? proofToSend : undefined);
+  const lastProofShot =
+    me?.lastCompleted?.status === 'completed'
+      ? preparedShots.get(runDraftKey(season, me.lastCompleted.id))
+      : undefined;
   /** Opens the proof form of a run on the card and puts the focus in it */
   const openProof = (runId: string) => {
     const fold = document.querySelector<HTMLDetailsElement>(`[data-proof-run="${runId}"]`);
     if (!fold) return;
     fold.open = true;
-    const field = fold.querySelector<HTMLElement>('input, textarea, select');
+    const field = Array.from(
+      fold.querySelectorAll<HTMLElement>('input, textarea, select, button[type="submit"]'),
+    ).find((control) => !control.closest('details:not([open])'));
     (field ?? fold.querySelector('summary'))?.focus();
+  };
+  const revealPreparedProof = (event: MouseEvent<HTMLDetailsElement>) => {
+    const fold = event.currentTarget;
+    const summary = fold.querySelector('summary');
+    if (fold.open || !(event.target instanceof Node) || !summary?.contains(event.target)) return;
+    requestAnimationFrame(() => {
+      // The ready form fits under its summary once the mobile leaderboard dock is out of its way.
+      if (fold.open) summary.scrollIntoView({ block: 'center', behavior: 'instant' });
+    });
   };
   const afterRun =
     me &&
@@ -778,6 +818,9 @@ export function SeasonScreen({
               data-testid="proof-details"
               data-proof-run={me.lastCompleted.id}
               open={finishProof?.id === me.lastCompleted.id}
+              onClick={
+                !desk && !me.lastCompleted.proof && lastProofShot ? revealPreparedProof : undefined
+              }
               className="grid gap-2"
             >
               <Summary className="text-sm">
@@ -800,7 +843,11 @@ export function SeasonScreen({
                       )}
                 </span>{' '}
                 <span className="text-ink-soft">
-                  {me.lastCompleted.proof ? ru.turn.proofSummary : ru.turn.proofToSend}
+                  {me.lastCompleted.proof
+                    ? ru.turn.proofSummary
+                    : lastProofShot
+                      ? ru.turn.proofShotReady
+                      : ru.turn.proofToSend}
                 </span>
               </Summary>
               {me.lastCompleted.game.cover ? (
@@ -837,6 +884,10 @@ export function SeasonScreen({
                 key={`${me.lastCompleted.id}:${JSON.stringify(me.lastCompleted.proof ?? null)}`}
                 proof={me.lastCompleted.proof ?? null}
                 pending={pending}
+                preparedShot={lastProofShot}
+                onRemovePreparedShot={() => {
+                  if (me.lastCompleted) setPreparedShot(me.lastCompleted.id);
+                }}
                 witnesses={season.players.filter((p) => p.id !== me.playerId)}
                 onSubmit={(links, note, witnessId, files) => {
                   if (me.lastCompleted) {
@@ -894,6 +945,11 @@ export function SeasonScreen({
                       data-testid="check-proof"
                       data-proof-run={run.id}
                       open={finishProof?.id === run.id}
+                      onClick={
+                        !desk && !run.proof && preparedShots.has(runDraftKey(season, run.id))
+                          ? revealPreparedProof
+                          : undefined
+                      }
                       className="grid gap-2"
                     >
                       <Summary className="font-bold">
@@ -905,6 +961,10 @@ export function SeasonScreen({
                         key={`${run.id}:${JSON.stringify(run.proof ?? null)}`}
                         proof={run.proof ?? null}
                         pending={pending}
+                        preparedShot={preparedShots.get(runDraftKey(season, run.id))}
+                        onRemovePreparedShot={() => {
+                          setPreparedShot(run.id);
+                        }}
                         witnesses={season.players.filter((p) => p.id !== me.playerId)}
                         onSubmit={(links, note, witnessId, files) => {
                           void act({ kind: 'proof', runId: run.id, links, note, witnessId, files });
@@ -1545,7 +1605,7 @@ export function SeasonScreen({
             </div>
           )}
           {me && completableRun && (
-            <div key={completableRun.id} className="grid min-w-0 gap-4">
+            <div key={completionKey} className="grid min-w-0 gap-4">
               <Button
                 ref={completionOpener}
                 data-testid="complete-open"
@@ -1553,7 +1613,7 @@ export function SeasonScreen({
                 disabled={pending}
                 onClick={() => {
                   setMessage(null);
-                  setCompletionDraftRun(completableRun.id);
+                  setCompletionDraftRun(completionKey);
                 }}
               >
                 {ru.turn.completeOpen}
@@ -1576,6 +1636,12 @@ export function SeasonScreen({
                   declared={completableRun.declaredDifficulty ?? null}
                   showHeading={false}
                   pending={pending}
+                  proofDraft={{
+                    shot: preparedShots.get(runDraftKey(season, completableRun.id)),
+                    onChange: (shot) => {
+                      setPreparedShot(completableRun.id, shot);
+                    },
+                  }}
                   onComplete={(completion) => {
                     void act({ kind: 'complete', completion }).then((ok) => {
                       if (ok) setCompletionDraftRun(null);

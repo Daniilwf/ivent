@@ -1,6 +1,18 @@
-import { camera, cameraFrame, fanSpot, openingView, type Box, type View } from './camera';
+import {
+  camera,
+  cameraFrame,
+  fanSpot,
+  moveView,
+  openingView,
+  stickerLift,
+  type Bounds,
+  type Box,
+  type MoveFraming,
+  type View,
+} from './camera';
 import { Flag, LocateFixed, Minus, Orbit, Plus, ShoppingBag, Sparkles, X } from 'lucide-react';
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
   useId,
@@ -14,7 +26,6 @@ import {
   type Ref,
 } from 'react';
 import { playerToken } from '../design/players';
-import { moveMotion } from '../design/motion';
 import { ru } from '../i18n/ru';
 import { IconButton } from '../ui/Button';
 import { useDesk } from '../ui/useDesk';
@@ -185,7 +196,7 @@ export function MapSticker({
   size = 36,
   index = 0,
   count = 1,
-  lift = 32,
+  lift = stickerLift.onCell,
 }: {
   player: Player;
   at: Point;
@@ -391,6 +402,20 @@ function signSpots(board: Board): Map<string, Point> {
 }
 
 // ---- Pan and zoom ----
+type StoredView = View & { move?: { bounds: Bounds | undefined; ratio: number } };
+
+function fitMoveToFrame(view: StoredView, ratio: number): View {
+  if (!view.move) return view;
+  return { ...view, w: view.w * Math.max(1, view.move.ratio / ratio) };
+}
+
+function measureFrame(el: SVGSVGElement | null): Box | null {
+  const rect = el?.getBoundingClientRect();
+  return rect && rect.width > 0 && rect.height > 0
+    ? { width: rect.width, height: rect.height }
+    : null;
+}
+
 /**
  * `focus`: open around this point, about one world unit to a pixel of the frame; `anchor`: where a tall frame centres;
  * `toolsAt`: the side of the frame the zoom buttons stand on, kept clear of the board in the first view.
@@ -403,7 +428,7 @@ function usePanZoom(
   onTap: (target: Element | null) => void,
 ) {
   // null until the user moves the map: the whole world, fitted to the frame
-  const [moved, setView] = useState<View | null>(null);
+  const [moved, setView] = useState<StoredView | null>(null);
   const [box, setBox] = useState<Box>({ width: board.width, height: board.height });
   const pointers = useRef(new Map<number, Point>());
   // The pointer that went down alone: where, on what, and whether it has moved since (a tap or a drag)
@@ -411,19 +436,30 @@ function usePanZoom(
     null,
   );
   const svg = useRef<SVGSVGElement | null>(null);
+  const updateBox = useCallback((size: Box) => {
+    setBox((old) => (old.width === size.width && old.height === size.height ? old : size));
+  }, []);
+  const attachSvg = useCallback(
+    (el: SVGSVGElement | null) => {
+      svg.current = el;
+      const size = measureFrame(el);
+      if (size) updateBox(size);
+    },
+    [updateBox],
+  );
 
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
     const observer = new ResizeObserver(() => {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) setBox({ width: r.width, height: r.height });
+      const size = measureFrame(el);
+      if (size) updateBox(size);
     });
     observer.observe(el);
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [updateBox]);
 
   const ratio = box.height / box.width;
   // The zoom buttons stand at the bottom of the frame on every size (K2-4)
@@ -432,8 +468,10 @@ function usePanZoom(
   // Around the focus on a phone, the whole board on a desktop while it is readable (K2-3); never past the world's edge
   const desk = useDesk();
   const opening = openingView(board, box, focus, anchor, side, desk);
-  const view = clamp(moved ?? opening);
-  const current = (v: View | null) => clamp(v ?? opening);
+  const current = (v: StoredView | null) => clamp(v ? fitMoveToFrame(v, ratio) : opening);
+  const view = moved?.move
+    ? cameraFrame(board, box, side, anchor, moved.move.bounds).clamp(fitMoveToFrame(moved, ratio))
+    : current(moved);
   // The page scrolls under a swipe while the map has nowhere to go up or down (K1M-2: a phone held sideways)
   const world = area(view.w);
   const pansUpDown = view.w * ratio < world.y1 - world.y0 - 1;
@@ -586,58 +624,41 @@ function usePanZoom(
     setView(clamp({ w, cx: p.x, cy: p.y }));
   };
 
-  const planMove = (path: readonly Point[]): MoveCamera => {
-    const first = path[0];
-    if (!first) return {};
-    const padding = moveMotion.pathPadding;
-    const left = Math.min(...path.map((p) => p.x)) - padding;
-    const right = Math.max(...path.map((p) => p.x)) + padding;
-    const top = Math.min(...path.map((p) => p.y)) - padding;
-    const bottom = Math.max(...path.map((p) => p.y)) + padding;
-    if (
-      left >= view.cx - view.w / 2 &&
-      right <= view.cx + view.w / 2 &&
-      top >= view.cy - (view.w * ratio) / 2 &&
-      bottom <= view.cy + (view.w * ratio) / 2
-    )
-      return {};
-
-    const needed = Math.max(view.w, right - left, (bottom - top) / ratio);
-    const fits = needed <= Math.max(view.w, box.width / camera.readable);
-    const target = clamp(
-      fits
-        ? { w: needed, cx: (left + right) / 2, cy: (top + bottom) / 2 }
-        : { w: view.w, cx: first.x, cy: first.y },
-    );
+  const planMove = (path: readonly Point[], framing: MoveFraming): MoveCamera => {
+    if (path.length === 0) return {};
+    // A cached animation can start before the resize observer delivers an updated size.
+    const measured = measureFrame(svg.current) ?? box;
+    if (measured.width !== box.width || measured.height !== box.height) updateBox(measured);
+    const measuredRatio = measured.height / measured.width;
+    const origin = moved
+      ? cameraFrame(board, measured, side, anchor, moved.move?.bounds).clamp(
+          fitMoveToFrame(moved, measuredRatio),
+        )
+      : openingView(board, measured, focus, anchor, side, desk);
+    const move = moveView(origin, measured, path, framing);
+    const moveFrame = { bounds: move?.bounds ?? moved?.move?.bounds, ratio: measuredRatio };
+    const target = move
+      ? cameraFrame(board, measured, side, anchor, moveFrame.bounds).clamp(move.target)
+      : origin;
     const mix = (from: number, to: number, p: number) => from + (to - from) * p;
     const plan: MoveCamera = {};
-    if (target.cx !== view.cx || target.cy !== view.cy || target.w !== view.w) {
+    if (target.cx !== origin.cx || target.cy !== origin.cy || target.w !== origin.w) {
       plan.frame = (progress) => {
         setView({
-          cx: mix(view.cx, target.cx, progress),
-          cy: mix(view.cy, target.cy, progress),
-          w: mix(view.w, target.w, progress),
+          cx: mix(origin.cx, target.cx, progress),
+          cy: mix(origin.cy, target.cy, progress),
+          w: mix(origin.w, target.w, progress),
+          move: moveFrame,
         });
       };
+    } else {
+      // Keep the measured coverage on resize even when the path already fits.
+      setView({ ...origin, move: moveFrame });
     }
-    if (!fits) {
-      // Follow with a fixed zoom and a velocity cap in viewport units, regardless of token speed.
-      let last = 0;
-      let at = target;
-      plan.follow = (point, seconds) => {
-        const dx = point.x - at.cx;
-        const dy = point.y - at.cy;
-        const distance = Math.hypot(dx, dy);
-        const limit =
-          Math.max(0, seconds - last) *
-          at.w *
-          Math.min(1, ratio) *
-          moveMotion.cameraScreensPerSecond;
-        last = seconds;
-        if (distance === 0 || limit === 0) return;
-        const fraction = Math.min(1, limit / distance);
-        at = clamp({ ...at, cx: at.cx + dx * fraction, cy: at.cy + dy * fraction });
-        setView(at);
+    const follow = move?.follow;
+    if (follow) {
+      plan.follow = (seconds) => {
+        setView({ ...follow(seconds), move: moveFrame });
       };
     }
     return plan;
@@ -649,17 +670,17 @@ function usePanZoom(
   };
 
   const viewBox = `${view.cx - view.w / 2} ${view.cy - (view.w * ratio) / 2} ${view.w} ${view.w * ratio}`;
-  return { viewBox, svg, handlers, zoomAt, centerOn, planMove, reset, pansUpDown };
+  return { viewBox, svg, attachSvg, handlers, zoomAt, centerOn, planMove, reset, pansUpDown };
 }
 
 type MoveCamera = {
   frame?: (progress: number) => void;
-  follow?: (point: Point, seconds: number) => void;
+  follow?: (seconds: number) => void;
 };
 
 export type MapApi = {
   centerOn: (p: Point, w?: number) => void;
-  planMove: (path: readonly Point[]) => MoveCamera;
+  planMove: (path: readonly Point[], framing: MoveFraming) => MoveCamera;
   /** Projects board coordinates into viewport pixels using the current SVG transform. */
   project: (p: Point) => Point | null;
   reset: () => void;
@@ -698,16 +719,11 @@ export function MapView({
   const meAt = players.find((p) => p.me);
   // The cell whose players a tap named (K1M-7): a phone has no hover for the tokens' titles
   const [picked, setPicked] = useState<number | null>(null);
-  const { viewBox, svg, handlers, zoomAt, centerOn, planMove, reset, pansUpDown } = usePanZoom(
-    board,
-    start,
-    meAt ? cellById(board, meAt.cell) : null,
-    tools,
-    (target) => {
+  const { viewBox, svg, attachSvg, handlers, zoomAt, centerOn, planMove, reset, pansUpDown } =
+    usePanZoom(board, start, meAt ? cellById(board, meAt.cell) : null, tools, (target) => {
       const at = target?.closest('[data-at]')?.getAttribute('data-at');
       setPicked(at === undefined || at === null ? null : Number(at));
-    },
-  );
+    });
   useImperativeHandle(ref, () => ({
     centerOn,
     planMove,
@@ -742,7 +758,7 @@ export function MapView({
       )}
     >
       <svg
-        ref={svg}
+        ref={attachSvg}
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
         role="application"
@@ -987,7 +1003,7 @@ export function MapView({
           // Me first, so my sticker is never the one hidden behind «+N»
           const ordered = [...here].sort((a, b) => Number(b.me ?? false) - Number(a.me ?? false));
           const big = c.kind === 'start' || c.kind === 'finish';
-          const lift = big ? 52 : 32;
+          const lift = big ? stickerLift.onBigCell : stickerLift.onCell;
           // More than three: two stickers (me first) and «+N» in the third place (K2-2)
           const shown = here.length > 3 ? 2 : 3;
           // A tap on a token or on «+N» names everybody on the cell (K1M-7)

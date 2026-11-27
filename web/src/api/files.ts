@@ -39,6 +39,8 @@ export async function uploadFile(
     | '/api/bug-reports/screenshot'
     | `/api/admin/seasons/${string}/map/background` = '/api/files',
 ): Promise<StoredFile> {
+  // Keep the token bound to the user who chose this file while the site's limits load.
+  const headers = antiforgeryHeaders();
   // A body over the server's limit is cut off with no answer the page could read (K1A): it is refused here first. A
   // site that did not say its limits gets the file and answers for itself.
   const limits = (await siteEnvironment())?.uploads;
@@ -52,7 +54,7 @@ export async function uploadFile(
     method: 'POST',
     body: form,
     credentials: 'same-origin',
-    headers: antiforgeryHeaders(),
+    headers,
   });
   noteResponse('POST', url, response.status);
   const body: unknown = await response.json().catch(() => null);

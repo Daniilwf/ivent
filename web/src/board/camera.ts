@@ -1,4 +1,6 @@
 import type { Board, Point } from './types';
+import { easeInOut } from 'motion/react';
+import { moveMotion } from '../design/motion';
 
 // The map's camera and the places of the stickers on a cell: pure geometry, apart from MapView for its tests
 // (K1M-2, K1M-6, K2-2…K2-4)
@@ -6,6 +8,7 @@ import type { Board, Point } from './types';
 /** The view is its centre and its width in world units; the height follows the frame's shape */
 export type View = { cx: number; cy: number; w: number };
 export type Box = { width: number; height: number };
+export type Bounds = { x0: number; x1: number; y0: number; y1: number };
 /** The side of the frame the zoom buttons stand on (the bottom on every size, K2-4), or none */
 export type ToolsSide = 'bottom' | null;
 
@@ -32,21 +35,30 @@ export const camera = {
   tapSlop: 8,
 };
 
+export const stickerLift = { onCell: 32, onBigCell: 52 };
+
 /**
  * The world a frame's camera may show (K1M-2): the board with room round its edge and, on the buttons' side, the band
  * they stand on (in world units at the view's zoom); `clamp` moves a view back into it, `fit` shows all of it.
  */
-export function cameraFrame(board: Board, box: Box, side: ToolsSide, anchor: Point | null = null) {
+export function cameraFrame(
+  board: Board,
+  box: Box,
+  side: ToolsSide,
+  anchor: Point | null = null,
+  extra?: Bounds,
+) {
   const ratio = box.height / box.width;
   const gap = side ? camera.tools : 0;
   const area = (w: number) => {
     const strip = (gap * w) / box.width;
-    return {
+    const world = {
       x0: -camera.edge,
       x1: board.width + camera.edge,
       y0: -camera.edge,
-      y1: board.height + camera.edge + (side ? strip : 0),
+      y1: board.height + camera.edge + strip,
     };
+    return extra ? union(world, extra) : world;
   };
   /** A view moved back into the world: never past its edges, and centred on it once it is all in the frame */
   const clamp = (v: View): View => {
@@ -73,6 +85,142 @@ export function cameraFrame(board: Board, box: Box, side: ToolsSide, anchor: Poi
     w: portrait ? tallWidth : wholeWidth,
   });
   return { ratio, area, clamp, wholeWidth, fit };
+}
+
+const union = (a: Bounds, b: Bounds): Bounds => ({
+  x0: Math.min(a.x0, b.x0),
+  x1: Math.max(a.x1, b.x1),
+  y0: Math.min(a.y0, b.y0),
+  y1: Math.max(a.y1, b.y1),
+});
+
+export type MoveHop = { start: number; finish: number; height: number; duration: number };
+
+export function moveHops(points: readonly Point[], jumps: readonly number[], budget: number) {
+  const steps = points.length - 1;
+  if (steps < 1) return [];
+  const units = steps + jumps.filter((i) => i > 0 && i <= steps).length;
+  const long = units * moveMotion.minHopSeconds > budget;
+  const groups = long
+    ? Math.min(steps, Math.max(1, Math.floor(budget / moveMotion.minHopSeconds)))
+    : steps;
+  const hop = Math.min(moveMotion.hopSeconds, budget / Math.max(1, long ? groups : units));
+
+  return Array.from({ length: groups }, (_, group): MoveHop => {
+    // A long route groups several cells into a single hop, still crossing them in order.
+    const start = Math.round((group * steps) / groups);
+    const finish = Math.round(((group + 1) * steps) / groups);
+    const from = points[start] as Point;
+    const to = points[finish] as Point;
+    const flight = finish === start + 1 && jumps.includes(finish);
+    const height = flight
+      ? Math.max(Math.hypot(to.x - from.x, to.y - from.y) / 3, 40)
+      : moveMotion.hopHeight;
+    return { start, finish, height, duration: flight && !long ? hop * 2 : hop };
+  });
+}
+
+export type MoveFraming = {
+  hops: readonly MoveHop[];
+  /** Bounds of the sticker relative to the ground point before adding the hop. */
+  sticker: Bounds;
+};
+
+export function hopPoint(path: readonly Point[], hop: MoveHop, progress: number): Point {
+  const at = hop.start + (hop.finish - hop.start) * progress;
+  const index = Math.min(hop.finish - 1, Math.floor(at));
+  const a = path[index] as Point;
+  const b = path[index + 1] as Point;
+  const along = at - index;
+  return { x: a.x + (b.x - a.x) * along, y: a.y + (b.y - a.y) * along };
+}
+
+// Divide each hop into timed envelopes so the camera can follow even a fast hop with a large arc.
+const hopSpans = 4;
+
+/** An initial shot, with a fixed-zoom sweep when the route would otherwise need a wider shot. */
+export function moveView(view: View, box: Box, path: readonly Point[], framing: MoveFraming) {
+  const from = path[0];
+  const to = path.at(-1);
+  if (!from || !to) return;
+  const { hops, sticker } = framing;
+  const ratio = box.height / box.width;
+  const footprint = (p: Point): Bounds => ({
+    x0: p.x + sticker.x0,
+    x1: p.x + sticker.x1,
+    y0: p.y + sticker.y0,
+    y1: p.y + sticker.y1,
+  });
+  const start = footprint(from);
+  const spans = hops.flatMap((hop) =>
+    Array.from({ length: hopSpans }, (_, i) => {
+      const a = easeInOut(i / hopSpans);
+      const b = easeInOut((i + 1) / hopSpans);
+      const steps = hop.finish - hop.start;
+      const inside = path.slice(
+        hop.start + Math.ceil(steps * a),
+        hop.start + Math.floor(steps * b) + 1,
+      );
+      const area = [hopPoint(path, hop, a), ...inside, hopPoint(path, hop, b)]
+        .map(footprint)
+        .reduce(union);
+      const peak = Math.sin(Math.PI * Math.min(b, Math.max(a, 0.5))) * hop.height;
+      return { duration: hop.duration / hopSpans, area: { ...area, y0: area.y0 - peak } };
+    }),
+  );
+  const bounds = spans.reduce((area, span) => union(area, span.area), start);
+  if (
+    bounds.x0 >= view.cx - view.w / 2 &&
+    bounds.x1 <= view.cx + view.w / 2 &&
+    bounds.y0 >= view.cy - (view.w * ratio) / 2 &&
+    bounds.y1 <= view.cy + (view.w * ratio) / 2
+  )
+    return;
+
+  const shot = ({ x0, x1, y0, y1 }: Bounds, minWidth: number): View => ({
+    cx: (x0 + x1) / 2,
+    cy: (y0 + y1) / 2,
+    w: Math.max(minWidth, x1 - x0, (y1 - y0) / ratio),
+  });
+  const still = shot(bounds, view.w);
+  const readable = Math.max(view.w, box.width / camera.readable);
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const distance = Math.hypot(dx, dy);
+  const duration = hops.reduce((total, hop) => total + hop.duration, 0);
+  if (still.w <= readable || distance === 0 || duration === 0) return { bounds, target: still };
+
+  const speed = Math.min(
+    readable * Math.min(1, ratio) * moveMotion.cameraScreensPerSecond,
+    distance / duration,
+  );
+  const vx = (speed * dx) / distance;
+  const vy = (speed * dy) / distance;
+  let elapsed = 0;
+  // Frame the hop envelopes in coordinates moving with the camera. Reserving each envelope
+  // throughout its hop keeps fast jumps visible even when they can outrun the camera.
+  const swept = spans.reduce((required, { area, duration }) => {
+    const end = elapsed + duration;
+    const shift = (at: number) => ({
+      x0: area.x0 - vx * at,
+      x1: area.x1 - vx * at,
+      y0: area.y0 - vy * at,
+      y1: area.y1 - vy * at,
+    });
+    const covered = union(required, union(shift(elapsed), shift(end)));
+    elapsed = end;
+    return covered;
+  }, start);
+  const target = shot(swept, readable);
+  if (target.w >= still.w) return { bounds, target: still };
+  return {
+    bounds,
+    target,
+    follow: (seconds: number): View => {
+      const time = Math.min(duration, Math.max(0, seconds));
+      return { ...target, cx: target.cx + vx * time, cy: target.cy + vy * time };
+    },
+  };
 }
 
 /**

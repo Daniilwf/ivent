@@ -725,11 +725,15 @@ export const ru = {
     hoursSourceHint: 'Ссылка, например на HowLongToBeat, или короткая пометка.',
     hoursSourceRequired: 'Укажи источник оценки: ссылку или пометку.',
     challengeDone: 'Челлендж выполнен',
-    review: 'Отзыв — по желанию',
+    review: 'Отзыв и скрин — по желанию',
     reviewRating: 'Оценка игры',
     reviewNoRating: 'Без оценки',
     reviewText: 'Отзыв',
     reviewRatingRequired: 'Чтобы оставить отзыв, поставь оценку от 1 до 10.',
+    proofShot: 'Добавить скрин для пруфа',
+    proofShotReplace: 'Заменить скрин для пруфа',
+    proofShotHint: 'JPEG, PNG, WebP или GIF. Скрин будет в форме пруфа.',
+    proofShotReady: 'Скрин для пруфа готов',
     lastRejected: (title: string) => `Прохождение отклонено (${title}): снято всё, что дал ход.`,
     lastChallengeDice: (dice: number[]) => `Кубы за челлендж: ${dice.join(' + ')}`,
     lastReview: (rating: number, text: string | null) =>
@@ -758,6 +762,8 @@ export const ru = {
   proof: {
     title: 'Пруф',
     lead: 'Хватит одного: ссылки, скрины или свидетель.',
+    prepared: 'Скрина достаточно, чтобы отправить пруф.',
+    moreMaterials: 'Дополнительные материалы',
     // K1S-2: a new send replaces the waiting proof, so the form starts with it
     replaces:
       'В форме — отправленный пруф. Поправь или добавь: новая отправка заменит его целиком.',
