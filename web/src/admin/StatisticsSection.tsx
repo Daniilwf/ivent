@@ -1,5 +1,5 @@
 import { ChartNoAxesColumn } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { api, type Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { answerOf, useLoaded } from '../app/useLoaded';
@@ -15,6 +15,16 @@ type SortOrder = keyof typeof t.sort;
 const column = 'min-w-0 text-left desk:px-4 desk:py-3';
 const attack =
   'flex flex-wrap items-baseline justify-between gap-x-2 border-b border-muted pb-1 desk:table-cell desk:border-0';
+const rate = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
+const scientificRate = new Intl.NumberFormat('ru-RU', {
+  notation: 'scientific',
+  maximumFractionDigits: 2,
+});
+
+function formatRate(value: number) {
+  if (value > 0 && value < 0.01) return t.belowPrecision;
+  return Math.abs(value) >= 1e12 ? scientificRate.format(value) : rate.format(value);
+}
 
 function actionTime(player: Player) {
   return player.lastActionAt ? Date.parse(player.lastActionAt) : Number.NEGATIVE_INFINITY;
@@ -23,10 +33,16 @@ function actionTime(player: Player) {
 function ordered(players: readonly Player[], order: SortOrder) {
   if (order === 'name') return players;
   if (order === 'lastActionAt') return players.toSorted((a, b) => actionTime(b) - actionTime(a));
+  if (order === 'pointsPerHour')
+    return players.toSorted((a, b) => {
+      if (a.pointsPerHour == null) return b.pointsPerHour == null ? 0 : 1;
+      if (b.pointsPerHour == null) return -1;
+      return b.pointsPerHour - a.pointsPerHour;
+    });
   return players.toSorted((a, b) => b[order] - a[order]);
 }
 
-/** Effective attacks and each participant's last own action in the selected season. */
+/** Effective attacks, credited completion efficiency and each participant's last own action in the selected season. */
 export function StatisticsSection({ seasonId, version }: { seasonId: string; version: number }) {
   const load = useCallback(
     async () =>
@@ -39,6 +55,7 @@ export function StatisticsSection({ seasonId, version }: { seasonId: string; ver
   );
   const loaded = useLoaded(load, { version });
   const [order, setOrder] = useState<SortOrder>('name');
+  const rateExplanation = useId();
 
   return (
     <AsyncState loaded={loaded} errorTitle={ru.admin.loadErrorTitle}>
@@ -52,6 +69,9 @@ export function StatisticsSection({ seasonId, version }: { seasonId: string; ver
           />
         ) : (
           <div className="grid min-w-0 gap-4">
+            <p id={rateExplanation} className="max-w-prose text-sm text-ink-soft">
+              {t.rateFormula}
+            </p>
             <Select
               label={t.order}
               value={order}
@@ -71,6 +91,7 @@ export function StatisticsSection({ seasonId, version }: { seasonId: string; ver
             <table
               role="table"
               aria-label={ru.admin.sections.statistics}
+              aria-describedby={rateExplanation}
               className="block w-full border-collapse desk:table desk:bg-card"
             >
               <thead role="rowgroup" className="sr-only desk:not-sr-only desk:table-header-group">
@@ -98,6 +119,14 @@ export function StatisticsSection({ seasonId, version }: { seasonId: string; ver
                     className={column}
                   >
                     {t.attacksReceived}
+                  </th>
+                  <th
+                    role="columnheader"
+                    scope="col"
+                    aria-sort={order === 'pointsPerHour' ? 'descending' : undefined}
+                    className={column}
+                  >
+                    {t.pointsPerHour}
                   </th>
                   <th
                     role="columnheader"
@@ -134,6 +163,28 @@ export function StatisticsSection({ seasonId, version }: { seasonId: string; ver
                         {t.attacksReceived}
                       </span>
                       <span className="font-bold tabular-nums">{player.attacksReceived}</span>
+                    </td>
+                    <td
+                      role="cell"
+                      className={`col-span-2 border-b border-muted pb-1 desk:table-cell desk:border-0 ${column}`}
+                    >
+                      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2 desk:block">
+                        <span aria-hidden="true" className="text-sm text-ink-soft desk:hidden">
+                          {t.pointsPerHour}
+                        </span>
+                        <div className="min-w-0 text-right desk:text-left">
+                          <span className="font-bold tabular-nums">
+                            {player.pointsPerHour == null
+                              ? t.noRate
+                              : formatRate(player.pointsPerHour)}
+                          </span>
+                          <p className="text-sm text-ink-soft tabular-nums wrap-anywhere">
+                            {player.pointsPerHour == null
+                              ? t.noHours
+                              : t.sample(player.completedRunPoints, player.completedRunHours)}
+                          </p>
+                        </div>
+                      </div>
                     </td>
                     <td
                       role="cell"

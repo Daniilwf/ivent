@@ -2389,7 +2389,7 @@ export const ru = {
     leads: {
       proofs: 'Финиши сверху, дальше по времени завершения. Проверь пруф и одобри или отклони.',
       players: 'Очки, монетки, клетка и ход каждого игрока. Правка пишется в лог с комментарием.',
-      statistics: 'Попавшие атаки и последние собственные действия игроков.',
+      statistics: 'Попавшие атаки, очки в час и последние собственные действия игроков.',
       log: 'Все действия сезона, новые сверху. Откат отменяет действие целиком.',
       effects: 'Ивенты, которые игроки ещё не разыграли. Разыграй за игрока, если он забыл.',
       pool: 'Веса категорий колеса и игры пула.',
@@ -2431,15 +2431,41 @@ export const ru = {
       player: 'Игрок',
       attacksMade: 'Нанесено атак',
       attacksReceived: 'Получено атак',
+      pointsPerHour: 'Очки в час',
+      belowPrecision: '<0,01',
+      noRate: '—',
+      noHours: 'Нет зачтённых часов',
+      rateFormula:
+        'Очки за зачтённые прохождения делятся на их сохранённые часы. В коопе каждому учитывается полная длина игры; свободный режим и непроверенные пруфы не учитываются.',
+      sample: (completedPoints: number, hours: number) => {
+        const largeHours = hours >= 1e12;
+        const savedHours = hours.toLocaleString(
+          'ru-RU',
+          largeHours || (hours > 0 && hours < 1e-20)
+            ? { notation: 'scientific', maximumSignificantDigits: 21 }
+            : { maximumFractionDigits: 20 },
+        );
+        const hoursWord = largeHours
+          ? 'часов'
+          : Number.isInteger(hours)
+            ? plural(hours, 'час', 'часа', 'часов')
+            : 'часа';
+        return (
+          `${completedPoints.toLocaleString('ru-RU')} ${plural(completedPoints, 'очко', 'очка', 'очков')} за ` +
+          `${savedHours} ${hoursWord}`
+        );
+      },
       lastAction: 'Последнее действие',
       noAction: 'Пока без действий',
       emptyTitle: 'В сезоне пока нет игроков',
-      emptyText: 'Когда игроки присоединятся, здесь появятся их атаки и последние действия.',
+      emptyText:
+        'Когда игроки присоединятся, здесь появятся их атаки, очки в час и последние действия.',
       order: 'Порядок',
       sort: {
         name: 'По имени',
         attacksMade: 'По нанесённым атакам',
         attacksReceived: 'По полученным атакам',
+        pointsPerHour: 'По очкам в час',
         lastActionAt: 'По последнему действию',
       },
     },
