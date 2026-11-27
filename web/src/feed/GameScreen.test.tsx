@@ -266,7 +266,9 @@ describe('GameScreen', () => {
 
     const button = await screen.findByRole('button', { name: 'Реакция 🔥', pressed: false });
     expect(button).toHaveAccessibleDescription('1 реакция');
-    expect([...watchedSeasons.keys()]).toEqual(['s1']);
+    await waitFor(() => {
+      expect([...watchedSeasons.keys()]).toEqual(['s1']);
+    });
     button.focus();
 
     count = 2;

@@ -2,7 +2,7 @@ import { useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { DiceMoment, type DiceRoll } from '../board/Dice';
 import { movePath } from '../board/geometry';
-import { momentBudget, type MomentHandle } from '../board/moment';
+import { diceSettleSeconds, momentBudget, type MomentHandle } from '../board/moment';
 import { TokenMove } from '../board/TokenMove';
 import type { Board, Player } from '../board/types';
 import { ru } from '../i18n/ru';
@@ -11,8 +11,8 @@ import { cx } from '../ui/cx';
 
 /** How long the total stays on the table before the token sets off (not with reduced motion) */
 const totalRest = 300;
-/** The dice settle in 1.5 s; the rest and the walk fit the moments' budget with them (docs/DESIGN.md: under 3 s) */
-const walkBudget = momentBudget - 1.5 - totalRest / 1000;
+/** The dice, the rest, and the walk fit the moments' budget together (docs/DESIGN.md: under 3 s) */
+const walkBudget = momentBudget - diceSettleSeconds - totalRest / 1000;
 
 /**
  * A completion that came while the page is open (H4): the run's dice roll across the table, the total rests a moment,

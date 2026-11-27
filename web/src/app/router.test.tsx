@@ -66,6 +66,8 @@ describe('router', () => {
     expect(routeOf('/pool')).toEqual({ kind: 'pool' });
     expect(routeOf('/pool/')).toEqual({ kind: 'pool' });
     expect(routeOf('/rules')).toEqual({ kind: 'rules' });
+    expect(routeOf('/whats-new/')).toEqual({ kind: 'whatsNew' });
+    expect(routeOf('/whats-new/latest')).toEqual({ kind: 'notFound' });
     expect(routeOf('/whatever')).toEqual({ kind: 'notFound' });
     expect(routeOf('/admin')).toEqual({ kind: 'admin', section: null });
     expect(routeOf('/admin/players/')).toEqual({ kind: 'admin', section: 'players' });
@@ -81,6 +83,7 @@ describe('router', () => {
     expect(paths.game(id)).toBe(`/games/${id}`);
     expect(paths.pool()).toBe('/pool');
     expect(paths.rules()).toBe('/rules');
+    expect(paths.whatsNew()).toBe('/whats-new');
     expect(paths.admin()).toBe('/admin');
     expect(paths.admin('log')).toBe('/admin/log');
     expect(routeOf(paths.profile(id))).toEqual({ kind: 'profile', userId: id });
@@ -172,6 +175,27 @@ describe('router', () => {
     expect(scrolled).toHaveBeenLastCalledWith(0, 400);
     scrolled.mockRestore();
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+  });
+
+  it('opens an unvisited fragment without jumping to the top and restores a saved position', async () => {
+    const scrolled = vi.spyOn(window, 'scrollTo');
+    try {
+      act(() => {
+        globalThis.history.replaceState(null, '', '/rules#rules-roll');
+        globalThis.dispatchEvent(new PopStateEvent('popstate'));
+      });
+      await nextFrame();
+      expect(scrolled).not.toHaveBeenCalled();
+
+      act(() => {
+        globalThis.history.replaceState({ scrollY: 640 }, '', '/rules#rules-roll');
+        globalThis.dispatchEvent(new PopStateEvent('popstate'));
+      });
+      await nextFrame();
+      expect(scrolled).toHaveBeenLastCalledWith(0, 640);
+    } finally {
+      scrolled.mockRestore();
+    }
   });
 
   it('a reload keeps where the page was scrolled in its entry', () => {

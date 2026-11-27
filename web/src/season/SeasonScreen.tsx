@@ -19,6 +19,7 @@ import { WaitingEvents } from './WaitingEvents';
 import { RunConditions } from './RunConditions';
 import { ManualEffectItem, type EffectOutcome } from './ManualEffectItem';
 import { IrlProofSection } from './IrlProofSection';
+import { PlayerSuggestions } from '../suggestions/PlayerSuggestions';
 import { EconomySection } from './Inventory';
 import { RunActions } from './RunActions';
 import { MyFinish } from './MyFinish';
@@ -30,6 +31,7 @@ import { branchOptions, legsPath } from '../board/graphBoard';
 import { seasonBoard } from '../board/seasonBoard';
 import { MapLegend } from '../board/MapLegend';
 import { cellById, cellsToFinish } from '../board/geometry';
+import { Confetti } from '../board/Confetti';
 import { TokenMove } from '../board/TokenMove';
 import { BranchChoice, branchTitle } from './BranchChoice';
 import { Leaderboard } from '../board/Leaderboard';
@@ -214,6 +216,7 @@ export function SeasonScreen({
   >(undefined);
   const [thrown, setThrown] = useState<Thrown | null>(null);
   const [walking, setWalking] = useState<Walking | null>(null);
+  const [celebration, setCelebration] = useState<'waiting' | 'playing' | null>(null);
   const walk = useRef<MomentHandle>(null);
   // The season as the page showed it last: while the dice roll, the map and the leaderboard keep it (the moment owns
   // its result, H4 design review)
@@ -234,6 +237,7 @@ export function SeasonScreen({
         const opened = loaded.season.me?.roll?.sequence ?? null;
         setLanded((landed) => (landed === undefined ? opened : landed));
         const view = loaded.season;
+        if (!view.me?.finish) setCelebration(null);
         const last = view.me?.lastCompleted ?? null;
         const mine = view.players.find((p) => p.id === view.me?.playerId);
         const cell = mine?.cellId ?? null;
@@ -312,6 +316,8 @@ export function SeasonScreen({
 
   async function act(command: Command) {
     const drawBeforeCommand = season?.me?.lastEvent?.sequence ?? 0;
+    // Starting a new action also skips any celebration still waiting for the previous card.
+    setCelebration(null);
     setPending(true);
     setMessage(null);
     try {
@@ -416,6 +422,7 @@ export function SeasonScreen({
   }, [eventQuestionId, season, thrown, walking]);
   const [drawBase, setDrawBase] = useState<{ sequence: number | null } | null>(null);
   const [shownDraws, setShownDraws] = useState<ReadonlySet<number>>(() => new Set());
+  const [settledDraw, setSettledDraw] = useState<number | null>(null);
   const noteDrawShown = useCallback((sequence: number) => {
     setShownDraws((shown) => (shown.has(sequence) ? shown : new Set([...shown, sequence])));
   }, []);
@@ -423,6 +430,10 @@ export function SeasonScreen({
   const newDraw =
     drawBase !== null && drawnSequence !== null && drawnSequence > (drawBase.sequence ?? 0);
   const freshDraw = newDraw && !shownDraws.has(drawnSequence);
+  // A difficulty event can arrive with a finish. Follow the current card until it turns face up,
+  // including if the server replaces it or removes it before the celebration.
+  if (celebration === 'waiting' && (!newDraw || settledDraw === drawnSequence))
+    setCelebration('playing');
   const [retrying, setRetrying] = useState(false);
 
   if (loadFailed && !season)
@@ -737,6 +748,7 @@ export function SeasonScreen({
             fresh={freshDraw}
             initiallyOpen={newDraw && me.lastEvent.sequence > historyFold.through}
             onShown={noteDrawShown}
+            onSettled={newDraw ? setSettledDraw : undefined}
           />
         ) : null}
       </section>
@@ -803,6 +815,7 @@ export function SeasonScreen({
   // A later finisher's token stands still: the dice give points only; the frozen first gets no points (free mode)
   const throwStays = mine ? throwFrom === mine.cell : false;
   const throwFree = me?.finish?.frozen === true;
+  const finishCell = board.cells.find((c) => c.id === mine?.cell)?.kind === 'finish';
   const myActualRow = rows.find((r) => r.player.me);
   const diceStage =
     throwing && thrown && mine ? (
@@ -831,7 +844,7 @@ export function SeasonScreen({
         fill={desk}
         onDone={() => {
           setThrown(null);
-          const finishCell = board.cells.find((c) => c.id === mine.cell)?.kind === 'finish';
+          if (finishCell && me?.finish && !thrown.before.me?.finish) setCelebration('waiting');
           const at = throwFree
             ? ''
             : finishCell
@@ -891,6 +904,13 @@ export function SeasonScreen({
           onPhase={(phase) => {
             if (phase !== 'done') return;
             setWalking(null);
+            if (
+              finishCell &&
+              me?.finish &&
+              !moving.before.me?.finish &&
+              me.lastMove?.sequence === moving.sequence
+            )
+              setCelebration('waiting');
             setAnnounced(ru.map.branch.announce(mine.cell));
           }}
         />
@@ -918,6 +938,14 @@ export function SeasonScreen({
 
   return (
     <main className="mx-auto grid max-w-300 grid-cols-1 gap-4 px-4 pt-4 pb-28 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-6 desk:px-8 desk:pb-8">
+      {celebration === 'playing' && me?.finish && !finished ? (
+        <Confetti
+          overlay
+          onDone={() => {
+            setCelebration(null);
+          }}
+        />
+      ) : null}
       <header className="grid gap-2 min-w-0 desk:col-start-1 desk:w-96">
         <h1
           ref={heading}
@@ -1069,6 +1097,7 @@ export function SeasonScreen({
               drawn={me?.lastEvent ?? null}
               fresh={freshDraw}
               onShown={noteDrawShown}
+              onSettled={newDraw ? setSettledDraw : undefined}
               unavailableReason={
                 answerAllowed
                   ? ''
@@ -1336,6 +1365,13 @@ export function SeasonScreen({
           className="desk:col-start-1 desk:w-96"
         />
       ) : null}
+      <PlayerSuggestions
+        seasonId={seasonId}
+        role={role}
+        participating={me !== null}
+        seasonStatus={season.status}
+        onSignedOut={onSignedOut}
+      />
       {/* The latest of the feed beside the map on a desktop; a phone opens the feed from the header */}
       {desk ? (
         <FeedPreview

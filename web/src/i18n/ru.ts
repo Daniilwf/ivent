@@ -3,6 +3,7 @@
 import { stage5Moderation } from './stage5Moderation';
 import { stage5Operations } from './stage5Operations';
 import { stage5Interactions } from './stage5Interactions';
+import { playerSuggestions } from './playerSuggestions';
 
 // A Russian noun after a number: 1 очко, 2 очка, 5 очков
 const plural = (n: number, one: string, few: string, many: string) => {
@@ -533,6 +534,7 @@ export const ru = {
     logout: 'Выйти',
   },
   interactions: stage5Interactions,
+  playerSuggestions,
   turn: {
     interactions: 'Напарники и дуэли',
     race: (opponent: string, deadline: string) => `Дуэль с игроком ${opponent} до ${deadline}`,
@@ -3428,6 +3430,7 @@ export const ru = {
       viewing: 'Открыт в админке',
       openHere: 'Открыть',
       create: 'Новый сезон',
+      createJump: 'К созданию сезона',
       createLead:
         'Сезон создаётся черновиком с правилами по умолчанию; начнёшь его кнопкой «Начать сезон».',
       template: 'Сезон по образцу',

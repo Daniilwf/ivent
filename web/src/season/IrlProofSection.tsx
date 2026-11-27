@@ -29,9 +29,11 @@ export type IrlProofSectionProps = {
 type Draft = {
   files: readonly Schemas['FileLinkView'][];
   link: string;
-  sourceAt: string | null;
+  source: string | null;
   dirty: boolean;
 };
+
+type Submission = { materials: string; source: string | null };
 
 type FocusReturn = { origin: HTMLElement; after: 'upload' | 'submit'; sawPending: boolean };
 
@@ -43,11 +45,21 @@ function returnOwnedFocus(origin: HTMLElement, target: HTMLElement | null | unde
 const pictureTypes = 'image/png,image/jpeg,image/webp,image/gif';
 const acceptedTypes = new Set(pictureTypes.split(','));
 
+function materialsOf(files: readonly Schemas['FileLinkView'][], link: string | null | undefined) {
+  return JSON.stringify([files.map((file) => file.id), trimIrlLink(link ?? '')]);
+}
+
+function sourceOf(proof: Schemas['IrlProofView'] | null | undefined) {
+  return proof
+    ? JSON.stringify([proof.submittedAt, proof.status, materialsOf(proof.files, proof.link)])
+    : null;
+}
+
 function draftOf(proof: Schemas['IrlProofView'] | null | undefined): Draft {
   return {
     files: [...(proof?.files ?? [])],
     link: proof?.link ?? '',
-    sourceAt: proof?.submittedAt ?? null,
+    source: sourceOf(proof),
     dirty: false,
   };
 }
@@ -68,9 +80,22 @@ function IrlProofForm({
   const t = ru.irlProof;
   const proof = effect.irlProof;
   const [draft, setDraft] = useState(() => draftOf(proof));
+  const [submission, setSubmission] = useState<Submission | null>(null);
   const incomingAt = proof?.submittedAt ?? null;
-  // Another tab may send the proof first. Adopt its materials only while this tab has no unsent edits.
-  if (proof && incomingAt !== draft.sourceAt && !draft.dirty) setDraft(draftOf(proof));
+  const incomingSource = sourceOf(proof);
+  if (
+    proof &&
+    submission &&
+    incomingSource !== submission.source &&
+    materialsOf(proof.files, proof.link) === submission.materials
+  ) {
+    // Acknowledging a sent draft must not erase edits made while its response was in flight.
+    setSubmission(null);
+    if (materialsOf(draft.files, draft.link) === submission.materials) setDraft(draftOf(proof));
+  } else if (proof && incomingSource !== draft.source && !draft.dirty) {
+    // Another tab may send first, including a different proof with the same clock timestamp.
+    setDraft(draftOf(proof));
+  }
   const [uploading, setUploading] = useState(false);
   const [uploadProblem, setUploadProblem] = useState<string | null>(null);
   const [formProblem, setFormProblem] = useState<string | null>(null);
@@ -147,6 +172,7 @@ function IrlProofForm({
       active instanceof HTMLElement && form.current?.contains(active)
         ? { origin: active, after: 'submit', sawPending: false }
         : null;
+    setSubmission({ materials: materialsOf(draft.files, link), source: incomingSource });
     onSubmit(
       draft.files.map((file) => file.id),
       link === '' ? null : link,

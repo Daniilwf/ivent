@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react';
+import { ArrowDown, Download } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type Ref, type SyntheticEvent } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { siteEnvironment } from '../app/siteStatus';
@@ -27,6 +27,11 @@ const next: Partial<Record<Status, Status>> = {
   closing: 'finished',
   finished: 'archived',
 };
+
+function focusHeading(heading: HTMLHeadingElement | null) {
+  heading?.focus({ preventScroll: true });
+  heading?.scrollIntoView({ block: 'center' });
+}
 
 /** The season's lifecycle, deadline, archive and integrity; the list of seasons and a new one */
 export function SeasonSection({
@@ -59,14 +64,14 @@ export function SeasonSection({
   const [templatesEnabled, setTemplatesEnabled] = useState(false);
   const createdSeason = useRef<string>(null);
   const statusHeading = useRef<HTMLHeadingElement>(null);
+  const creationHeading = useRef<HTMLHeadingElement>(null);
   const viewedSeason = loaded.kind === 'ready' ? loaded.value.season?.id : undefined;
 
   useEffect(() => {
     const heading = statusHeading.current;
     if (!heading || createdSeason.current !== viewedSeason) return;
     createdSeason.current = null;
-    heading.focus({ preventScroll: true });
-    heading.scrollIntoView({ block: 'center' });
+    focusHeading(heading);
   }, [viewedSeason]);
 
   useEffect(() => {
@@ -92,6 +97,15 @@ export function SeasonSection({
         return (
           <div className="grid gap-6" data-testid="admin-season">
             {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+            <Button
+              className="justify-self-start"
+              icon={<ArrowDown size={20} aria-hidden />}
+              onClick={() => {
+                focusHeading(creationHeading.current);
+              }}
+            >
+              {t.createJump}
+            </Button>
             {season && seasonId ? (
               <>
                 <StatusPanel
@@ -157,6 +171,7 @@ export function SeasonSection({
               </ul>
             </Panel>
             <CreateSeason
+              headingRef={creationHeading}
               templates={
                 templatesEnabled
                   ? list.filter(
@@ -391,9 +406,11 @@ function IntegrityPanel({ seasonId }: { seasonId: string }) {
 }
 
 function CreateSeason({
+  headingRef,
   templates,
   onCreated,
 }: {
+  headingRef: Ref<HTMLHeadingElement>;
   templates: Schemas['SeasonListItemView'][];
   onCreated: (id: string, name: string) => void;
 }) {
@@ -463,7 +480,7 @@ function CreateSeason({
   }
 
   return (
-    <Panel title={t.create}>
+    <Panel title={t.create} titleRef={headingRef}>
       <p className="max-w-prose wrap-anywhere text-ink-soft">
         {template ? t.templateLead(template.name) : t.createLead}
       </p>

@@ -225,6 +225,43 @@ describe('The season section', () => {
     expect(onPick).toHaveBeenCalledWith(other);
   });
 
+  it('gets to the existing creation form from the top of a long season list', async () => {
+    const archives = Array.from({ length: 12 }, (_, index) => ({
+      id: `archive-${index}`,
+      name: `Длинное название завершённого архивного сезона ${index}`,
+      status: 'archived',
+      deadline: null,
+      createdAt: '2026-03-01T00:00:00Z',
+    }));
+    const originalScroll = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    try {
+      open('active', { 'GET /api/seasons': [...archives, ...list] });
+      const shortcut = await screen.findByRole('button', { name: 'К созданию сезона' });
+      const heading = screen.getByRole('heading', { name: t.create, level: 2 });
+      await userEvent.tab();
+      expect(shortcut).toHaveFocus();
+
+      await userEvent.keyboard('{Enter}');
+
+      expect(heading).toHaveFocus();
+      expect(screen.getAllByTestId('season-name')).toHaveLength(1);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+      await userEvent.tab();
+      expect(screen.getByTestId('season-name')).toHaveFocus();
+    } finally {
+      if (originalScroll) {
+        Object.defineProperty(Element.prototype, 'scrollIntoView', originalScroll);
+      } else {
+        Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+      }
+    }
+  });
+
   it('creates a season by its name and opens it', async () => {
     const onPick = vi.fn();
     const server = open('active', { 'POST /api/admin/seasons': ok }, onPick);

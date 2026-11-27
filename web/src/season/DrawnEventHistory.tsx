@@ -10,11 +10,13 @@ export function DrawnEventHistory({
   fresh,
   initiallyOpen,
   onShown,
+  onSettled,
 }: {
   drawn: Schemas['DrawnEventView'];
   fresh: boolean;
   initiallyOpen: boolean;
   onShown: (sequence: number) => void;
+  onSettled?: ((sequence: number) => void) | undefined;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   return (
@@ -29,7 +31,7 @@ export function DrawnEventHistory({
         <span className="wrap-anywhere">{ru.events.history(drawn.name)}</span>
       </Summary>
       <div className="pt-2">
-        <DrawnEventCard drawn={drawn} fresh={fresh} onShown={onShown} />
+        <DrawnEventCard drawn={drawn} fresh={fresh} onShown={onShown} onSettled={onSettled} />
       </div>
     </details>
   );

@@ -1,12 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import type { Schemas } from '../support/api.ts';
-import {
-  goToAdminSection,
-  openAdmin,
-  seasonOf,
-  setUpSeason,
-  signInHere,
-} from '../support/world.ts';
+import { goToAdminSection, seasonOf, setUpSeason, signInHere } from '../support/world.ts';
+
+async function expectHeadingBelowHeader(heading: Locator, header: Locator) {
+  await expect(heading).toBeFocused();
+  await expect(heading).toBeInViewport({ ratio: 1 });
+  const [headerBox, headingBox] = await Promise.all([header.boundingBox(), heading.boundingBox()]);
+  if (!headerBox || !headingBox) throw new Error('The heading or page header is missing.');
+  expect(headingBox.y).toBeGreaterThanOrEqual(headerBox.y + headerBox.height);
+}
 
 test('an admin creates and opens a draft using an archived season', async ({ page }, info) => {
   const world = await setUpSeason({ players: ['Лис'] });
@@ -15,20 +17,54 @@ test('an admin creates and opens a draft using an archived season', async ({ pag
 
   const sourceId = crypto.randomUUID();
   const sourceName = `Архив походов по дальним играм с остановками у каждого маяка ${world.seasonName}`;
-  const sourceAdmin = `/api/admin/seasons/${sourceId}`;
   const name = `Новый поход ${world.seasonName}`;
   const deadline = '2099-12-20T18:05';
+  const archives = [
+    { id: sourceId, name: sourceName },
+    ...Array.from({ length: 8 }, (_, index) => ({
+      id: crypto.randomUUID(),
+      name: `Архив ${String(index + 1)}, ${world.seasonName}`,
+    })),
+  ];
 
   try {
-    await world.adminApi.post('/api/admin/seasons', { seasonId: sourceId, name: sourceName });
-    await world.adminApi.post(`${sourceAdmin}/players`, { userId: player.id });
-    for (const to of ['active', 'closing', 'finished', 'archived'] as const) {
-      await world.adminApi.post(`${sourceAdmin}/status`, { to });
-    }
+    await Promise.all(
+      archives.map(async ({ id, name: archiveName }) => {
+        const adminSeason = `/api/admin/seasons/${id}`;
+        await world.adminApi.post('/api/admin/seasons', { seasonId: id, name: archiveName });
+        await world.adminApi.post(`${adminSeason}/players`, { userId: player.id });
+        for (const to of ['active', 'closing', 'finished', 'archived'] as const) {
+          await world.adminApi.post(`${adminSeason}/status`, { to });
+        }
+      }),
+    );
 
     await page.goto('/');
     await signInHere(page, world.admin);
-    await openAdmin(page, world, 'season');
+    await page.goto('/admin/season');
+
+    const size =
+      info.project.name === 'phone' ? { width: 390, height: 844 } : { width: 1440, height: 900 };
+    expect(page.viewportSize()).toEqual(size);
+    const header = page.getByRole('banner');
+    const shortcut = page.getByRole('button', { name: 'К созданию сезона' });
+    const creationHeading = page.getByRole('heading', { name: 'Новый сезон', level: 2 });
+    await expect(shortcut).toBeInViewport({ ratio: 1 });
+    await expect(
+      page.getByTestId('season-list').getByText(sourceName, { exact: true }),
+    ).toBeVisible();
+    await expect(creationHeading).not.toBeInViewport();
+    await page.evaluate(() => document.fonts.ready);
+    const shortcutPath = info.outputPath('season-create-entry.png');
+    await page.screenshot({ path: shortcutPath, scale: 'css' });
+    await info.attach('Shortcut to the season form', {
+      path: shortcutPath,
+      contentType: 'image/png',
+    });
+
+    if (info.project.name === 'phone') await shortcut.tap();
+    else await shortcut.press('Enter');
+    await expectHeadingBelowHeader(creationHeading, header);
 
     const source = page.getByRole('combobox', { name: 'Сезон по образцу' });
     await expect(source).toHaveValue('');
@@ -47,15 +83,10 @@ test('an admin creates and opens a draft using an archived season', async ({ pag
     await expect(deadlineField).toHaveValue('');
     await deadlineField.fill(deadline);
 
-    const size =
-      info.project.name === 'phone' ? { width: 390, height: 844 } : { width: 1440, height: 900 };
-    expect(page.viewportSize()).toEqual(size);
-    await page.evaluate(() => document.fonts.ready);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       size.width,
     );
     const action = page.getByTestId('season-create');
-    await action.scrollIntoViewIfNeeded();
     const formPath = info.outputPath('clone-form.png');
     await page.screenshot({ path: formPath, scale: 'css' });
     await info.attach('Season template form', { path: formPath, contentType: 'image/png' });
@@ -73,15 +104,9 @@ test('an admin creates and opens a draft using an archived season', async ({ pag
     await expect(status).toContainText(name);
     await expect(status).toContainText('Готовится');
     const title = status.getByRole('heading', { level: 2 });
-    await expect(title).toBeFocused();
+    await expectHeadingBelowHeader(title, header);
     await expect(status).toBeInViewport({ ratio: 1 });
     await expect(page.getByText(`Сезон создан: ${name}`, { exact: true })).toBeInViewport();
-    const [headerBox, titleBox] = await Promise.all([
-      page.getByRole('banner').boundingBox(),
-      title.boundingBox(),
-    ]);
-    if (!headerBox || !titleBox) throw new Error('The draft title or page header is missing.');
-    expect(titleBox.y).toBeGreaterThanOrEqual(headerBox.y + headerBox.height);
     await expect(page.getByTestId('season-deadline-panel')).toContainText('18:05 МСК');
 
     const seasons = await world.adminApi.get<Schemas['SeasonListItemView'][]>('/api/seasons');

@@ -6,12 +6,13 @@ import {
   LogOut,
   Map as MapIcon,
   MessagesSquare,
+  Newspaper,
   ShieldCheck,
   Trophy,
   UserRound,
   Vote,
 } from 'lucide-react';
-import { useSyncExternalStore, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { connectionStatus } from '../api/connection';
 import { useWaitingProofs } from '../admin/waitingProofs';
 import type { Schemas } from '../api/client';
@@ -99,7 +100,7 @@ function SiteNav({
 
 /**
  * The frame of every signed-in page: the name of the game, the sections, the connection mark, the bug report and my
- * menu (my profile, the admin's pages for the admin, my password, sign out)
+ * menu (my profile, the admin's pages for the admin, the release journal, my password, sign out)
  */
 export function Shell({
   user,
@@ -134,9 +135,32 @@ export function Shell({
   const shownWaiting = admin && waiting > 0 ? waiting : 0;
   const live = useSyncExternalStore(connectionStatus.subscribe, connectionStatus.get) === 'online';
   const online = offline === undefined ? live : !offline;
+  const frame = useRef<HTMLDivElement>(null);
+  const header = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const layout = frame.current;
+    const bar = header.current;
+    if (!admin || !onAdminPage || !layout || !bar) return;
+
+    // The optional season links can wrap into a second row after the initial render.
+    const measure = () => {
+      const height = bar.getBoundingClientRect().height;
+      if (height > 0) layout.style.setProperty('--shell-header-height', `${height}px`);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(bar, { box: 'border-box' });
+    return () => {
+      observer?.disconnect();
+      layout.style.removeProperty('--shell-header-height');
+    };
+  }, [admin, onAdminPage]);
   return (
-    <div className="min-h-dvh">
-      <header className="sticky top-0 z-10 border-b-2 border-muted bg-page/95 backdrop-blur-sm">
+    <div ref={frame} className="min-h-dvh">
+      <header
+        ref={header}
+        className="sticky top-0 z-10 border-b-2 border-muted bg-page/95 backdrop-blur-sm"
+      >
         <div className="mx-auto flex max-w-300 flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2 pb-1 desk:flex-nowrap desk:gap-3 desk:px-8 desk:py-2">
           <Link
             to={paths.season()}
@@ -211,6 +235,13 @@ export function Shell({
                     },
                   ]
                 : []),
+              {
+                label: ru.whatsNew.title,
+                icon: <Newspaper size={18} aria-hidden />,
+                onSelect: () => {
+                  navigate(paths.whatsNew());
+                },
+              },
               {
                 label: ru.shell.changePassword,
                 icon: <KeyRound size={18} aria-hidden />,
