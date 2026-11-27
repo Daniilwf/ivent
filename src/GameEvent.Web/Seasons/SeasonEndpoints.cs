@@ -691,8 +691,13 @@ public static class SeasonEndpoints
         return TypedResults.Ok(new SeasonNavigationView(seasonId, features.Polls, adminFeatures, features.Gallery ? true : null));
     }
 
-    private static async Task<Results<Ok<SeasonView>, NotFound>> GetSeasonAsync(
-        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards, SeasonStateReader seasonStates, IClock clock, CancellationToken ct)
+    private static Task<Results<Ok<SeasonView>, NotFound>> GetSeasonAsync(
+        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards, SeasonStateReader seasonStates, IClock clock, CancellationToken ct) =>
+        ReadForUserAsync(seasonId, user.UserId(), user.IsInRole(nameof(Infrastructure.Accounts.Role.Player)), db, contentCards, seasonStates, clock, ct);
+
+    /// <summary>Reads an explicitly selected player's game without changing the authenticated request's identity.</summary>
+    internal static async Task<Results<Ok<SeasonView>, NotFound>> ReadForUserAsync(
+        Guid seasonId, Guid? userId, bool playerInteractions, GameEventDbContext db, ContentCards contentCards, SeasonStateReader seasonStates, IClock clock, CancellationToken ct)
     {
         if (await SeasonMaps.CurrentAsync(db, seasonId, ct) is not { } map)
         {
@@ -730,8 +735,6 @@ public static class SeasonEndpoints
             map);
 
         MyTurnView? me = null;
-        var userId = user.UserId();
-        var playerInteractions = user.IsInRole(nameof(Infrastructure.Accounts.Role.Player));
         if (players.SingleOrDefault(p => p.UserId == userId) is { } mine)
         {
             var offer = mine.OfferJson is null ? null : JsonSerializer.Deserialize<RollOffer>(mine.OfferJson, EngineJson.Options);

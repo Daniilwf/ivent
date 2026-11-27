@@ -17,12 +17,14 @@ namespace GameEvent.Web.Site;
 /// Development and Test), so the admin gets the page of the test tools (H9, D-220); <c>uploads</c> — the largest file
 /// of each kind the site takes, so a page refuses a bigger one before sending it (D-617). <c>seasonTemplates</c> is set
 /// when the site offers the admin the season template action (D-936). <c>adminStatistics</c> is set when the site offers
-/// the season statistics report to the admin.
+/// the season statistics report to the admin. <c>playerPreview</c> is set when the admin may open a scoped read-only
+/// view of a participant's game; neither flag changes the authenticated user's role.
 /// </summary>
 public sealed record SiteStatusView(
     bool Maintenance, string Version, SiteEnvironment Environment, bool TestTools, UploadLimitsView Uploads,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? SeasonTemplates = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? AdminStatistics = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? AdminStatistics = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PlayerPreview = null);
 
 /// <summary>The largest upload of each kind in bytes, as the site is configured (FileLimits, BugReportRules; D-617).</summary>
 public sealed record UploadLimitsView(long Picture, long Gif, long BugScreenshot, long MapBackground);
@@ -134,7 +136,8 @@ public static partial class MaintenanceEndpoints
                 Files.FileEndpoints.MaxBytes(FileKind.BugScreenshot, limits),
                 Files.FileEndpoints.MaxBytes(FileKind.MapBackground, limits)),
             configuration.GetValue<bool>(AdminPlayerEndpoints.SeasonTemplatesKey) ? true : null,
-            configuration.GetValue<bool>(AdminSeasonStatisticsEndpoints.FeatureKey) ? true : null);
+            configuration.GetValue<bool>(AdminSeasonStatisticsEndpoints.FeatureKey) ? true : null,
+            configuration.GetValue<bool>(GameEvent.Web.PlayerPreview.PlayerPreviewEndpoints.FeatureKey) ? true : null);
 
     private static bool IsWrite(HttpRequest request) =>
         !(HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) || HttpMethods.IsOptions(request.Method))

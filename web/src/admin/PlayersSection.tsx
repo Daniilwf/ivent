@@ -15,6 +15,9 @@ import { commentProblem, parseWhole, refusal } from './actions';
 import { newCommandId } from '../api/commands';
 import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
+import { Link } from '../app/Link';
+import { paths } from '../app/router';
+import { standaloneLink } from '../ui/buttonStyles';
 
 const t = ru.admin.players;
 
@@ -39,7 +42,15 @@ function numbered(season: Schemas['SeasonView']): Cell[] {
 }
 
 /** The season's players: balances, turn, the inactivity hint, and the admin's corrections */
-export function PlayersSection({ seasonId, version }: { seasonId: string; version: number }) {
+export function PlayersSection({
+  seasonId,
+  version,
+  previewEnabled = false,
+}: {
+  seasonId: string;
+  version: number;
+  previewEnabled?: boolean;
+}) {
   const loaded = useLoaded(
     useCallback(async () => {
       const [players, season] = await Promise.all([
@@ -99,7 +110,13 @@ export function PlayersSection({ seasonId, version }: { seasonId: string; versio
               <ul className="grid gap-3">
                 {players.map((p) => (
                   <li key={p.id}>
-                    <PlayerRow seasonId={seasonId} player={p} cells={cells} onDone={finished} />
+                    <PlayerRow
+                      seasonId={seasonId}
+                      player={p}
+                      cells={cells}
+                      onDone={finished}
+                      previewEnabled={previewEnabled}
+                    />
                   </li>
                 ))}
               </ul>
@@ -117,11 +134,13 @@ function PlayerRow({
   player,
   cells,
   onDone,
+  previewEnabled,
 }: {
   seasonId: string;
   player: Player;
   cells: readonly Cell[];
   onDone: (message: string) => void;
+  previewEnabled: boolean;
 }) {
   const [open, setOpen] = useState<'adjust' | 'techReroll' | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -171,6 +190,15 @@ function PlayerRow({
         </p>
       </div>
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {previewEnabled ? (
+        <Link
+          to={paths.playerPreview(seasonId, player.id)}
+          className={standaloneLink}
+          data-testid="player-preview-open"
+        >
+          {ru.playerPreview.entry}
+        </Link>
+      ) : null}
       <div className="flex flex-wrap gap-3">
         <Button
           aria-expanded={open === 'adjust'}

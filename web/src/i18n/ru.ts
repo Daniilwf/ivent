@@ -4,6 +4,7 @@ import { stage5Moderation } from './stage5Moderation';
 import { stage5Operations } from './stage5Operations';
 import { stage5Interactions } from './stage5Interactions';
 import { playerSuggestions } from './playerSuggestions';
+import { playerPreview } from './playerPreview';
 
 // A Russian noun after a number: 1 очко, 2 очка, 5 очков
 const plural = (n: number, one: string, few: string, many: string) => {
@@ -535,6 +536,7 @@ export const ru = {
   },
   interactions: stage5Interactions,
   playerSuggestions,
+  playerPreview,
   turn: {
     interactions: 'Напарники и дуэли',
     race: (opponent: string, deadline: string) => `Дуэль с игроком ${opponent} до ${deadline}`,
@@ -581,8 +583,9 @@ export const ru = {
           ? 'Бонус за финиш получен, фишка остаётся здесь.'
           : `Сейчас ${String(place)}-е место: бонус за финиш получен, фишка остаётся здесь.`,
       laterNext: 'Играй дальше: кубы за прохождения ещё дают очки, место — по очкам.',
-      // Past the deadline no one rolls (SPEC «После дедлайна»): the place waits for the proofs
-      closedNext: 'Броски закрыты — место станет окончательным после проверки пруфов.',
+      // Past the deadline no one rolls; the finish state above says whether the place is final.
+      closedNext: 'Броски закрыты.',
+      frozenClosedNext: 'Броски закрыты. Первое место подтверждено.',
     },
     roll: 'Крутить колесо',
     start: 'Начать',

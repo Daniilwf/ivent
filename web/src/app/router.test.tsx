@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link } from './Link';
-import { navigate, paths, routeOf, usePageHeading, usePath } from './router';
+import { adminPlayersSeason, navigate, paths, routeOf, usePageHeading, usePath } from './router';
 
 // H5: the site's pages by address (D-150) — links open them without a reload, back and forward work.
 
@@ -48,6 +48,23 @@ const goBack = () =>
   });
 
 describe('router', () => {
+  it('carries only an explicit valid season in the admin players return address', () => {
+    const href = paths.adminPlayers(id);
+    const url = new URL(href, globalThis.location.origin);
+    expect(url.pathname).toBe('/admin/players');
+    expect(routeOf(url.pathname)).toEqual({ kind: 'admin', section: 'players' });
+    expect(adminPlayersSeason(url.search)).toBe(id);
+    expect(adminPlayersSeason(`?season=${id.toUpperCase()}`)).toBe(id);
+    for (const search of [
+      '',
+      '?season=',
+      '?season=not-a-guid',
+      `?season=${id}%2F`,
+      `?season=${id}&season=${id}`,
+    ]) {
+      expect(adminPlayersSeason(search)).toBeNull();
+    }
+  });
   afterEach(() => {
     globalThis.history.replaceState(null, '', '/');
   });
@@ -75,6 +92,11 @@ describe('router', () => {
   });
 
   it('builds the addresses the links point to', () => {
+    expect(routeOf(paths.playerPreview(id, id))).toEqual({
+      kind: 'playerPreview',
+      seasonId: id,
+      playerId: id,
+    });
     expect(routeOf(paths.season(id))).toEqual({ kind: 'season', seasonId: id });
     expect(paths.feed()).toBe('/feed');
     expect(paths.feed(id)).toBe(`/seasons/${id}/feed`);

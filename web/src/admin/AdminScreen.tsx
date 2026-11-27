@@ -113,18 +113,21 @@ const refreshEveryMs = 10_000;
 export function AdminScreen({
   section: sectionName,
   currentSeasonId,
+  initialSeasonId,
   user,
 }: {
   /** The router's `admin` route's section */
   section: string | null;
   currentSeasonId: string | null;
+  /** Explicit tab-local scope when returning from a player preview. */
+  initialSeasonId?: string | null;
   user: Schemas['CurrentUser'];
 }) {
   const section = adminSection(sectionName);
   const desk = useDesk();
   // The season opened in «Сезон» stays across a reload and in a new tab (K1A); one the site no longer lists gives way
   // to the current one
-  const [kept, setKept] = useState(keptSeason);
+  const [kept, setKept] = useState(() => initialSeasonId ?? keptSeason());
   const seasons = useLoaded(useCallback(async () => answerOf(await api.GET('/api/seasons')), []));
   const listed = seasons.kind === 'ready' ? seasons.value : null;
   // A season picked on this page wins as it is: one just created is not yet in the list read before it
@@ -178,6 +181,7 @@ export function AdminScreen({
   );
   const testTools = status.kind === 'ready' && status.value.testTools;
   const adminStatistics = status.kind === 'ready' && status.value.adminStatistics === true;
+  const playerPreview = status.kind === 'ready' && status.value.playerPreview === true;
   const shown = sections.filter(({ id }) => {
     if (id === 'test') return testTools;
     if (id === 'statistics') return adminStatistics;
@@ -338,7 +342,7 @@ export function AdminScreen({
       case 'proofs':
         return <ProofQueue seasonId={id} loaded={proofs} />;
       case 'players':
-        return <PlayersSection seasonId={id} version={version} />;
+        return <PlayersSection seasonId={id} version={version} previewEnabled={playerPreview} />;
       case 'statistics':
         return <StatisticsSection seasonId={id} version={version} />;
       case 'log':

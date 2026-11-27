@@ -56,7 +56,11 @@ export default defineConfig({
     : {
         webServer: {
           command: 'node ../scripts/e2e-server.mjs',
-          env: { Site__SeasonTemplates: 'true', Site__AdminStatistics: 'true' },
+          env: {
+            Site__SeasonTemplates: 'true',
+            Site__AdminStatistics: 'true',
+            Site__PlayerPreview: 'true',
+          },
           url: `http://localhost:${port}/health`,
           reuseExistingServer: false,
           timeout: 240_000,

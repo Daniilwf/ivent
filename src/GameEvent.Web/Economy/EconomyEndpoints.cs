@@ -222,15 +222,19 @@ public static class EconomyEndpoints
             : await SeasonEndpoints.SendAsync(seasonId, commandId, command(playerId.Value), userId, bus, ct);
     }
 
-    private static async Task<Results<Ok<EconomyView>, NotFound, ForbidHttpResult, ProblemHttpResult>> GetAsync(
-        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, IClock clock, CancellationToken ct)
+    private static Task<Results<Ok<EconomyView>, NotFound, ForbidHttpResult, ProblemHttpResult>> GetAsync(
+        Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, IClock clock, CancellationToken ct) =>
+        ReadForUserAsync(seasonId, user.UserId(), db, clock, ct);
+
+    /// <summary>Reads the selected participant's economy; authentication stays with the caller.</summary>
+    internal static async Task<Results<Ok<EconomyView>, NotFound, ForbidHttpResult, ProblemHttpResult>> ReadForUserAsync(
+        Guid seasonId, Guid? userId, GameEventDbContext db, IClock clock, CancellationToken ct)
     {
         if (seasonId == Guid.Empty || !await db.Seasons.AnyAsync(s => s.Id == seasonId, ct))
         {
             return TypedResults.NotFound();
         }
 
-        var userId = user.UserId();
         var (state, _) = await EventLogReader.ReplaySeasonAsync(db, seasonId, ct);
         if (state.Players.Values.FirstOrDefault(p => p.UserId == userId) is not { } me)
         {
