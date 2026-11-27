@@ -7,26 +7,44 @@ import { Button } from '../ui/Button';
 
 const noop = () => undefined;
 const done = () => Promise.resolve({ ok: true as const });
-const shopOf = (shop: ReturnType<typeof shopFixture>) => ({
+const shopOf = (shop: ReturnType<typeof shopFixture>, coins?: number) => ({
   kind: 'ready' as const,
-  economy: economyFixture({ shop }),
+  economy: economyFixture({ shop, ...(coins === undefined ? {} : { coins }) }),
 });
 
 /** The shop in each of its states and the lot's button in its states (4.11c); the clock stands still */
 export function ShopDemos() {
   const t = ru.styleguide.shop;
-  const lot = shopFixture().lots[0];
+  const shop = shopFixture();
+  const lot = shop.lots[0];
   return (
     <div className="grid gap-6">
       <div className="grid items-start gap-4 desk:grid-cols-2">
         <ShopPanel
-          state={shopOf(shopFixture())}
+          state={shopOf(shop)}
           onRetry={noop}
           onRoll={done}
           onBuy={done}
           now={fixtureNow}
         />
         <div className="grid content-start gap-4">
+          <ShopPanel
+            state={shopOf(
+              shopFixture({
+                refusal: 'roll.notEnoughCoins',
+                lots: shop.lots.map((entry) => ({
+                  ...entry,
+                  sold: false,
+                  refusal: 'roll.notEnoughCoins',
+                })),
+              }),
+              3,
+            )}
+            onRetry={noop}
+            onRoll={done}
+            onBuy={done}
+            now={fixtureNow}
+          />
           <ShopPanel
             state={shopOf(
               shopFixture({
@@ -48,6 +66,8 @@ export function ShopDemos() {
                 refusal: 'coins.inDebt',
                 expiresAt: new Date(fixtureNow.getTime() - 1000).toISOString(),
               }),
+              // In debt: the balance in the shop's heading agrees with the reason (BUG-S7-12)
+              -3,
             )}
             onRetry={noop}
             onRoll={done}

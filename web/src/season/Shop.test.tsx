@@ -292,3 +292,57 @@ describe('the shop says each thing once', () => {
     expect(ru.shop.buyFor(1)).toBe('Купить за 1 монетку');
   });
 });
+
+// BUG-S7-12: on the demo season most lots cost more than a player holds after the roll; the shop hid «Купить» and said
+// a bare «Не хватает монеток.» (once, in small print above the news of the roll) without the balance anywhere in it, so
+// the owner could not tell why nothing was bought. The shop says my coins, what each lot is short by, and — when no lot
+// is affordable — says so next to the lots.
+describe('the shop says why nothing can be bought (BUG-S7-12)', () => {
+  it('shows my coins in the shop itself', async () => {
+    fakeServer({ [economyUrl]: economyFixture({ coins: 7, shop: liveShop() }) });
+    renderShop();
+
+    expect(await screen.findByTestId('shop-coins')).toHaveTextContent(ru.shop.myCoins(7));
+    expect(ru.shop.myCoins(7)).toBe('У тебя 7 монеток');
+  });
+
+  it('says by how many coins a lot is short', async () => {
+    // The lot costs 15, I hold 7
+    fakeServer({ [economyUrl]: economyFixture({ coins: 7, shop: liveShop() }) });
+    renderShop();
+
+    await screen.findByTestId('shop-lots');
+    expect(screen.getByTestId('lot-why-1')).toHaveTextContent(ru.shop.short(8));
+    expect(ru.shop.short(8)).toBe('Не хватает монеток. До цены лота ещё 8 монеток.');
+  });
+
+  it('says that no lot is affordable next to the lots, after the news of the roll', async () => {
+    const dear = shopFixture().lots.map((l, index) => ({
+      ...l,
+      price: 12 + 4 * index,
+      sold: false,
+      refusal: 'roll.notEnoughCoins',
+    }));
+    fakeServer({
+      [economyUrl]: economyFixture({ coins: 3, shop: liveShop({ lots: dear }) }),
+      [rollUrl]: ok,
+    });
+    renderShop();
+
+    const why = await screen.findByTestId('shop-why');
+    expect(why).toHaveTextContent(ru.shop.poorAll(3));
+    expect(ru.shop.poorAll(3)).toBe(
+      'Ни на один лот не хватает монеток: у тебя 3 монетки. Монетки дают прохождения.',
+    );
+    expect(screen.queryByTestId('buy-0')).not.toBeInTheDocument();
+    expect(screen.getAllByText(ru.shop.poorAll(3))).toHaveLength(1);
+    expect(screen.getByTestId('lot-why-0')).toHaveTextContent(/^До цены лота ещё 9 монеток\.$/);
+    expect(screen.getByTestId('lot-why-1')).toHaveTextContent(/^До цены лота ещё 13 монеток\.$/);
+    expect(screen.getByTestId('lot-why-2')).toHaveTextContent(/^До цены лота ещё 17 монеток\.$/);
+    // Said where the buttons would be: right before the lots, not above the timer
+    const lots = screen.getByTestId('shop-lots');
+    const timer = screen.getByTestId('shop-timer');
+    expect(timer.compareDocumentPosition(why) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(why.compareDocumentPosition(lots) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});

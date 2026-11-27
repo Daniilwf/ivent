@@ -1,4 +1,4 @@
-import { Check, Clock, Store, Ticket } from 'lucide-react';
+import { Check, Clock, Coins, Store, Ticket } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
@@ -38,6 +38,7 @@ export function ShopPanel({
   className?: string | undefined;
 }) {
   const shop = state.kind === 'ready' ? state.economy.shop : null;
+  const myCoins = state.kind === 'ready' ? state.economy.coins : null;
   const expiresAt = shop?.expiresAt ? new Date(shop.expiresAt) : null;
   // The lots' time is the server's (S4-4): the device's clock moved by how far the server's was ahead when the view came
   const offset = state.kind === 'ready' && !fixedNow ? (state.clockOffset ?? 0) : 0;
@@ -52,12 +53,13 @@ export function ShopPanel({
   const live = expiresAt !== null && now < expiresAt;
   const lots = live ? (shop?.lots ?? []) : [];
   const rolled = (shop?.lots.length ?? 0) > 0;
-  // A reason every lot still on sale shares (the inventory full) is said once under the heading (S4D-5)
+  // Say a shared reason once (S4D-5), and keep the price difference on each lot.
   const unsold = lots.filter((l) => !l.sold);
   const sharedWhy =
     unsold.length > 1 && unsold.every((l) => l.refusal !== null && l.refusal === unsold[0]?.refusal)
       ? (unsold[0]?.refusal ?? null)
       : null;
+  const allUnaffordable = sharedWhy === 'roll.notEnoughCoins' && myCoins !== null;
   // With no lots on screen a refused roll's cause is the empty state's text, not a «сделай ролл» above a closed roll
   const emptyWhy =
     lots.length === 0 && shop?.refusal
@@ -82,11 +84,18 @@ export function ShopPanel({
         <h2 id={titleId} className="font-display text-lg font-heavy">
           {ru.shop.title}
         </h2>
-        {shop && shop.freeRolls > 0 ? (
-          <Chip icon={<Ticket size={16} aria-hidden />}>
-            <span data-testid="shop-coupons">{ru.shop.coupons(shop.freeRolls)}</span>
-          </Chip>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {shop && myCoins !== null ? (
+            <Chip icon={<Coins size={16} aria-hidden />}>
+              <span data-testid="shop-coins">{ru.shop.myCoins(myCoins)}</span>
+            </Chip>
+          ) : null}
+          {shop && shop.freeRolls > 0 ? (
+            <Chip icon={<Ticket size={16} aria-hidden />}>
+              <span data-testid="shop-coupons">{ru.shop.coupons(shop.freeRolls)}</span>
+            </Chip>
+          ) : null}
+        </div>
       </div>
       {state.kind === 'loading' ? (
         <div className="grid gap-3" aria-busy="true">
@@ -103,7 +112,7 @@ export function ShopPanel({
         />
       ) : shop ? (
         <>
-          {sharedWhy ? (
+          {sharedWhy && !allUnaffordable ? (
             <p className="text-sm text-ink-soft" data-testid="shop-why">
               {refusalText(sharedWhy, ru.shop.refusals)}
             </p>
@@ -115,6 +124,11 @@ export function ShopPanel({
               <span className="tabular-nums">{ru.shop.left(timeLeft(expiresAt, now))}</span>
             </p>
           ) : null}
+          {allUnaffordable ? (
+            <p className="text-sm font-bold" data-testid="shop-why">
+              {ru.shop.poorAll(myCoins)}
+            </p>
+          ) : null}
           {lots.length > 0 ? (
             <ul className="grid gap-3" data-testid="shop-lots">
               {lots.map((lot) => (
@@ -124,6 +138,7 @@ export function ShopPanel({
                   busy={busy === lot.lot}
                   disabled={busy !== null}
                   why={sharedWhy === null}
+                  coins={myCoins}
                   {...(force ? { force } : {})}
                   onBuy={() => void run(lot.lot, () => onBuy(lot.lot), ru.shop.bought(lot.name))}
                 />
@@ -183,6 +198,7 @@ export function LotRow({
   disabled,
   onBuy,
   why = true,
+  coins = null,
   force,
 }: {
   lot: ShopLot;
@@ -191,9 +207,15 @@ export function LotRow({
   onBuy: () => void;
   /** Whether the lot says its own reason; false — the panel says one reason for all lots (S4D-5) */
   why?: boolean;
+  /** My coins: a lot I cannot pay for says how many more it needs (BUG-S7-12) */
+  coins?: number | null;
   force?: string;
 }) {
   const titleId = useId();
+  const shortfall =
+    lot.refusal === 'roll.notEnoughCoins' && coins !== null && coins < lot.price
+      ? lot.price - coins
+      : null;
   return (
     <li
       aria-labelledby={titleId}
@@ -230,11 +252,13 @@ export function LotRow({
           >
             {ru.shop.buyFor(lot.price)}
           </Button>
-        ) : !why ? null : (
+        ) : why || shortfall !== null ? (
           <span className="text-sm text-ink-soft" data-testid={`lot-why-${lot.lot}`}>
-            {refusalText(lot.refusal, ru.shop.refusals)}
+            {shortfall !== null
+              ? ru.shop.short(shortfall, why)
+              : refusalText(lot.refusal, ru.shop.refusals)}
           </span>
-        )}
+        ) : null}
       </div>
     </li>
   );
