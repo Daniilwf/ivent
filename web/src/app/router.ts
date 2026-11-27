@@ -15,6 +15,7 @@ export type Route =
   | { kind: 'game'; gameId: string }
   | { kind: 'pool' }
   | { kind: 'rules' }
+  | { kind: 'whatsNew' }
   /** The admin's pages (H8), for the admin only: App shows anyone else the game. `section` null is the proof queue */
   | { kind: 'admin'; section: string | null }
   | { kind: 'notFound' };
@@ -32,7 +33,7 @@ const admin = /^\/admin(?:\/([a-z]+))?$/;
 
 /**
  * What page an address opens: `/`, `/seasons/{id}`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}`,
- * `/pool`, `/rules`, `/hall-of-fame`, `/polls`, `/seasons/{id}/polls`, `/admin` and `/admin/{section}`
+ * `/pool`, `/rules`, `/hall-of-fame`, `/whats-new`, `/polls`, `/seasons/{id}/polls`, `/admin` and `/admin/{section}`
  */
 export function routeOf(path: string): Route {
   const clean = path.replace(/\/+$/, '') || '/';
@@ -43,6 +44,7 @@ export function routeOf(path: string): Route {
   if (clean === '/interactions') return { kind: 'interactions', seasonId: null };
   if (clean === '/pool') return { kind: 'pool' };
   if (clean === '/rules') return { kind: 'rules' };
+  if (clean === '/whats-new') return { kind: 'whatsNew' };
   if (clean === '/hall-of-fame') return { kind: 'hallOfFame' };
   let match = season.exec(clean);
   if (match?.[1]) return { kind: 'season', seasonId: match[1].toLowerCase() };
@@ -78,6 +80,7 @@ export const paths = {
   game: (gameId: string) => `/games/${gameId}`,
   pool: () => '/pool',
   rules: () => '/rules',
+  whatsNew: () => '/whats-new',
   admin: (section?: string) => (section ? `/admin/${section}` : '/admin'),
 };
 
@@ -97,13 +100,39 @@ globalThis.addEventListener('popstate', () => {
 // once their list is there, useRestoredScroll). Every page opened by Back or Forward goes where it was left, a page
 // left without a kept place goes to the top, never where the page before it was scrolled (review of K1A-21)
 if ('scrollRestoration' in globalThis.history) globalThis.history.scrollRestoration = 'manual';
-// A reload: the entry keeps where the page was, and the page comes back to it like after Back
+const reloadScrollKey = 'scroll-on-reload';
+// Chromium can commit a reload before a pagehide update to history.state reaches its new document.
 globalThis.addEventListener('pagehide', () => {
-  keepInEntry('scrollY', globalThis.scrollY);
+  const { href } = globalThis.location;
+  const y = globalThis.scrollY;
+  try {
+    globalThis.sessionStorage.setItem(reloadScrollKey, JSON.stringify([href, y]));
+  } catch {
+    // The history entry still remembers the position when storage is unavailable.
+  }
+  keepInEntry('scrollY', y);
 });
 if (isReload()) {
   popped = true;
+  restoreReloadScroll();
   restoreEntryScroll();
+}
+
+function restoreReloadScroll() {
+  try {
+    const saved = globalThis.sessionStorage.getItem(reloadScrollKey);
+    globalThis.sessionStorage.removeItem(reloadScrollKey);
+    const entry: unknown = saved === null ? null : JSON.parse(saved);
+    if (
+      Array.isArray(entry) &&
+      entry[0] === globalThis.location.href &&
+      typeof entry[1] === 'number'
+    ) {
+      keepInEntry('scrollY', entry[1]);
+    }
+  } catch {
+    // Fall back to the position stored in the history entry.
+  }
 }
 
 function isReload(): boolean {
@@ -121,6 +150,11 @@ function isReload(): boolean {
 function restoreEntryScroll() {
   const kept = entryState().scrollY;
   requestAnimationFrame(() => {
+    if (typeof kept !== 'number' && globalThis.location.hash) {
+      // With manual restoration, Forward to an anchor does not scroll it into view.
+      document.querySelector(':target')?.scrollIntoView({ block: 'start' });
+      return;
+    }
     globalThis.scrollTo(0, typeof kept === 'number' ? kept : 0);
   });
 }
@@ -167,8 +201,8 @@ export function useRestoredScroll(ready: boolean) {
   const done = useRef(false);
   useEffect(() => {
     if (!ready || done.current || typeof restore !== 'number') return;
-    done.current = true;
     const frame = requestAnimationFrame(() => {
+      done.current = true;
       globalThis.scrollTo(0, restore);
     });
     return () => {

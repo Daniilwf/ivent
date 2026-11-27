@@ -6,6 +6,7 @@ import {
   LogOut,
   Map as MapIcon,
   MessagesSquare,
+  Newspaper,
   ShieldCheck,
   Trophy,
   UserRound,
@@ -99,7 +100,7 @@ function SiteNav({
 
 /**
  * The frame of every signed-in page: the name of the game, the sections, the connection mark, the bug report and my
- * menu (my profile, the admin's pages for the admin, my password, sign out)
+ * menu (my profile, the admin's pages for the admin, the release journal, my password, sign out)
  */
 export function Shell({
   user,
@@ -234,6 +235,13 @@ export function Shell({
                     },
                   ]
                 : []),
+              {
+                label: ru.whatsNew.title,
+                icon: <Newspaper size={18} aria-hidden />,
+                onSelect: () => {
+                  navigate(paths.whatsNew());
+                },
+              },
               {
                 label: ru.shell.changePassword,
                 icon: <KeyRound size={18} aria-hidden />,

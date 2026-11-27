@@ -47,6 +47,26 @@ describe('the shell', () => {
     vi.unstubAllGlobals();
   });
 
+  it('opens the release journal from my menu without an update banner and focuses its heading', async () => {
+    serve({ '/api/auth/me': () => json(200, user) });
+    const person = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('no-season');
+    expect(screen.queryByTestId('update-banner')).not.toBeInTheDocument();
+
+    try {
+      await person.click(screen.getByTestId('user-menu'));
+      await person.click(await screen.findByRole('menuitem', { name: ru.whatsNew.title }));
+      const heading = await screen.findByRole('heading', { level: 1, name: ru.whatsNew.title });
+      expect(window.location.pathname).toBe('/whats-new');
+      await waitFor(() => {
+        expect(heading).toHaveFocus();
+      });
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
+  });
+
   it('shows «no connection» while a live subscription is offline, and hides it when it is back', async () => {
     serve({ '/api/auth/me': () => json(200, user) });
     render(<App />);

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { siteEnvironment } from './siteStatus';
 import { ru } from '../i18n/ru';
 import { Button, IconButton } from '../ui/Button';
+import { cx } from '../ui/cx';
 import { BottomSheet } from '../ui/Dialogs';
 import changelog from '../whatsNew/changelog.json';
 
@@ -31,13 +32,24 @@ function remember(version: string) {
 }
 
 /** The list of releases, newest first */
-export function ReleaseList({ releases }: { releases: Release[] }) {
+export function ReleaseList({
+  releases,
+  headingLevel = 3,
+  className,
+}: {
+  releases: Release[];
+  headingLevel?: 2 | 3;
+  className?: string;
+}) {
   if (releases.length === 0) return <p className="text-ink-soft">{t.empty}</p>;
+  const Heading = `h${headingLevel}` as const;
   return (
-    <ol className="grid gap-5" data-testid="whats-new-list">
+    <ol className={cx('grid gap-5 wrap-anywhere', className)} data-testid="whats-new-list">
       {releases.map((release) => (
         <li key={release.version} className="grid gap-2">
-          <h3 className="font-display font-heavy">{t.release(release.version, release.date)}</h3>
+          <Heading className="font-display font-heavy">
+            {t.release(release.version, release.date)}
+          </Heading>
           {release.items.length > 0 ? (
             <ul className="grid list-disc gap-1 pl-5">
               {release.items.map((item) => (
