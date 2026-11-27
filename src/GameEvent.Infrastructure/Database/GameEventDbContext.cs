@@ -18,6 +18,10 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
 
     public DbSet<SeasonPlayerRecord> SeasonPlayers => Set<SeasonPlayerRecord>();
 
+    public DbSet<PlayerAchievementRecord> PlayerAchievements => Set<PlayerAchievementRecord>();
+
+    public DbSet<AccountAchievementRecord> AccountAchievements => Set<AccountAchievementRecord>();
+
     public DbSet<RulesetRecord> Rulesets => Set<RulesetRecord>();
 
     public DbSet<SeasonResultRecord> SeasonResults => Set<SeasonResultRecord>();
@@ -37,6 +41,12 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
     public DbSet<PollOptionRecord> PollOptions => Set<PollOptionRecord>();
 
     public DbSet<VoteRecord> Votes => Set<VoteRecord>();
+    public DbSet<ReviewReactionRecord> ReviewReactions => Set<ReviewReactionRecord>();
+    public DbSet<FeedReactionRecord> FeedReactions => Set<FeedReactionRecord>();
+    public DbSet<CommentRecord> Comments => Set<CommentRecord>();
+    public DbSet<GalleryMomentRecord> GalleryMoments => Set<GalleryMomentRecord>();
+    public DbSet<GalleryReactionRecord> GalleryReactions => Set<GalleryReactionRecord>();
+    public DbSet<GalleryMediaBindingRecord> GalleryMediaBindings => Set<GalleryMediaBindingRecord>();
 
     public DbSet<GlobalEventRecord> GlobalEvents => Set<GlobalEventRecord>();
 
@@ -139,6 +149,26 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.Property(x => x.Phase).HasMaxLength(20);
         });
 
+        modelBuilder.Entity<PlayerAchievementRecord>(e =>
+        {
+            e.ToTable("PlayerAchievement");
+            e.HasKey(x => new { x.PlayerId, x.ObjectId });
+            e.HasOne<SeasonPlayerRecord>().WithMany().HasForeignKey(x => x.PlayerId);
+            e.Property(x => x.Name).HasMaxLength(Engine.Content.ContentValidator.MaxNameLength);
+            e.Property(x => x.Description).HasMaxLength(Engine.Content.ContentValidator.MaxDescriptionLength);
+        });
+
+        modelBuilder.Entity<AccountAchievementRecord>(e =>
+        {
+            e.ToTable("AccountAchievement");
+            e.HasKey(x => new { x.UserId, x.ObjectId });
+            e.HasOne<UserRecord>().WithMany().HasForeignKey(x => x.UserId);
+            e.HasOne<SeasonPlayerRecord>().WithMany().HasForeignKey(x => x.PlayerId);
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.Property(x => x.Name).HasMaxLength(Engine.Content.ContentValidator.MaxNameLength);
+            e.Property(x => x.Description).HasMaxLength(Engine.Content.ContentValidator.MaxDescriptionLength);
+        });
+
         modelBuilder.Entity<PlayerGameExclusionRecord>(e =>
         {
             e.ToTable("PlayerGameExclusion");
@@ -219,6 +249,58 @@ public sealed class GameEventDbContext(DbContextOptions<GameEventDbContext> opti
             e.ToTable("Vote");
             e.HasKey(x => new { x.PollId, x.UserId });
             e.HasOne<PollRecord>().WithMany().HasForeignKey(x => x.PollId);
+        });
+
+        modelBuilder.Entity<ReviewReactionRecord>(e =>
+        {
+            e.ToTable("ReviewReaction");
+            e.HasKey(x => new { x.RunId, x.UserId, x.Emoji });
+            e.HasOne<RunRecord>().WithMany().HasForeignKey(x => x.RunId);
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+        });
+
+        modelBuilder.Entity<FeedReactionRecord>(e =>
+        {
+            e.ToTable("FeedReaction");
+            e.HasKey(x => new { x.SeasonId, x.TargetCommandId, x.UserId, x.Emoji });
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+        });
+
+        modelBuilder.Entity<CommentRecord>(e =>
+        {
+            e.ToTable("Comment");
+            e.HasKey(x => new { x.SeasonId, x.CommentId });
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.HasIndex(x => new { x.SeasonId, x.TargetKind, x.TargetId, x.Status, x.CreatedAt, x.CommentId });
+            e.HasIndex(x => new { x.SeasonId, x.UserId, x.CreatedDay });
+            e.Property(x => x.TargetKind).HasMaxLength(20);
+            e.Property(x => x.Status).HasMaxLength(20);
+            e.Property(x => x.Text).HasMaxLength(Engine.Kernel.Limits.MaxCommentLength);
+        });
+
+        modelBuilder.Entity<GalleryMomentRecord>(e =>
+        {
+            e.ToTable("GalleryMoment");
+            e.HasKey(x => new { x.SeasonId, x.ItemId });
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+            e.HasIndex(x => new { x.SeasonId, x.Hidden, x.CreatedAt, x.ItemId });
+            e.HasIndex(x => new { x.SeasonId, x.PlayerId, x.Hidden, x.CreatedAt, x.ItemId });
+            e.Property(x => x.Caption).HasMaxLength(Engine.Kernel.Limits.MaxCommentLength);
+        });
+
+        modelBuilder.Entity<GalleryMediaBindingRecord>(e =>
+        {
+            e.ToTable("GalleryMediaBinding");
+            e.HasKey(x => x.FileId);
+            e.HasOne<Files.FileRecord>().WithMany().HasForeignKey(x => x.FileId);
+            e.HasOne<SeasonRecord>().WithMany().HasForeignKey(x => x.SeasonId);
+        });
+
+        modelBuilder.Entity<GalleryReactionRecord>(e =>
+        {
+            e.ToTable("GalleryReaction");
+            e.HasKey(x => new { x.SeasonId, x.ItemId, x.UserId, x.Emoji });
+            e.HasOne<GalleryMomentRecord>().WithMany().HasForeignKey(x => new { x.SeasonId, x.ItemId }).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<GlobalEventRecord>(e =>

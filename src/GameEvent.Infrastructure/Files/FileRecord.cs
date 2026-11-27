@@ -29,7 +29,7 @@ public sealed class FileRecord
 
     public DateTimeOffset CreatedAt { get; set; }
 
-    /// <summary>An upload the site shows, or a bug report's screenshot only the admin sees (D-121).</summary>
+    /// <summary>The kind of upload determines which routes may serve it.</summary>
     public FileKind Kind { get; set; }
 }
 
@@ -74,7 +74,7 @@ public static class FileRules
     public static Rejection? Check(RecordFile command) =>
         command.MediaType is not (FileNames.Webp or FileNames.Gif)
             ? new Rejection(MediaTypeInvalid, "Only WebP and GIF are stored.")
-            : !Enum.IsDefined(command.Kind)
-                ? new Rejection(KindInvalid, "Unknown kind of file.")
+            : !Enum.IsDefined(command.Kind) || command.Kind == FileKind.GalleryImage
+                ? new Rejection(KindInvalid, "This kind of file is not registered by the global upload command.")
                 : null;
 }

@@ -3,9 +3,12 @@ import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
+import { Summary } from '../ui/Disclosure';
 import { ChoiceGroup } from '../ui/Field';
 import { Chip } from '../ui/Marks';
 import { Notice } from '../ui/States';
+import { NominationCandidate } from './NominationCandidate';
+import { isOpenPoll } from './pollView';
 
 export type PollCardProps = {
   poll: Schemas['PollView'];
@@ -24,6 +27,11 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
   const titleId = useId();
   const title = useRef<HTMLHeadingElement>(null);
   const Heading = level === 3 ? 'h3' : 'h2';
+  const open = isOpenPoll(poll);
+  const missingCandidate = Boolean(
+    poll.nomination && poll.options.some((option) => option.unavailable),
+  );
+  const endedWithSeason = poll.status === 'open' && !open;
   const [draft, setDraft] = useState({ value: '', dirty: false });
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -40,7 +48,8 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
   const selected = draft.dirty ? draft.value : (ownOption?.id ?? '');
   const hasVoted = poll.myVote !== null;
   const mayVote =
-    poll.status === 'open' &&
+    open &&
+    !missingCandidate &&
     poll.voting?.canVote === true &&
     (!hasVoted || poll.voting.allowChangeVote);
   const busy = pending || sending;
@@ -51,16 +60,18 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
   const counts = new Map(visibleCounts?.map((count) => [count.optionId, count.votes]) ?? []);
   const winner =
     poll.status === 'closed' ? poll.options.find((option) => option.id === poll.result) : null;
-  const awaitingResult = poll.status === 'open' && poll.voting?.reason === 'poll.closed';
-  const reason = !poll.voting
-    ? t.eligibilityUnknown
-    : awaitingResult
-      ? t.votingEnded
-      : poll.voting.reason
-        ? (ru.rejection[poll.voting.reason] ?? t.unavailable)
-        : hasVoted && !poll.voting.allowChangeVote
-          ? ru.rejection['poll.alreadyVoted']
-          : t.unavailable;
+  const awaitingResult = open && poll.voting?.reason === 'poll.closed';
+  const reason = missingCandidate
+    ? t.nominationCandidateMissing
+    : !poll.voting
+      ? t.eligibilityUnknown
+      : awaitingResult
+        ? t.votingEnded
+        : poll.voting.reason
+          ? (ru.rejection[poll.voting.reason] ?? t.unavailable)
+          : hasVoted && !poll.voting.allowChangeVote
+            ? ru.rejection['poll.alreadyVoted']
+            : t.unavailable;
 
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
@@ -99,13 +110,15 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
           tabIndex={-1}
           className="max-w-prose font-display text-lg font-heavy wrap-anywhere is-focus:focus-ring"
         >
-          {poll.question}
+          {poll.nomination ? ru.nomination.votedTitles[poll.nomination] : poll.question}
         </Heading>
         <div className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
-          {poll.status === 'open' ? (
+          {open ? (
             <span>
               {t.until} <time dateTime={poll.closesAt}>{moscowTime(poll.closesAt)}</time>
             </span>
+          ) : endedWithSeason ? (
+            <span>{t.endedWithSeason}</span>
           ) : (
             <Chip tone={poll.status === 'cancelled' ? 'warning' : 'muted'}>
               {poll.status === 'cancelled' ? t.cancelled : t.closed}
@@ -114,9 +127,12 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
           {poll.anonymous ? <Chip>{t.anonymous}</Chip> : null}
         </div>
       </header>
+      {poll.nomination ? (
+        <NominationMaterials options={poll.options} nomination={poll.nomination} />
+      ) : null}
       {ownOption ? (
         <p data-private={poll.anonymous || undefined} className="text-sm font-medium wrap-anywhere">
-          {t.ownVote(ownOption.label)}
+          {t.ownVote(ownOption.unavailable ? t.nominationCandidateHidden : ownOption.label)}
         </p>
       ) : null}
       <form
@@ -133,11 +149,11 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
             const count = counts.get(option.id);
             return {
               value: option.id,
-              label: option.label,
+              label: option.unavailable ? t.nominationCandidateHidden : option.label,
               ...(count !== undefined ? { description: t.votes(count) } : {}),
             };
           })}
-          value={poll.status === 'open' ? selected : (ownOption?.id ?? '')}
+          value={open ? selected : (ownOption?.id ?? '')}
           onChange={(value) => {
             if (!mayVote || busy) return;
             setDraft({ value, dirty: value !== poll.myVote });
@@ -147,7 +163,7 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
           checkMark
           multiline
         />
-        {poll.status === 'open' && visibleCounts === null ? (
+        {open && visibleCounts === null ? (
           <p className="text-sm text-ink-soft">
             {awaitingResult ? t.pendingCounts : t.hiddenCounts}
           </p>
@@ -155,17 +171,17 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
         {poll.status === 'closed' ? (
           <p className="font-medium wrap-anywhere">
             {winner
-              ? t.result(winner.label)
+              ? winner.unavailable
+                ? ru.nominationResults.hiddenWinner
+                : t.result(winner.label)
               : poll.result === null
                 ? t.noResult
                 : t.resultUnavailable}
           </p>
         ) : null}
-        {poll.status === 'open' && !mayVote ? (
-          <p className="text-sm text-ink-soft">{reason}</p>
-        ) : null}
+        {open && !mayVote ? <p className="text-sm text-ink-soft">{reason}</p> : null}
         {failed && mayVote ? <Notice tone="danger">{t.voteFailed}</Notice> : null}
-        {accepted !== null && accepted === poll.myVote && poll.status === 'open' ? (
+        {accepted !== null && accepted === poll.myVote && open ? (
           <Notice tone="success">{t.accepted}</Notice>
         ) : null}
         {mayVote && poll.options.length > 0 ? (
@@ -182,5 +198,31 @@ function PollForm({ poll, pending, onVote, level = 2 }: PollCardProps) {
         ) : null}
       </form>
     </article>
+  );
+}
+
+function NominationMaterials({
+  options,
+  nomination,
+}: {
+  options: Schemas['PollOptionView'][];
+  nomination: Schemas['VotedNomination'];
+}) {
+  const materials = options.filter(
+    (option) => !option.unavailable && (option.detail || option.href || option.thumbnailUrl),
+  );
+  if (!materials.length) return null;
+
+  return (
+    <details className="min-w-0 rounded-md border-2 border-muted px-3">
+      <Summary className="text-sm font-bold">{ru.polls.nominationMaterials}</Summary>
+      <ul className="grid divide-y-2 divide-muted">
+        {materials.map((option) => (
+          <li key={option.id} className="min-w-0 py-3">
+            <NominationCandidate candidate={option} nomination={nomination} />
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

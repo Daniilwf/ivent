@@ -34,9 +34,9 @@ const t = ru.admin.content;
 
 type View = Schemas['AdminContentView'];
 
-type Filter = 'item' | 'effect' | 'specialRoll' | 'wheels' | 'deleted';
+type Filter = 'item' | 'effect' | 'specialRoll' | 'achievement' | 'wheels' | 'deleted';
 
-const filters: Filter[] = ['item', 'effect', 'specialRoll', 'wheels', 'deleted'];
+const filters: Filter[] = ['item', 'effect', 'specialRoll', 'achievement', 'wheels', 'deleted'];
 
 type Open = { collection: Collection; index: number | null; initial: Json; key: number };
 
@@ -121,7 +121,12 @@ function Pinned({
       <Workspace
         key={`${rest.seasonId}-${shown.version}`}
         {...rest}
-        view={shown}
+        view={{
+          ...shown,
+          status: latest.status,
+          itemsEnabled: latest.itemsEnabled,
+          achievementsEnabled: latest.achievementsEnabled,
+        }}
         onEditing={setEditing}
         onSaved={(next) => {
           setOwn(true);
@@ -152,8 +157,17 @@ function Workspace({
   const desk = useDesk();
   const pack = useMemo(() => packOf(view.pack), [view.pack]);
   const open = view.status === 'draft' || view.status === 'active';
-  const editable = desk && view.itemsEnabled && open;
-  const [filter, setFilter] = useState<Filter>('item');
+  const achievementsEnabled = view.achievementsEnabled;
+  const achievementsOnly = achievementsEnabled && !view.itemsEnabled;
+  const publishingEnabled = view.itemsEnabled || achievementsEnabled;
+  const editable = desk && publishingEnabled && open;
+  const [selectedFilter, setFilter] = useState<Filter>();
+  const filter =
+    selectedFilter && (selectedFilter !== 'achievement' || achievementsEnabled)
+      ? selectedFilter
+      : achievementsOnly
+        ? 'achievement'
+        : 'item';
   const [kind, setKind] = useState<NewKind>('item');
   const counter = useRef(0);
   const importFile = useRef<HTMLInputElement>(null);
@@ -198,7 +212,7 @@ function Workspace({
     pack.objects.length === 0 &&
     pack.wheels.length === 0 &&
     view.deleted.length === 0;
-  const create = (
+  const create = achievementsOnly ? null : (
     <>
       <Select
         label={t.createKind}
@@ -246,7 +260,8 @@ function Workspace({
   return (
     <div className="grid gap-6" data-testid="admin-content">
       {saved ? <Notice tone="success">{saved.text}</Notice> : null}
-      {view.itemsEnabled ? null : <Notice tone="info">{t.itemsOff}</Notice>}
+      {publishingEnabled ? null : <Notice tone="info">{t.itemsOff}</Notice>}
+      {achievementsOnly ? <Notice tone="info">{t.achievementsOnly}</Notice> : null}
       {open ? null : <Notice tone="warning">{t.closed}</Notice>}
       {desk ? null : <Notice tone="info">{t.phone}</Notice>}
       {schemaFailed ? <Notice tone="info">{t.schemaFailed}</Notice> : null}
@@ -256,7 +271,7 @@ function Workspace({
           <EmptyState
             icon={<PackageOpen size={28} aria-hidden />}
             title={t.emptyTitle}
-            {...(desk ? { text: t.empty } : {})}
+            {...(desk && !achievementsOnly ? { text: t.empty } : {})}
             action={
               desk ? (
                 <div className="flex flex-wrap items-end justify-center gap-3">
@@ -277,16 +292,18 @@ function Workspace({
           <>
             <ChoiceGroup
               label={t.kindsLabel}
-              options={filters.map((f) => ({
-                value: f,
-                label: `${t.kinds[f] ?? f}: ${
-                  f === 'wheels'
-                    ? pack.wheels.length
-                    : f === 'deleted'
-                      ? view.deleted.length
-                      : pack.objects.filter((o) => o.kind === f).length
-                }`,
-              }))}
+              options={filters
+                .filter((f) => f !== 'achievement' || achievementsEnabled)
+                .map((f) => ({
+                  value: f,
+                  label: `${t.kinds[f] ?? f}: ${
+                    f === 'wheels'
+                      ? pack.wheels.length
+                      : f === 'deleted'
+                        ? view.deleted.length
+                        : pack.objects.filter((o) => o.kind === f).length
+                  }`,
+                }))}
               value={filter}
               onChange={setFilter}
               data-testid="content-filter"
@@ -394,7 +411,10 @@ function Workspace({
           index={editing.index}
           initial={editing.initial}
           schemas={schemas}
-          editable={editable}
+          editable={
+            editable &&
+            (editing.initial.kind === 'achievement' ? achievementsEnabled : view.itemsEnabled)
+          }
           readOnly={!desk}
           history={view.history}
           onSaved={(next) => {

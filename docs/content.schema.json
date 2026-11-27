@@ -148,6 +148,7 @@
                   "time",
                   "hostileIncoming",
                   "runEnded",
+                  "proofApproved",
                   null
                 ]
               },
@@ -256,6 +257,12 @@
                   "gte": {
                     "type": [
                       "integer",
+                      "null"
+                    ]
+                  },
+                  "gt": {
+                    "type": [
+                      "number",
                       "null"
                     ]
                   },
@@ -756,6 +763,12 @@
                             "gte": {
                               "type": [
                                 "integer",
+                                "null"
+                              ]
+                            },
+                            "gt": {
+                              "type": [
+                                "number",
                                 "null"
                               ]
                             },
@@ -1472,6 +1485,12 @@
                                           "null"
                                         ]
                                       },
+                                      "gt": {
+                                        "type": [
+                                          "number",
+                                          "null"
+                                        ]
+                                      },
                                       "lte": {
                                         "type": [
                                           "integer",
@@ -1754,6 +1773,12 @@
               "gte": {
                 "type": [
                   "integer",
+                  "null"
+                ]
+              },
+              "gt": {
+                "type": [
+                  "number",
                   "null"
                 ]
               },

@@ -269,6 +269,29 @@ public sealed class ProofRecord
 }
 
 /// <summary>A review of a completed run (SPEC «Модель данных»: Review): one per run, the latest wins.</summary>
+public sealed class ReviewReactionRecord
+{
+    public Guid RunId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public string Emoji { get; set; } = "";
+
+    public Guid SeasonId { get; set; }
+}
+
+/// <summary>A user's selected emoji on one command row of the season feed (D-903).</summary>
+public sealed class FeedReactionRecord
+{
+    public Guid SeasonId { get; set; }
+
+    public Guid TargetCommandId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public string Emoji { get; set; } = "";
+}
+
 public sealed class ReviewRecord
 {
     public Guid RunId { get; set; }

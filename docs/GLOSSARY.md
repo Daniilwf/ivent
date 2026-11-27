@@ -48,12 +48,15 @@
 | Тайбрейк | правило при равных очках: число пройденных игр, затем кто раньше набрал итоговые очки | `Tiebreaker` |
 | Клеток до финиша | наименьшее число шагов вперёд до финиша | `LeaderboardRow.CellsToFinish` |
 | Номер изменения очков | порядковый номер ненулевого изменения очков в сезоне; для тайбрейка «раньше набрал» | `SeasonPlayer.PointsTick`, счётчик — `SeasonState.PointsChanges` |
-| Итоги сезона | снимок мест и очков при завершении сезона (номинации — этап 6) | `SeasonResultRecorded`, `SeasonResultRecord`, `SeasonState.Result` |
+| Итоги сезона | снимок мест, очков и результатов номинаций при завершении сезона | `SeasonResultRecorded`, `SeasonResultRecord`, `SeasonState.Result`, `SeasonNominationsRecorded` |
 | Наступление дедлайна | системная команда планировщика: сезон «идёт» переходит в «закрытие» | `ReachDeadline`, `DeadlineScheduler` |
 | Планировщик | фоновый проход сайта раз в несколько секунд: закрывает сезоны по дедлайну, запускает наступившие таймеры, чистит сессии; сроки хранит база, поэтому перезапуск сайта их не теряет (D-101, D-404, D-773) | `DeadlineScheduler`, `Scheduler:IntervalSeconds` |
 | Проверка целостности | сверка состояния сезона в базе с повтором его лога | `SeasonIntegrity`, `GET /api/admin/seasons/{id}/integrity`, `season-check` |
 | Твой сезон | личная страница итогов игрока | `SeasonRecap` |
+| Сводка за всё время | личная статистика игрока по всем его сезонам в «Моём профиле» | `AllTimeStatisticsView` |
 | Зал славы | победители, рекорды и статистика за все сезоны | `HallOfFame` |
+| Самый большой бросок | рекорд по сумме итоговых граней зачтённого броска | `HallOfFameRollView`, `HallOfFameRecordsView.LargestRolls` |
+| Удача броска | положение итоговой суммы между возможным минимумом и максимумом того же набора кубиков; при совпадении границ оценка неопределённа (D-931) | `RollStatistics`, `SeasonRollView.Luck` |
 
 ## Игры и ролл
 
@@ -207,6 +210,7 @@
 | Колода | колесо с ивентами одного вида (D-501) | `WheelDefinition` с полем `Deck` (вид ивентов) |
 | Общий ивент | ивент на всех, запускается админом на срок, с баннером на главной и, может быть, общей целью (D-517) | `GlobalEvent` |
 | Достижение | значок за выполнение условия по статистике | `ObjectKind.Achievement`, `PlayerAchievement` |
+| Пожизненное достижение | награда и значок, которые аккаунт получает один раз за всё время; «Джекпот» относится к этой категории | `LifetimeAchievementEarned`, `SeasonPlayer.LifetimeAchievements` |
 | Определение объекта | шаблон предмета, эффекта, ивента или достижения | `ObjectDefinition`, блок эффекта — `EffectSpec`, разбор — `ContentJson`, проверка — `ContentValidator` |
 | Объект инвентаря | конкретный экземпляр у игрока | `InventoryObject`; события `ObjectGiven`, `ObjectRemoved` (`ObjectRemoval`), `ObjectTransferred`, `ObjectChanged`, `ObjectLost`; откуда — `ObjectSource` |
 | Пакет контента | определения объектов, колёса лутбоксов и колоды ивентов, загружаемые в сезон; файлы `content/items`, `content/wheels`, `content/events`, `content/decks` | `ContentPack`, `ContentFiles`, команда `PublishContent`, событие `ContentPublished`, в сезоне — `ContentCatalog` (`CatalogEntry.Deleted`) |
@@ -328,8 +332,9 @@
 | Страница игры | карточка игры из пула и все её прохождения с отзывами | `PoolGameView`, `GameRunView`, `GET /api/pool/{id}/runs`; экран — `GameScreen`, факты игры — `GameFacts` |
 | Реакция | эмодзи на запись ленты, отзыв или момент | `Reaction` |
 | Комментарий | текст к записи ленты или отзыву | `Comment` |
-| Галерея моментов | пруфы и смешные скрины сезона | `GalleryItem` |
+| Галерея моментов | опубликованные автором кадры одобренных пруфов и отдельные скриншоты сезона | `GalleryItem` |
 | Голосование | вопрос с вариантами и сроком | `Poll`, `PollOption`, `Vote`, в контенте — `PollDefinition` |
+| Итоговое голосование | отдельное голосование за номинацию после проверки пруфов | разновидность `Poll` для `Nomination` |
 | Номинация | награда по итогам сезона: автоматическая или голосованием | `Nomination` |
 | Челлендж недели | условие от админа с наградой на срок из конфига | `WeeklyChallengeState`, `SeasonState.WeeklyChallenges`, в контенте — `WeeklyChallengeDefinition` |
 | Доска «ищу напарника» | запросы игроков, ищущих напарника в своё кооп-прохождение (D-524) | `PartnerBoard`, флаг `features.partnerBoard`, срок `partnerBoard.requestTtlHours` |

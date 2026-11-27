@@ -1,5 +1,5 @@
-import { CalendarRange, MessageSquareQuote, Trophy, UserRoundX } from 'lucide-react';
-import { useCallback, type Ref } from 'react';
+import { Award, CalendarRange, MessageSquareQuote, Trophy, UserRoundX } from 'lucide-react';
+import { useCallback, type ReactNode, type Ref } from 'react';
 import { api, type Schemas } from '../api/client';
 import { Link } from '../app/Link';
 import { paths, usePageHeading } from '../app/router';
@@ -15,13 +15,14 @@ import { Skeleton } from '../ui/Progress';
 import { EmptyState } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
+import { AllTimeStatisticsPanel } from './AllTimeStatisticsPanel';
 import { Quote } from './Review';
 import { SessionsPanel } from './SessionsPanel';
 import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
 
 type Profile = Schemas['ProfileView'];
 
-/** A player's page (H5, SPEC «Профиль»): their name and avatar, how many games they completed, their seasons and reviews */
+/** A player's page (H5, SPEC «Профиль»): their name, avatar, completed games, achievements, seasons and reviews */
 export function ProfileScreen({
   userId,
   meId,
@@ -57,12 +58,31 @@ export function ProfileScreen({
           />
         }
       >
-        {(profile) => (
-          <>
-            <ProfileDetails profile={profile} mine={profile.id === meId} headingRef={heading} />
-            {profile.id === meId ? <SessionsPanel onSignedOut={onSignedOut} /> : null}
-          </>
-        )}
+        {(profile) => {
+          const mine = profile.id === meId;
+          const current = profile.seasons.find(
+            (season) => season.status === 'active' || season.status === 'closing',
+          );
+          return (
+            <>
+              <ProfileDetails
+                profile={profile}
+                mine={mine}
+                headingRef={heading}
+                recap={
+                  mine ? (
+                    <AllTimeStatisticsPanel
+                      seasonId={current?.seasonId ?? null}
+                      fallbackCompleted={profile.seasons.length ? profile.completed : null}
+                      onSignedOut={onSignedOut}
+                    />
+                  ) : null
+                }
+              />
+              {mine ? <SessionsPanel onSignedOut={onSignedOut} /> : null}
+            </>
+          );
+        }}
       </AsyncState>
     </main>
   );
@@ -73,12 +93,19 @@ export function ProfileDetails({
   profile,
   mine,
   headingRef,
+  recap,
 }: {
   profile: Profile;
   mine: boolean;
   /** The page's heading, for the focus when the page is opened (usePageHeading) */
   headingRef?: Ref<HTMLHeadingElement>;
+  recap?: ReactNode;
 }) {
+  const achievements = Array.isArray(profile.achievements) ? profile.achievements : [];
+  const seasonNames = new Map(
+    profile.seasons.map((season) => [season.seasonId, season.seasonName]),
+  );
+
   return (
     <>
       <header
@@ -104,13 +131,52 @@ export function ProfileDetails({
             {profile.name}
             {mine ? <Badge tone="me">{ru.board.you}</Badge> : null}
           </h1>
-          <span data-testid="profile-completed">
-            <Chip icon={<Trophy size={16} aria-hidden />}>
-              {ru.profile.completed(profile.completed)}
-            </Chip>
-          </span>
+          {!recap || profile.seasons.length === 0 ? (
+            <span data-testid="profile-completed">
+              <Chip icon={<Trophy size={16} aria-hidden />}>
+                {ru.profile.completed(profile.completed)}
+              </Chip>
+            </span>
+          ) : null}
         </div>
       </header>
+
+      {recap}
+
+      {achievements.length === 0 ? null : (
+        <Panel title={ru.profile.achievements}>
+          <ul className="grid divide-y-2 divide-muted" data-testid="profile-achievements">
+            {achievements.map((achievement) => {
+              const source =
+                achievement.scope === 'allTime'
+                  ? ru.profile.lifetimeAchievement
+                  : seasonNames.get(achievement.seasonId);
+              return (
+                <li
+                  key={`${achievement.scope ?? 'season'}:${achievement.seasonId}:${achievement.objectId}`}
+                  className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 py-3"
+                >
+                  <span className="grid size-8 place-items-center rounded-full bg-gold text-ink">
+                    <Award size={20} aria-hidden />
+                  </span>
+                  <div className="grid gap-1 wrap-anywhere">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <p className="font-bold">{achievement.name}</p>
+                      <span className="text-sm text-ink-soft tabular-nums">
+                        {source ? `${source}, ` : ''}
+                        <time dateTime={achievement.earnedAt}>
+                          {moscowDay(achievement.earnedAt)}
+                        </time>
+                      </span>
+                    </div>
+                    <p>{achievement.description}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+      )}
 
       <Panel title={ru.profile.seasons}>
         {profile.seasons.length === 0 ? (
@@ -135,12 +201,25 @@ export function ProfileDetails({
                 <span className="font-display font-heavy tabular-nums">
                   {ru.profile.points(season.points)}
                 </span>
-                <span className="flex flex-wrap gap-2 text-sm">
+                <span className="flex flex-wrap items-center gap-2 text-sm">
                   <Tag>{ru.seasonStatus[season.status] ?? season.status}</Tag>
+                  {season.place === 1 &&
+                  (season.status === 'finished' || season.status === 'archived') ? (
+                    <Badge>{ru.profile.champion}</Badge>
+                  ) : null}
                 </span>
                 <span className="text-sm text-ink-soft tabular-nums">
                   {season.place === null ? ru.profile.noPlace : ru.profile.place(season.place)}
                 </span>
+                {mine && season.seasonRecapAvailable ? (
+                  <Link
+                    to={paths.seasonRecap(season.seasonId)}
+                    className={cx(standaloneLink, 'col-span-full justify-self-start font-medium')}
+                    aria-label={ru.seasonRecap.profileLink(season.seasonName)}
+                  >
+                    {ru.seasonRecap.title}
+                  </Link>
+                ) : null}
               </li>
             ))}
           </ul>

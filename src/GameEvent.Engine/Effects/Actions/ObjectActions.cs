@@ -58,7 +58,7 @@ internal sealed class GiveObjectHandler : ActionHandler<GiveObjectAction>
 {
     protected override void Execute(GiveObjectAction action, EffectRun run)
     {
-        if (run.State.Catalog.Find(action.ObjectId) is not { } definition)
+        if (run.State.Catalog.Find(action.ObjectId) is not { Kind: not ObjectKind.Achievement } definition)
         {
             return;
         }
@@ -200,7 +200,7 @@ internal sealed class TransformObjectHandler : ActionHandler<TransformObjectActi
             return;
         }
 
-        if (run.State.Catalog.Live(action.Into!) is not { } into)
+        if (run.State.Catalog.Live(action.Into!) is not { Kind: not ObjectKind.Achievement } into)
         {
             return;
         }

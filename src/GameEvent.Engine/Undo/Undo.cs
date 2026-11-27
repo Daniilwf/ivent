@@ -74,7 +74,17 @@ public sealed record CommandUndone(
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     EquatableArray<Duels.Duel>? Duels = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    EquatableArray<Guid>? RemovedDuels = null) : IGameEvent;
+    EquatableArray<Guid>? RemovedDuels = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Reactions.ReviewReactionSet>? ReviewReactions = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Reactions.FeedReactionSet>? FeedReactions = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Comments.CommentSnapshot>? Comments = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Gallery.GalleryItemSnapshot>? GalleryItems = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    EquatableArray<Reactions.GalleryReactionSet>? GalleryReactions = null) : IGameEvent;
 
 internal static class Undoing
 {
@@ -119,6 +129,11 @@ internal static class Undoing
 
         var target = history[index];
         // D-308: a map is taken back by publishing the previous version again
+        if (target.Events.Any(e => e is Gallery.GalleryProofConsentWithdrawn))
+        {
+            return Decision.Reject(RejectionCodes.UndoNotUndoable, "Only the author can grant consent to publish a proof again.");
+        }
+
         if (target.Events.Any(e => e is SeasonCreated or CommandUndone or Map.MapPublished or Content.ContentPublished))
         {
             return Decision.Reject(RejectionCodes.UndoNotUndoable, "The season's creation, map and content publications and undos are not undone; do the action again instead.");
@@ -140,6 +155,12 @@ internal static class Undoing
             var after = history[i].Events.Aggregate(before, SeasonEngine.Apply);
             if (i == index)
             {
+                if (target.Events.Count > 0 && target.Events.All(e => e is Polls.PollCancelled cancelled
+                    && before.Polls.GetValueOrDefault(cancelled.PollId)?.Source == Polls.PollSource.Nomination))
+                {
+                    return Decision.Reject(RejectionCodes.UndoNotUndoable, "Open a new final ballot after its candidates become eligible again.");
+                }
+
                 beforeTarget = before;
                 targetKeys = Keys(before, after, history[i].Events);
             }
@@ -209,14 +230,34 @@ internal static class Undoing
     private static bool DependsOn(ISet<string> later, ISet<string> target) =>
         later.Overlaps(target)
         || later.Any(k => WholeOf(k) is { } whole && target.Contains(whole))
-        || target.Any(k => WholeOf(k) is { } whole && later.Contains(whole));
+        || target.Any(k => WholeOf(k) is { } whole && later.Contains(whole))
+        // A later publication depends on reactivation. An earlier publication remains undoable after it.
+        || later.Any(key => key.StartsWith(GalleryEligibilityPrefix, StringComparison.Ordinal)
+            && key.LastIndexOf(':') is var separator && separator >= GalleryEligibilityPrefix.Length
+            && target.Contains(key[..separator]));
 
     // A part's key «challenge:{id}:{playerId}» or «author:{playerId}:{suggestionId}» belongs to the whole before its last colon
-    private static string? WholeOf(string key) =>
-        new[] { ChallengePrefix, AuthorPrefix, PollPrefix, GlobalEventPrefix }.FirstOrDefault(p => key.StartsWith(p, StringComparison.Ordinal)) is { } prefix
+    private static string? WholeOf(string key)
+    {
+        if (key.StartsWith(ReviewPrefix, StringComparison.Ordinal))
+        {
+            var endOfRun = key.IndexOf(':', ReviewPrefix.Length);
+            return endOfRun < 0 ? null : key[..endOfRun];
+        }
+
+        if (key.StartsWith(GalleryReactionPrefix, StringComparison.Ordinal))
+        {
+            var endOfItem = key.IndexOf(':', GalleryReactionPrefix.Length);
+            return endOfItem < 0 ? null : key[..endOfItem];
+        }
+
+        return new[] { ChallengePrefix, AuthorPrefix, PollPrefix, GlobalEventPrefix }.FirstOrDefault(p => key.StartsWith(p, StringComparison.Ordinal)) is { } prefix
             && key.LastIndexOf(':') is var last && last > prefix.Length
             ? key[..last]
             : null;
+    }
+
+    private const string ReviewPrefix = "review:";
 
     private const string ChallengePrefix = "challenge:";
 
@@ -275,6 +316,9 @@ internal static class Undoing
     {
         var players = state.Players.RemoveRange(e.RemovedPlayers).SetItems(e.Players.Select(p => KeyValuePair.Create(p.PlayerId, p)));
         var runs = state.Runs.RemoveRange(e.RemovedRuns).SetItems(e.Runs.Select(r => KeyValuePair.Create(r.RunId, r)));
+        // Undo snapshots restore the run data. Keep the log position unless the completion itself is undone.
+        var reopenedRuns = e.Runs.Where(r => r.CompletedAt is null).Select(r => r.RunId);
+        var completionOrder = state.RunCompletionOrder.RemoveRange(e.RemovedRuns.Concat(reopenedRuns));
         var effects = state.ManualEffects.RemoveRange(e.RemovedEffects).SetItems(e.Effects.Select(x => KeyValuePair.Create(x.EffectId, x)));
         var challenges = state.WeeklyChallenges.RemoveRange(e.RemovedWeeklyChallenges ?? [])
             .SetItems((e.WeeklyChallenges ?? []).Select(c => KeyValuePair.Create(c.ChallengeId, c)));
@@ -289,12 +333,34 @@ internal static class Undoing
         var globals = state.GlobalEvents.RemoveRange(e.RemovedGlobalEvents ?? [])
             .SetItems((e.GlobalEvents ?? []).Select(x => KeyValuePair.Create(x.GlobalEventId, x)));
         var duels = state.Duels.RemoveRange(e.RemovedDuels ?? []).SetItems((e.Duels ?? []).Select(x => KeyValuePair.Create(x.DuelId, x)));
+        var comments = state.Comments;
+        foreach (var snapshot in e.Comments ?? [])
+        {
+            comments = snapshot.Before is { } previous
+                ? comments.SetItem(snapshot.CommentId, previous)
+                : comments.Remove(snapshot.CommentId);
+        }
+
+        var galleryItems = state.GalleryItems;
+        foreach (var snapshot in e.GalleryItems ?? [])
+        {
+            galleryItems = snapshot.Before is { } previous
+                ? galleryItems.SetItem(snapshot.ItemId,
+                    galleryItems.GetValueOrDefault(snapshot.ItemId)?.ConsentRevoked == true ? previous with { ConsentRevoked = true } : previous)
+                : galleryItems.Remove(snapshot.ItemId);
+        }
+
+        galleryItems = galleryItems.SetItems(galleryItems
+            .Where(item => !item.Value.ConsentRevoked && item.Value.ProofSource?.ApprovalCommandId == e.CommandId)
+            .Select(item => KeyValuePair.Create(item.Key, item.Value with { ConsentRevoked = true })));
+
         var restored = state with
         {
             GlobalEvents = globals,
             Polls = polls,
             Players = players,
             Runs = runs,
+            RunCompletionOrder = completionOrder,
             ManualEffects = effects,
             WeeklyChallenges = challenges,
             Suggestions = suggestions,
@@ -302,7 +368,24 @@ internal static class Undoing
             Interactions = interactions,
             PartnerRequests = requests,
             Duels = duels,
+            Comments = comments,
+            GalleryItems = galleryItems,
         };
+        foreach (var reaction in e.ReviewReactions ?? [])
+        {
+            restored = Reactions.ReviewReactions.Apply(restored, reaction);
+        }
+
+        foreach (var reaction in e.FeedReactions ?? [])
+        {
+            restored = Reactions.FeedReactions.Apply(restored, reaction);
+        }
+
+        foreach (var reaction in e.GalleryReactions ?? [])
+        {
+            restored = Reactions.GalleryReactions.Apply(restored, reaction);
+        }
+
         if (e.Season is not { } season)
         {
             return restored;
@@ -367,6 +450,11 @@ internal static class Undoing
         foreach (var id in Changed(before.Runs, after.Runs))
         {
             keys.Add($"run:{id}");
+            if ((before.Runs.GetValueOrDefault(id)?.Review is not null) != (after.Runs.GetValueOrDefault(id)?.Review is not null))
+            {
+                keys.Add($"{ReviewPrefix}{id}");
+            }
+
             foreach (var run in new[] { before.Runs.GetValueOrDefault(id), after.Runs.GetValueOrDefault(id) }.OfType<RunState>())
             {
                 keys.Add($"game:{run.GameId}");
@@ -382,6 +470,16 @@ internal static class Undoing
                     keys.Add(FinishKey);
                 }
             }
+        }
+
+        foreach (var reaction in ChangedReviewReactions(before, after))
+        {
+            keys.Add(ReviewReactionKey(reaction.RunId, reaction.UserId, reaction.Emoji));
+        }
+
+        foreach (var itemId in Changed(before.GalleryItems, after.GalleryItems))
+        {
+            keys.Add($"galleryItem:{itemId}");
         }
 
         foreach (var id in Changed(before.ManualEffects, after.ManualEffects))
@@ -506,6 +604,10 @@ internal static class Undoing
             if (e is Players.PlayerInactivitySet inactivity)
             {
                 keys.Add($"{DuelsPrefix}{inactivity.PlayerId}");
+                if (!inactivity.IsInactive)
+                {
+                    keys.Add($"{GalleryEligibilityPrefix}{inactivity.PlayerId}");
+                }
             }
 
             var finisher = e switch
@@ -532,6 +634,55 @@ internal static class Undoing
 
         foreach (var e in events)
         {
+            if (e is Reactions.ReviewReactionSet reaction)
+            {
+                // A confirmation of the current choice also depends on the review and that user's earlier choice.
+                keys.Add(ReviewReactionKey(reaction.RunId, reaction.UserId, reaction.Emoji));
+                continue;
+            }
+
+            if (e is Reactions.FeedReactionSet feedReaction)
+            {
+                // A reaction depends on earlier choices by this user on this row and emoji (D-903).
+                keys.Add($"feedReaction:{feedReaction.TargetCommandId}:{feedReaction.UserId}:{feedReaction.Emoji}");
+                continue;
+            }
+
+            if (e is Reactions.GalleryReactionSet galleryReaction)
+            {
+                keys.Add($"{GalleryReactionPrefix}{galleryReaction.ItemId}:{galleryReaction.UserId}:{galleryReaction.Emoji}");
+                continue;
+            }
+
+            var commentId = e switch
+            {
+                Comments.CommentPosted posted => posted.CommentId,
+                Comments.CommentEdited edited => edited.CommentId,
+                Comments.CommentDeleted deleted => deleted.CommentId,
+                Comments.CommentHidden hidden => hidden.CommentId,
+                _ => (Guid?)null,
+            };
+            if (commentId is { } touchedComment)
+            {
+                keys.Add($"comment:{touchedComment}");
+                if (after.Comments[touchedComment].Target is { Kind: Comments.CommentTargetKind.Review } review)
+                {
+                    // A review's original publication holds its comments. Feed comments do not hold the underlying command.
+                    keys.Add($"{ReviewPrefix}{review.Id}:comment:{touchedComment}");
+                }
+
+                continue;
+            }
+
+            if (e is Gallery.IGalleryMomentPublished published)
+            {
+                // Enrollment and reactivation hold a player's publications independently of their turns.
+                keys.Add($"{AuthorPrefix}{published.PlayerId}:gallery-{published.ItemId}");
+                keys.Add($"{GalleryEligibilityPrefix}{published.PlayerId}:{published.ItemId}");
+                keys.Add($"{GalleryReactionPrefix}{published.ItemId}");
+                continue;
+            }
+
             if (e is PlayerFinished or PlayerFinishRevoked or PlayerFrozen or FinishSurplusChanged or FinishBonusRulesRefreshed
                 or Scoring.PointsChanged { Reason: Scoring.PointsReason.FinishBonus or Scoring.PointsReason.FinishBonusRevoked })
             {
@@ -573,6 +724,8 @@ internal static class Undoing
         return keys;
     }
 
+    private static string ReviewReactionKey(Guid runId, Guid userId, string emoji) => $"{ReviewPrefix}{runId}:{userId}:{emoji}";
+
     private const string FinishKey = "finishOrder";
 
     private const string DuelsPrefix = "duels:";
@@ -588,6 +741,8 @@ internal static class Undoing
         };
 
     private const string AuthorPrefix = "author:";
+    private const string GalleryEligibilityPrefix = "galleryEligibility:";
+    private const string GalleryReactionPrefix = "galleryReaction:";
 
     /// <summary>The players whose completions of a challenge differ between two versions of it.</summary>
     private static IEnumerable<Guid> CompletionsChanged(Challenges.WeeklyChallengeState? was, Challenges.WeeklyChallengeState? now)
@@ -629,7 +784,10 @@ internal static class Undoing
         var forAll = Changed(before.ForAll, after.ForAll).ToList();
         var interactions = Changed(before.Interactions, after.Interactions).ToList();
         var requests = Changed(before.PartnerRequests, after.PartnerRequests).ToList();
-        var polls = Changed(before.Polls, after.Polls).ToList();
+        // Making a candidate visible again leaves its cancelled final ballot closed to voting.
+        var polls = Changed(before.Polls, after.Polls)
+            .Where(id => after.Polls.GetValueOrDefault(id) is not { Source: Polls.PollSource.Nomination, Status: Polls.PollStatus.Cancelled })
+            .ToList();
         var globals = Changed(before.GlobalEvents, after.GlobalEvents).ToList();
         var duels = Changed(before.Duels, after.Duels).ToList();
         var seasonChanged = before.Status != after.Status || before.Deadline != after.Deadline || before.Name != after.Name
@@ -670,8 +828,30 @@ internal static class Undoing
                 .Select(id => Restored(before.GlobalEvents[id], after.GlobalEvents.GetValueOrDefault(id), now.GlobalEvents.GetValueOrDefault(id)))]),
             OrNull([.. globals.Where(id => !before.GlobalEvents.ContainsKey(id) && now.GlobalEvents.ContainsKey(id))]),
             OrNull([.. duels.Where(before.Duels.ContainsKey).Select(id => before.Duels[id])]),
-            OrNull([.. duels.Where(id => !before.Duels.ContainsKey(id) && now.Duels.ContainsKey(id))]));
+            OrNull([.. duels.Where(id => !before.Duels.ContainsKey(id) && now.Duels.ContainsKey(id))]),
+            OrNull([.. ChangedReviewReactions(before, after)
+                .OrderBy(reaction => reaction.RunId).ThenBy(reaction => reaction.UserId).ThenBy(reaction => reaction.Emoji, StringComparer.Ordinal)
+                .Select(reaction => new Reactions.ReviewReactionSet(reaction.RunId, reaction.UserId, reaction.Emoji, before.ReviewReactions.Contains(reaction)))]),
+            OrNull([.. ChangedFeedReactions(before, after)
+                .OrderBy(reaction => reaction.TargetCommandId).ThenBy(reaction => reaction.UserId).ThenBy(reaction => reaction.Emoji, StringComparer.Ordinal)
+                .Select(reaction => new Reactions.FeedReactionSet(reaction.TargetCommandId, reaction.UserId, reaction.Emoji, before.FeedReactions.Contains(reaction)))]),
+            OrNull([.. Changed(before.Comments, after.Comments)
+                .Select(id => new Comments.CommentSnapshot(id, before.Comments.GetValueOrDefault(id)))]),
+            OrNull([.. Changed(before.GalleryItems, after.GalleryItems)
+                .Select(id => new Gallery.GalleryItemSnapshot(id, before.GalleryItems.GetValueOrDefault(id)))]),
+            OrNull([.. ChangedGalleryReactions(before, after)
+                .OrderBy(reaction => reaction.ItemId).ThenBy(reaction => reaction.UserId).ThenBy(reaction => reaction.Emoji, StringComparer.Ordinal)
+                .Select(reaction => new Reactions.GalleryReactionSet(reaction.ItemId, reaction.UserId, reaction.Emoji, before.GalleryReactions.Contains(reaction)))]));
     }
+
+    private static System.Collections.Immutable.ImmutableHashSet<Reactions.ReviewReaction> ChangedReviewReactions(SeasonState before, SeasonState after) =>
+        ReferenceEquals(before.ReviewReactions, after.ReviewReactions) ? [] : before.ReviewReactions.SymmetricExcept(after.ReviewReactions);
+
+    private static System.Collections.Immutable.ImmutableHashSet<Reactions.FeedReaction> ChangedFeedReactions(SeasonState before, SeasonState after) =>
+        ReferenceEquals(before.FeedReactions, after.FeedReactions) ? [] : before.FeedReactions.SymmetricExcept(after.FeedReactions);
+
+    private static System.Collections.Immutable.ImmutableHashSet<Reactions.GalleryReaction> ChangedGalleryReactions(SeasonState before, SeasonState after) =>
+        ReferenceEquals(before.GalleryReactions, after.GalleryReactions) ? [] : before.GalleryReactions.SymmetricExcept(after.GalleryReactions);
 
     private static Polls.Poll Restored(Polls.Poll was, Polls.Poll? after, Polls.Poll? now)
     {

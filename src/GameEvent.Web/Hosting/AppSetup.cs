@@ -50,6 +50,12 @@ public static class AppSetup
 
     public const int SeasonReadsPerMinute = 60;
 
+    /// <summary>Gallery originals and thumbnails share a separate read limit per account.</summary>
+    public const string GalleryMediaRateLimit = "gallery-media";
+
+    // Two pages of 50 thumbnails leave room to open individual pictures.
+    public const int GalleryMediaReadsPerMinute = 120;
+
     /// <summary>
     /// The season view (the main screen, D-828): it folds the season's events, so per user — enough for a page that refetches
     /// after every command of a busy season, not for a loop.
@@ -68,6 +74,7 @@ public static class AppSetup
 
     /// <summary>New player interaction writes share one per-user budget, across routes and seasons (5.20).</summary>
     public const string InteractionRateLimit = "interaction-write";
+    public const string ReviewReactionRateLimit = "review-reaction-write";
 
     public const int InteractionActionsPerMinute = 20;
 
@@ -110,6 +117,7 @@ public static class AppSetup
         services.AddSingleton<SeasonBroadcaster>();
         services.AddSingleton<ContentCards>();
         services.AddSingleton<SeasonStateReader>();
+        services.AddSingleton<IFeedReactionTargets, FeedReactionTargets>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<SeasonBroadcaster>());
         services.AddSingleton<HubSessions>();
         services.AddSingleton<ICommittedEventsListener>(sp => sp.GetRequiredService<HubSessions>());
@@ -237,9 +245,15 @@ public static class AppSetup
             o.AddPolicy(InteractionRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = InteractionActionsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(ReviewReactionRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.AddPolicy(SeasonReadRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = SeasonReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(GalleryMediaRateLimit, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                ctx.User.UserId()?.ToString() ?? WebSecurity.ClientKey(ctx.Connection.RemoteIpAddress),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = GalleryMediaReadsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
         });
 
         services.Configure<ForwardedHeadersOptions>(o => WebSecurity.ConfigureForwardedHeaders(o, builder.Configuration));
@@ -294,6 +308,10 @@ public static class AppSetup
         api.MapAccounts();
         api.MapSessions();
         api.MapSeasons();
+        api.MapSeasonStatistics();
+        api.MapNominationResults();
+        api.MapHallOfFame();
+        api.MapHallOfFameRecords();
         api.MapRules();
         api.MapPoolStats();
         api.MapAdminRuns();
@@ -304,6 +322,8 @@ public static class AppSetup
         api.MapAdminContent();
         api.MapSeasonsAndPlayers();
         api.MapFeed();
+        api.MapComments();
+        api.MapGallery();
         api.MapEconomy();
         api.MapAdminEconomy();
         Polls.PollEndpoints.MapPolls(api);

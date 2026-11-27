@@ -79,8 +79,9 @@ internal static class EffectChain
             return ([], state);
         }
 
-        // Event cells (D-502) and the effects of items and cells (D-412) react first, then any handlers of the context (tests, D-24).
-        IReadOnlyList<ITriggerHandler> handlers = [Decks.EventCells.Instance, EffectTriggers.Instance, .. context.Triggers ?? []];
+        IReadOnlyList<ITriggerHandler> handlers =
+            [Decks.EventCells.Instance, EffectTriggers.Instance, Achievements.SeasonalAchievements.Instance,
+                Achievements.LifetimeAchievements.Instance, .. context.Triggers ?? []];
         var limits = ChainLimits.Of(state);
 
         var written = new List<IGameEvent>();

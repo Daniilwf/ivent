@@ -129,6 +129,11 @@ internal static class ItemUse
                 return Decision.Reject(RejectionCodes.ObjectUnknown, $"«{give}» is not in the season's content.");
             }
 
+            if (definition.Kind == ObjectKind.Achievement)
+            {
+                return Decision.Reject(RejectionCodes.ItemNotAnItem, $"«{give}» is an achievement: achievements are awarded by their trigger.");
+            }
+
             var after = events.Aggregate(state, SeasonEngine.Apply);
             var given = Inventories.Give(after, context, player.PlayerId, definition, null, ObjectSource.Admin, fromPlayerId: null);
             if (given is ObjectLost)

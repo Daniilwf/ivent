@@ -415,9 +415,15 @@ public partial class PlayerAdminInvariantTests
             "coop" => features.Coop,
             "partnerBoard" => features.PartnerBoard && features.Coop,
             "polls" => features.Polls,
+            "seasonNominations" => features.SeasonNominations,
             "globalEvents" => features.GlobalEvents && features.Events,
             "duels" => features.Duels,
             "interactions" => features.Coop || features.Duels,
+            "reactions" => features.Reactions,
+            "comments" => features.Comments,
+            "achievements" => features.Achievements,
+            "achievementContent" => features.Items || features.Achievements,
+            "gallery" => features.Gallery,
             _ => throw new ArgumentOutOfRangeException(nameof(mechanic), mechanic, "Unknown mechanic."),
         };
 
@@ -441,6 +447,8 @@ public partial class PlayerAdminInvariantTests
                 or Engine.Effects.ForAllQueued or Engine.Effects.ForAllSettled => "events",
 
             // The economy of stage 4 (D-400…): items and their effects, the shop, bets — each under its flag
+            Engine.Content.ContentPublished { Pack: { Wheels.Count: 0 } pack }
+                when pack.Objects.All(o => o.Kind == Engine.Content.ObjectKind.Achievement) => "achievementContent",
             Engine.Content.ContentPublished or Engine.Inventory.ObjectGiven or Engine.Inventory.ObjectRemoved or Engine.Inventory.ObjectTransferred
                 or Engine.Inventory.ObjectChanged or Engine.Inventory.ObjectLost or Engine.Inventory.ItemUsed or Engine.Inventory.EffectTriggered
                 or Engine.Inventory.EffectRolled or Engine.Inventory.HostileIntercepted or Engine.Inventory.HostileReceived or Engine.Inventory.WheelSpun
@@ -475,10 +483,18 @@ public partial class PlayerAdminInvariantTests
             // Polls of stage 5 (D-512, D-720)
             Engine.Polls.PollStarted or Engine.Polls.VoteCast or Engine.Polls.VoteChanged or Engine.Polls.PollClosed
                 or Engine.Polls.PollCancelled => "polls",
+            Engine.Polls.NominationPollStarted or Engine.Statistics.SeasonNominationsRecorded => "seasonNominations",
 
             // Global events and their goals (D-517, D-518, D-750)
             Engine.GlobalEvents.GlobalEventLaunched or Engine.GlobalEvents.GlobalEventEnded or Engine.GlobalEvents.GlobalProgressChanged
                 or Engine.GlobalEvents.GlobalGoalReached => "globalEvents",
+
+            Engine.Reactions.ReviewReactionSet or Engine.Reactions.FeedReactionSet or Engine.Reactions.GalleryReactionSet => "reactions",
+            Engine.Comments.CommentPosted or Engine.Comments.CommentEdited or Engine.Comments.CommentDeleted
+                or Engine.Comments.CommentHidden => "comments",
+            Engine.Achievements.AchievementEarned or Engine.Achievements.LifetimeAchievementEarned
+                or CoinsChanged { Reason: CoinsReason.Achievement } => "achievements",
+            Engine.Gallery.IGalleryMomentPublished or Engine.Gallery.GalleryMomentHidden => "gallery",
 
             // The effect dispatcher reacts to content (items, events); stage 1 has no content effects in play (D-24, D-103)
             EffectChainCut => "effects",
@@ -491,6 +507,8 @@ public partial class PlayerAdminInvariantTests
                 or PointsChanged or CoinsChanged or ResourceChanged or PlayerMoved
                 or PlayerFinished or PlayerFrozen or PlayerFinishRevoked or FinishSurplusChanged or FinishBonusRulesRefreshed
                 or ManualEffectCreated or ManualEffectResolved or CommandUndone
+                // Authors can withdraw consent even while the gallery is switched off.
+                or Engine.Gallery.GalleryProofConsentWithdrawn
 
                 // Accounts (D8, D-106) and stored files (D4a, D-108) are the site's, not a season mechanic
                 or Accounts.AccountCreated or Accounts.AccountPasswordReset or Accounts.AccountPasswordChanged

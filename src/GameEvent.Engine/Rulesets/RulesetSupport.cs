@@ -30,17 +30,6 @@ public static class RulesetSupport
         }
 
         var f = ruleset.Features;
-        foreach (var (name, on) in new[]
-        {
-            ("achievements", f.Achievements),
-            ("reactions", f.Reactions), ("comments", f.Comments), ("gallery", f.Gallery),
-        })
-        {
-            if (on)
-            {
-                errors.Add(new($"features.{name}", NotYet));
-            }
-        }
 
         // The shop sells items: it plays only with them (D-403).
         if (f.Shop && !f.Items)

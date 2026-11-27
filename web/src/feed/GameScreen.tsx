@@ -1,6 +1,8 @@
 import { CheckCheck, Gamepad2, Play, SearchX, X, RotateCcw, Ban } from 'lucide-react';
-import { useCallback, type ReactNode, type Ref } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { api, type Schemas } from '../api/client';
+import { newCommandId } from '../api/commands';
+import { watchSeason } from '../api/realtime';
 import { Link } from '../app/Link';
 import { paths, usePageHeading } from '../app/router';
 import { moscowDay } from '../app/time';
@@ -16,11 +18,22 @@ import { Skeleton } from '../ui/Progress';
 import { EmptyState } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
+import { CommentThread } from './CommentThread';
 import { Quote } from './Review';
+import { ReviewReactionButtons, type ChangeReviewReaction } from './ReviewReactionButtons';
 import { useLoaded, type Answer } from '../app/useLoaded';
 
 type Game = Schemas['PoolGameView'];
 type Run = Schemas['GameRunView'];
+type RunsRead = { request: AbortController; done: Promise<boolean> };
+
+const refreshEvents = new Set([
+  'review-reaction-set',
+  'run-reviewed',
+  'ruleset-changed',
+  'command-undone',
+]);
+const refreshDelayMs = 300;
 
 const statusIcons: Record<string, ReactNode> = {
   playing: <Play size={14} aria-hidden />,
@@ -67,9 +80,171 @@ export function GameScreen({ gameId, onSignedOut }: { gameId: string; onSignedOu
           />
         }
       >
-        {({ game, runs }) => <GameDetails game={game} runs={runs} headingRef={heading} />}
+        {({ game, runs }) => (
+          <GameWithReviewReactions
+            key={game.id}
+            game={game}
+            initialRuns={runs}
+            headingRef={heading}
+            onSignedOut={onSignedOut}
+          />
+        )}
       </AsyncState>
     </main>
+  );
+}
+
+function GameWithReviewReactions({
+  game,
+  initialRuns,
+  headingRef,
+  onSignedOut,
+}: {
+  game: Game;
+  initialRuns: Run[];
+  headingRef: Ref<HTMLHeadingElement>;
+  onSignedOut: () => void;
+}) {
+  const [{ runs, staleRuns }, setSnapshot] = useState(() => ({
+    runs: initialRuns,
+    staleRuns: new Set<string>(),
+  }));
+  const lifetime = useRef<AbortController | null>(null);
+  const read = useRef<RunsRead | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    lifetime.current = controller;
+    return () => {
+      controller.abort();
+      read.current?.request.abort();
+      read.current = null;
+    };
+  }, []);
+
+  const gameId = game.id;
+  const refreshRuns = useCallback(() => {
+    const request = new AbortController();
+    const load = async () => {
+      try {
+        const { data, response } = await api.GET('/api/pool/{gameId}/runs', {
+          params: { path: { gameId } },
+          signal: request.signal,
+        });
+        if (request.signal.aborted) return false;
+        if (data) {
+          setSnapshot({ runs: [...data], staleRuns: new Set() });
+          return true;
+        }
+        if (response.status === 401) {
+          onSignedOut();
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    };
+    // A live refresh may replace this read. A write waiting for its snapshot needs the result of the replacement.
+    const done = load().then((ok) =>
+      read.current?.request === request ? ok : (read.current?.done ?? true),
+    );
+    const previous = read.current;
+    read.current = { request, done };
+    previous?.request.abort();
+    return done;
+  }, [gameId, onSignedOut]);
+
+  // A game can have reviews in different seasons. Each enabled season is watched once, even with several reviews.
+  const seasonKey = [
+    ...new Set(
+      runs
+        .filter((run) => run.reviewReactions?.length || run.canComment)
+        .map((run) => run.seasonId),
+    ),
+  ]
+    .sort()
+    .join(',');
+  useEffect(() => {
+    if (!seasonKey) return;
+    let queued: ReturnType<typeof setTimeout> | undefined;
+    const stops = seasonKey.split(',').map((seasonId) =>
+      watchSeason(seasonId, (updates) => {
+        if (
+          updates.length > 0 &&
+          !updates.some((u) => u.types.some((type) => refreshEvents.has(type)))
+        )
+          return;
+        if (queued !== undefined) return;
+        queued = setTimeout(() => {
+          queued = undefined;
+          void refreshRuns();
+        }, refreshDelayMs);
+      }),
+    );
+    return () => {
+      stops.forEach((stop) => {
+        stop();
+      });
+      clearTimeout(queued);
+    };
+  }, [seasonKey, refreshRuns]);
+
+  const changeReaction: ChangeReviewReaction = async (runId, emoji, selected) => {
+    const signal = lifetime.current?.signal;
+    if (!signal) return null;
+    const aborted = () => signal.aborted;
+    if (aborted()) return null;
+    try {
+      const { response } = await api.PUT('/api/pool/{gameId}/runs/{runId}/review-reactions', {
+        params: { path: { gameId, runId } },
+        body: { commandId: newCommandId(), emoji, selected },
+        signal,
+      });
+      if (aborted()) return null;
+      if (response.status === 401) {
+        onSignedOut();
+        return null;
+      }
+      if (response.status === 429) return 'tooOften';
+      if (!response.ok) return 'refused';
+
+      // Apply the acknowledged selection once. The next snapshot supplies the authoritative totals.
+      setSnapshot((previous) => ({
+        ...previous,
+        runs: previous.runs.map((run) =>
+          run.runId === runId && run.reviewReactions
+            ? {
+                ...run,
+                reviewReactions: run.reviewReactions.map((reaction) =>
+                  reaction.emoji === emoji && reaction.selected !== selected
+                    ? { ...reaction, count: reaction.count + (selected ? 1 : -1), selected }
+                    : reaction,
+                ),
+              }
+            : run,
+        ),
+      }));
+      if (!(await refreshRuns()) && !aborted()) {
+        setSnapshot((previous) => ({
+          ...previous,
+          staleRuns: new Set([...previous.staleRuns, runId]),
+        }));
+      }
+      return null;
+    } catch {
+      return aborted() ? null : 'refused';
+    }
+  };
+
+  return (
+    <GameDetails
+      game={game}
+      runs={runs}
+      headingRef={headingRef}
+      changeReaction={changeReaction}
+      staleRuns={staleRuns}
+      onSignedOut={onSignedOut}
+    />
   );
 }
 
@@ -78,11 +253,17 @@ export function GameDetails({
   game,
   runs,
   headingRef,
+  changeReaction,
+  staleRuns,
+  onSignedOut,
 }: {
   game: Game;
   runs: Run[];
   /** The page's heading, for the focus when the page is opened (usePageHeading) */
   headingRef?: Ref<HTMLHeadingElement>;
+  changeReaction?: ChangeReviewReaction;
+  staleRuns?: ReadonlySet<string>;
+  onSignedOut?: () => void;
 }) {
   return (
     <>
@@ -152,6 +333,26 @@ export function GameDetails({
                     )}
                   </ul>
                   <Quote rating={run.rating} text={run.reviewText} />
+                  {changeReaction && run.reviewReactions?.length ? (
+                    <ReviewReactionButtons
+                      runId={run.runId}
+                      reactions={run.reviewReactions}
+                      changeReaction={changeReaction}
+                      stale={staleRuns?.has(run.runId) === true}
+                    />
+                  ) : null}
+                  {run.canComment && onSignedOut ? (
+                    <CommentThread
+                      target={{
+                        kind: 'review',
+                        seasonId: run.seasonId,
+                        gameId: game.id,
+                        runId: run.runId,
+                      }}
+                      label={ru.comments.reviewLabel(run.playerName)}
+                      onSignedOut={onSignedOut}
+                    />
+                  ) : null}
                 </div>
               </li>
             ))}

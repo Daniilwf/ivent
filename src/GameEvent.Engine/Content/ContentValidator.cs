@@ -110,6 +110,11 @@ public static partial class ContentValidator
             Error("$.effect.trigger", $"A {kind} acts when it is used or drawn, without a trigger.");
         }
 
+        if (kind is ObjectKind.Effect or ObjectKind.SpecialRoll && effect.Trigger == Trigger.ProofApproved)
+        {
+            Error("$.effect.trigger", "Only achievements use the «proofApproved» trigger.");
+        }
+
         if (kind is not (ObjectKind.Effect or ObjectKind.SpecialRoll) && effect.Duration is not null)
         {
             Error("$.effect.duration", "Only effects and special rolls last; a duration elsewhere means nothing.");
@@ -747,7 +752,7 @@ public static partial class ContentValidator
     private static void CheckRunCondition(ConditionSpec condition, string path, Action<string, string> error)
     {
         if (condition is { DifficultyAtLeast: null, DifficultyAtMost: null }
-            || condition.Game is not null || condition.Stat is not null || condition.Gte is not null || condition.Lte is not null
+            || condition.Game is not null || condition.Stat is not null || condition.Gte is not null || condition.Gt is not null || condition.Lte is not null
             || condition.Tag is not null || condition.MinDice is not null)
         {
             error(path, "A condition on the run names its difficulty only: «difficultyAtLeast» and/or «difficultyAtMost»; a game goes in «filter».");
@@ -759,7 +764,7 @@ public static partial class ContentValidator
 
     private static void CheckCondition(ConditionSpec condition, string path, Action<string, string> error)
     {
-        if (condition is { DifficultyAtLeast: null, DifficultyAtMost: null, Game: null, Stat: null, Gte: null, Lte: null, Tag: null, MinDice: null })
+        if (condition is { DifficultyAtLeast: null, DifficultyAtMost: null, Game: null, Stat: null, Gte: null, Gt: null, Lte: null, Tag: null, MinDice: null })
         {
             error(path, "A condition tests the run («difficultyAtLeast», «difficultyAtMost»), the game («game») or a statistic («stat»).");
             return;
@@ -772,7 +777,8 @@ public static partial class ContentValidator
 
         var missing = condition.Stat switch
         {
-            ContentStat.HostileReceived or ContentStat.RunHours when condition.Gte is null => "gte",
+            ContentStat.HostileReceived when condition.Gte is null => "gte",
+            ContentStat.RunHours when condition is { Gte: null, Gt: null } => "gte",
             ContentStat.CompletedStreakWithTag when string.IsNullOrWhiteSpace(condition.Tag) => "tag",
             ContentStat.CompletedStreakWithTag when condition.Gte is null => "gte",
             ContentStat.AllDiceMax when condition.MinDice is null => "minDice",
@@ -787,6 +793,11 @@ public static partial class ContentValidator
         if (condition.Stat is null && (condition.Gte is not null || condition.Lte is not null || condition.Tag is not null || condition.MinDice is not null))
         {
             error($"{path}.stat", "«gte», «lte», «tag» and «minDice» belong to a statistic.");
+        }
+
+        if (condition.Gt is { } threshold && (condition.Stat != ContentStat.RunHours || condition.Gte is not null || threshold < 0))
+        {
+            error($"{path}.gt", "«gt» is a non-negative bound for «runHours» in place of «gte».");
         }
 
         if (condition.Lte is not null && condition.Stat != ContentStat.Coins)

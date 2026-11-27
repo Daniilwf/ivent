@@ -38,6 +38,7 @@ namespace GameEvent.Web.Hosting;
 /// use their items on each other, bet on each other's runs; the admin gives items now and then. The season ends with
 /// items held, bets won, lost and open, offers gone and one shop offer still live.
 /// Stage 5 (5.25) adds active and historical events, polls and coop runs through the same queue.
+/// Stage 6 adds social activity to the live season and publishes the results of a separate demo season.
 /// </summary>
 public static partial class DemoSeed
 {
@@ -116,7 +117,7 @@ public static partial class DemoSeed
         {
             await bots.PlayAsync((first with { Background = background }, published with { Background = background }), ItemsPack(contentRoot));
             clock.Reset();
-            await bots.FinishAsync(realNow.AddDays(5), contentRoot, services.GetRequiredService<SeasonStateReader>());
+            await bots.FinishAsync(realNow.AddDays(5), contentRoot, services);
         }
         finally
         {
@@ -186,7 +187,7 @@ public static partial class DemoSeed
         private bool _undone;
 
         /// <summary>Seed the live examples once the real clock is back, then set the deadline as the last command.</summary>
-        public async Task FinishAsync(DateTimeOffset deadline, string contentRoot, SeasonStateReader reader)
+        public async Task FinishAsync(DateTimeOffset deadline, string contentRoot, IServiceProvider services)
         {
             // One player rolls the shop with the real clock: the screens show a live offer with its timer
             await using (var db = await factory.CreateDbContextAsync(ct))
@@ -219,7 +220,9 @@ public static partial class DemoSeed
                 }
             }
 
+            var reader = services.GetRequiredService<SeasonStateReader>();
             await new Stage5Demo(factory, bus, reader, _admin, ct).PlayAsync(contentRoot);
+            await new Stage6Demo(factory, bus, reader, _admin, ct).PlayAsync(contentRoot, services);
             await SendAsync(new SetSeasonDeadline(deadline), _admin);
         }
 

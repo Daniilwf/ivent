@@ -13,6 +13,9 @@ public enum PollSource
 
     /// <summary>A global event whose effect asks the voters first (EV23, D-753): the result settles it for everyone.</summary>
     GlobalEvent,
+
+    /// <summary>A final season nomination (D-927).</summary>
+    Nomination,
 }
 
 /// <summary>Where a poll is: open for votes, closed with its result, or cancelled by the deadline (D-516).</summary>
@@ -159,6 +162,13 @@ public sealed record Poll(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Guid? GlobalEventId { get; init; }
 
+    /// <summary>The category of a final ballot. Its options hold only candidate IDs.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public VotedNomination? Nomination { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EquatableArray<NominationReviewVersion>? ReviewVersions { get; init; }
+
     /// <summary>The option that won; null while open, without votes or cancelled.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Result { get; init; }
@@ -169,6 +179,11 @@ public sealed record Poll(
     /// </summary>
     [JsonIgnore]
     public bool HasEffect => OnResult is not null || Source is PollSource.Event or PollSource.GlobalEvent;
+
+    /// <summary>Whether this text is the review that voters actually saw on the final ballot.</summary>
+    public bool MatchesNominationReview(Guid candidateId, string? text) =>
+        Nomination == VotedNomination.BestReview && !string.IsNullOrWhiteSpace(text)
+        && ReviewVersions is { } versions && versions.Any(version => version.CandidateId == candidateId && version.Matches(text));
 
     /// <summary>The votes per option in the snapshot's order (0 included).</summary>
     public EquatableArray<PollCount> Counts() =>

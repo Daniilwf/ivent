@@ -1,7 +1,10 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using GameEvent.Engine.Comments;
 using GameEvent.Engine.Effects;
+using GameEvent.Engine.Gallery;
 using GameEvent.Engine.Kernel;
+using GameEvent.Engine.Reactions;
 using GameEvent.Engine.Seasons;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.EventLog;
@@ -29,7 +32,8 @@ public sealed partial class CommandProcessor(
     ILogger<CommandProcessor> logger,
     Site.MaintenanceMode? maintenance = null,
     TimeProvider? time = null,
-    IReadOnlyList<Engine.Effects.ITriggerHandler>? triggers = null) : BackgroundService
+    IReadOnlyList<Engine.Effects.ITriggerHandler>? triggers = null,
+    IFeedReactionTargets? feedReactionTargets = null) : BackgroundService
 {
     // triggers: test handlers that react to every command's events (D-24); none in the product
 
@@ -48,6 +52,7 @@ public sealed partial class CommandProcessor(
         {
             await SettleLeftPendingAsync(stoppingToken);
             await CancelDuelsLeftByDeletedAccountsAsync(seasonId: null, stoppingToken);
+            await ReconcileDeletedNominationGamesAsync(seasonId: null, gameId: null, bestEffort: true, stoppingToken);
             await foreach (var pending in queue.Reader.ReadAllAsync(stoppingToken))
             {
                 queue.Taken();
@@ -87,7 +92,22 @@ public sealed partial class CommandProcessor(
     {
         try
         {
-            var outcome = await ProcessAsync(pending.Envelope, ct);
+            var envelope = pending.Envelope;
+            if (envelope.Command is RestoreGame restore)
+            {
+                await ReconcileDeletedNominationGamesAsync(seasonId: null, restore.GameId, bestEffort: false, ct);
+            }
+            else if (envelope.Command is ChangeSeasonStatus { To: SeasonStatus.Finished }
+                or Engine.Polls.StartNominationPoll or Engine.Polls.CastVote or Engine.Polls.ClosePoll or Engine.Economy.FireTimers)
+            {
+                await ReconcileDeletedNominationGamesAsync(envelope.SeasonId, gameId: null, bestEffort: false, ct);
+            }
+
+            var outcome = await ProcessAsync(envelope, ct);
+            if (outcome.IsAccepted && envelope.Command is DeleteGame deletedGame)
+            {
+                await ReconcileDeletedNominationGamesAsync(seasonId: null, deletedGame.GameId, bestEffort: true, ct);
+            }
 
             // A deleted account leaves the duels of its running seasons before the deletion is reported done (D-734); a repeat
             // of the deletion tries again what a stop in between missed — the ids are the same, so nothing is written twice
@@ -194,6 +214,36 @@ public sealed partial class CommandProcessor(
             return Rejected(RejectionCodes.SeasonMismatch, $"CreateSeason {create.SeasonId} sent to season {envelope.SeasonId}.");
         }
 
+        if (envelope.Command is Engine.Polls.StartNominationPoll nomination
+            && await db.Polls.AnyAsync(poll => poll.Id == nomination.PollId && poll.SeasonId != envelope.SeasonId, ct))
+        {
+            return Rejected(RejectionCodes.NominationAlreadyStarted, "The poll ID belongs to another season.");
+        }
+
+        PreparedGalleryFile? preparedGalleryFile = null;
+        if (envelope.Command is SetGalleryReaction galleryChoice
+            && (envelope.AuthorId != galleryChoice.UserId || !await db.Users.AnyAsync(user => user.Id == galleryChoice.UserId && !user.IsDeleted, ct)))
+        {
+            return Rejected(RejectionCodes.GalleryReactionInvalidUser, "A reaction needs the current signed-in account.");
+        }
+
+        if (envelope.Command is WithdrawProofGalleryMoment withdrawal
+            && (envelope.AuthorId != withdrawal.UserId || !await db.Users.AnyAsync(user => user.Id == withdrawal.UserId && !user.IsDeleted, ct)))
+        {
+            return Rejected(GalleryRejectionCodes.TargetUnknown, "There is no proof moment to withdraw with this id.");
+        }
+
+        if (envelope.Command is IWriteGalleryMoment gallery)
+        {
+            if (envelope.AuthorId != gallery.UserId
+                || !await db.Users.AnyAsync(user => user.Id == gallery.UserId && !user.IsDeleted && user.Role == Accounts.Role.Player, ct))
+            {
+                return Rejected(GalleryRejectionCodes.NotParticipant, "Only a current player can publish a gallery moment.");
+            }
+
+            preparedGalleryFile = await CheckGalleryFileAsync(db, envelope.SeasonId, gallery, envelope.PreparedGalleryFile, ct);
+        }
+
         if (!_cache.TryGetValue(envelope.SeasonId, out var cached))
         {
             cached = await EventLogReader.ReplaySeasonAsync(db, envelope.SeasonId, ct);
@@ -214,7 +264,20 @@ public sealed partial class CommandProcessor(
         // An undo decides on the whole log by command (D-104); other commands need only the state.
         var history = envelope.Command is Engine.Undo.UndoCommand ? await EventLogReader.ReadCommandsAsync(db, envelope.SeasonId, ct) : null;
         var context = new EngineContext(
-            clock, random, ids, await PoolReader.LoadAsync(db, ct), Triggers: triggers, History: history, TimeZones: Kernel.SystemTimeZones.Instance);
+            clock, random, ids, await PoolReader.LoadAsync(db, ct), Triggers: triggers, History: history, TimeZones: Kernel.SystemTimeZones.Instance)
+        {
+            AccountAchievements = await ReadAccountAchievementsAsync(db, cached.State, envelope.Command, ct),
+            FeedReactionTargetAvailable = envelope.Command is Engine.Reactions.SetFeedReaction reaction
+                && cached.State.IsCreated && cached.State.Rules.Features.Reactions && feedReactionTargets is not null
+                && (await feedReactionTargets.FindAsync(db, envelope.SeasonId, [reaction.TargetCommandId], ct)).Contains(reaction.TargetCommandId),
+            CommentTargetAvailable = envelope.Command is ICommentCommand { Target.Kind: CommentTargetKind.FeedEntry } comment
+                && cached.State.IsCreated && cached.State.Rules.Features.Comments && feedReactionTargets is not null
+                && (await feedReactionTargets.FindAsync(db, envelope.SeasonId, [comment.Target.Id], ct)).Contains(comment.Target.Id),
+            PreparedGalleryFileId = preparedGalleryFile?.FileId,
+            GalleryProofApprovalCommandId = preparedGalleryFile?.ProofApprovalCommandId,
+            AvailableNominationCandidates = await ReadNominationCandidatesAsync(db, cached.State, envelope.Command, ct),
+            EffectiveAttacks = await ReadNominationAttacksAsync(db, cached.State, envelope.Command, ct),
+        };
 
         var result = SeasonEngine.Execute(cached.State, envelope.Command, context);
         if (!result.IsAccepted)
@@ -252,6 +315,12 @@ public sealed partial class CommandProcessor(
         {
             db.Events.AddRange(records);
             await SeasonProjection.WriteAsync(db, cached.State, result.State, now, envelope.AuthorId, ct);
+            if (preparedGalleryFile is not null)
+            {
+                var published = result.Events.OfType<IGalleryMomentPublished>().Single();
+                RecordGalleryFile(db, envelope.SeasonId, published, preparedGalleryFile);
+            }
+
             await db.SaveChangesAsync(ct);
 
             // The undone command's events stay in the log, marked with the event that undid them (D-104).
@@ -268,7 +337,10 @@ public sealed partial class CommandProcessor(
 
         _cache[envelope.SeasonId] = (result.State, sequence);
 
-        var logged = records.Zip(result.Events, (r, e) => new LoggedEvent(r.SeasonId, r.Sequence, r.CommandId, e, r.OccurredAt)).ToList();
+        // The command has passed the public-target check. This hint is only for direct live delivery.
+        var publicCommentTarget = (envelope.Command as ICommentCommand)?.Target;
+        var logged = records.Zip(result.Events,
+            (r, e) => new LoggedEvent(r.SeasonId, r.Sequence, r.CommandId, e, r.OccurredAt, publicCommentTarget)).ToList();
         await NotifyAsync(envelope, logged, ct);
         return new CommandOutcome(true, false, null, logged);
     }

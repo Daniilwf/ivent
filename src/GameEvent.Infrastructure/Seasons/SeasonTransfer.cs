@@ -1,9 +1,13 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using GameEvent.Engine.Comments;
+using GameEvent.Engine.Gallery;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Players;
 using GameEvent.Engine.Polls;
+using GameEvent.Engine.Proofs;
+using GameEvent.Engine.Reactions;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Suggestions;
 using GameEvent.Engine.Undo;
@@ -289,6 +293,85 @@ public static class SeasonTransfer
         // The log is copied as stored (events are not rewritten); the events naming accounts get this database's account
         // ids and are written in the current format (D-105, D-816).
         var records = new List<GameEventRecord>();
+        var previousCommands = new HashSet<Guid>();
+        var galleryPublications = new Dictionary<Guid, IGalleryMomentPublished>();
+        var proofApprovals = new Dictionary<Guid, ProofApproved>();
+
+        FeedReactionSet MapFeedReaction(FeedReactionSet reaction)
+        {
+            if (!previousCommands.Contains(reaction.TargetCommandId))
+            {
+                throw new InvalidDataException($"A feed reaction names command {reaction.TargetCommandId} before it appears in this season.");
+            }
+
+            return reaction with { UserId = MapAccount(reaction.UserId) };
+        }
+
+        CommentPosted MapCommentPosted(CommentPosted posted, SeasonState state)
+        {
+            var target = posted.Target;
+            var appeared = target.Kind switch
+            {
+                CommentTargetKind.FeedEntry => previousCommands.Contains(target.Id),
+                CommentTargetKind.Review => state.Runs.TryGetValue(target.Id, out var run) && run.Review is not null,
+                _ => false,
+            };
+            if (!appeared)
+            {
+                throw new InvalidDataException($"A comment names {target.Kind} {target.Id} before it appears in this season.");
+            }
+
+            return posted with { UserId = MapAccount(posted.UserId) };
+        }
+
+        CommentSnapshot MapCommentSnapshot(CommentSnapshot snapshot) => snapshot.Before is { } comment
+            ? snapshot with { Before = comment with { UserId = MapAccount(comment.UserId) } }
+            : snapshot;
+
+        T TrackGalleryPublication<T>(T publication, SeasonState state) where T : IGalleryMomentPublished
+        {
+            if (!state.Players.TryGetValue(publication.PlayerId, out var player) || player.UserId != publication.UserId
+                || publication.FileId == Guid.Empty || !galleryPublications.TryAdd(publication.FileId, publication))
+            {
+                throw new InvalidDataException($"Gallery moment {publication.ItemId} does not name its own player and unique file in this season.");
+            }
+
+            return publication;
+        }
+
+        GalleryProofMomentPublished MapGalleryProofPublication(GalleryProofMomentPublished original, SeasonState state)
+        {
+            if (original.ProofSource is not { } source || source.FileId == Guid.Empty || source.FileId == original.FileId
+                || !proofApprovals.TryGetValue(source.ApprovalCommandId, out var approval) || approval.RunId != source.RunId
+                || approval.PlayerId != original.PlayerId || !state.Runs.TryGetValue(source.RunId, out var run)
+                || run.PlayerId != original.PlayerId || run.Proof is not { Status: ProofStatus.Approved } proof
+                || !proof.Files.Contains(source.FileId))
+            {
+                throw new InvalidDataException($"Gallery moment {original.ItemId} does not name its active approved proof attachment.");
+            }
+
+            return TrackGalleryPublication(original with { UserId = MapAccount(original.UserId) }, state);
+        }
+
+        GalleryItemSnapshot MapGallerySnapshot(GalleryItemSnapshot snapshot)
+        {
+            if (snapshot.Before is not { } item)
+            {
+                return snapshot;
+            }
+
+            var mapped = item with { UserId = MapAccount(item.UserId) };
+            if (!galleryPublications.TryGetValue(mapped.FileId, out var published)
+                || mapped.ItemId != snapshot.ItemId || mapped.ItemId != published.ItemId
+                || mapped.PlayerId != published.PlayerId || mapped.UserId != published.UserId
+                || mapped.ProofSource != (published as GalleryProofMomentPublished)?.ProofSource)
+            {
+                throw new InvalidDataException($"The undo snapshot of gallery moment {snapshot.ItemId} does not match its publication.");
+            }
+
+            return snapshot with { Before = mapped };
+        }
+
         var state = SeasonState.Empty;
         foreach (var command in archive.Events.Zip(decoded).GroupBy(x => x.First.CommandId).OrderBy(g => g.Min(x => x.First.Sequence)))
         {
@@ -300,6 +383,12 @@ public static class SeasonTransfer
                     SeasonPlayerAdded added => added with { UserId = MapAccount(added.UserId) },
                     VoteCast cast => cast with { UserId = MapAccount(cast.UserId) },
                     VoteChanged changed => changed with { UserId = MapAccount(changed.UserId) },
+                    ReviewReactionSet reaction => reaction with { UserId = MapAccount(reaction.UserId) },
+                    FeedReactionSet reaction => MapFeedReaction(reaction),
+                    GalleryReactionSet reaction => reaction with { UserId = MapAccount(reaction.UserId) },
+                    CommentPosted posted => MapCommentPosted(posted, state),
+                    GalleryMomentPublished published => TrackGalleryPublication(published with { UserId = MapAccount(published.UserId) }, state),
+                    GalleryProofMomentPublished published => MapGalleryProofPublication(published, state),
                     SuggestionSubmitted submitted => submitted with { UserId = MapAccount(submitted.UserId) },
                     CommandUndone undone => undone with
                     {
@@ -309,6 +398,21 @@ public static class SeasonTransfer
                             : null,
                         Suggestions = undone.Suggestions is { } suggestions
                             ? [.. suggestions.Select(s => s with { UserId = MapAccount(s.UserId) })]
+                            : null,
+                        ReviewReactions = undone.ReviewReactions is { } reactions
+                            ? [.. reactions.Select(r => r with { UserId = MapAccount(r.UserId) })]
+                            : null,
+                        FeedReactions = undone.FeedReactions is { } feedReactions
+                            ? [.. feedReactions.Select(MapFeedReaction)]
+                            : null,
+                        GalleryReactions = undone.GalleryReactions is { } galleryReactions
+                            ? [.. galleryReactions.Select(reaction => reaction with { UserId = MapAccount(reaction.UserId) })]
+                            : null,
+                        Comments = undone.Comments is { } comments
+                            ? [.. comments.Select(MapCommentSnapshot)]
+                            : null,
+                        GalleryItems = undone.GalleryItems is { } galleryItems
+                            ? [.. galleryItems.Select(MapGallerySnapshot)]
                             : null,
                     },
                     _ => original,
@@ -328,13 +432,24 @@ public static class SeasonTransfer
                     OccurredAt = exported.OccurredAt,
                 });
                 state = SeasonEngine.Apply(state, mapped);
+                if (mapped is ProofApproved approval)
+                {
+                    proofApprovals[exported.CommandId] = approval;
+                }
+                else if (mapped is CommandUndone undo)
+                {
+                    proofApprovals.Remove(undo.CommandId);
+                }
             }
 
             var first = command.OrderBy(x => x.First.Sequence).First().First;
-            await SeasonProjection.WriteAsync(db, before, state, first.OccurredAt, first.AuthorId is { } a ? MapAccount(a) : null, ct);
+            await SeasonProjection.WriteAsync(db, before, state, first.OccurredAt, first.AuthorId is { } a ? MapAccount(a) : null, ct,
+                writeLifetimeAchievements: false);
             await db.SaveChangesAsync(ct);
+            previousCommands.Add(command.Key);
         }
 
+        await SeasonProjection.WriteImportedLifetimeAchievementsAsync(db, state, ct);
         db.Events.AddRange(records);
         await db.SaveChangesAsync(ct);
 
@@ -443,18 +558,27 @@ public static class SeasonTransfer
         }
     }
 
-    // The events that carry account ids: a player's arrival, a vote (a spectator's too), a suggestion and the snapshots of
-    // players, polls and suggestions an undo keeps (D-104, D-816).
+    // Include spectator authors and the accounts an undo references in its snapshots.
     private static IEnumerable<Guid> AccountIds(IGameEvent e) =>
         e switch
         {
             SeasonPlayerAdded added => [added.UserId],
             VoteCast cast => [cast.UserId],
             VoteChanged changed => [changed.UserId],
+            ReviewReactionSet reaction => [reaction.UserId],
+            FeedReactionSet reaction => [reaction.UserId],
+            GalleryReactionSet reaction => [reaction.UserId],
+            CommentPosted posted => [posted.UserId],
+            IGalleryMomentPublished published => [published.UserId],
             SuggestionSubmitted submitted => [submitted.UserId],
             CommandUndone undone => undone.Players.Select(p => p.UserId)
                 .Concat((undone.Polls ?? []).SelectMany(p => p.Votes.Select(v => v.UserId)))
-                .Concat((undone.Suggestions ?? []).Select(s => s.UserId)),
+                .Concat((undone.Suggestions ?? []).Select(s => s.UserId))
+                .Concat((undone.ReviewReactions ?? []).Select(r => r.UserId))
+                .Concat((undone.FeedReactions ?? []).Select(r => r.UserId))
+                .Concat((undone.GalleryReactions ?? []).Select(r => r.UserId))
+                .Concat((undone.Comments ?? []).Select(c => c.Before?.UserId).OfType<Guid>())
+                .Concat((undone.GalleryItems ?? []).Select(snapshot => snapshot.Before?.UserId).OfType<Guid>()),
             _ => [],
         };
 }

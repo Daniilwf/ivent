@@ -589,6 +589,65 @@ describe('the season polls screen (EV21/EV22/EV24/EV39)', () => {
     expect(server.sent('POST', '/vote')).toHaveLength(0);
   });
 
+  it.each(['hidden', 'visible'] as const)(
+    'moves an unfinished poll with %s counts to completed when its season finishes live',
+    async (visibility) => {
+      let current = poll({
+        myVote: horrorId,
+        ...(visibility === 'hidden' ? { anonymous: true, counts: null } : {}),
+      });
+      const server = serve(() => json(200, [current]));
+      render(<PollsScreen seasonId={seasonA} onSignedOut={vi.fn()} />);
+      await screen.findByRole('heading', { name: firstQuestion });
+      expect(screen.getByRole('heading', { name: 'Открытые' })).toBeVisible();
+      expect(radio('Хорроры')).toBeChecked();
+      await userEvent.click(radio('Стратегии'));
+      expect(radio('Стратегии')).toHaveFocus();
+
+      current = {
+        ...current,
+        voting: { canVote: false, reason: 'season.closed', allowChangeVote: true },
+      };
+      push(['season-status-changed']);
+
+      expect(await screen.findByRole('heading', { name: 'Завершённые' })).toBeVisible();
+      expect(screen.queryByRole('heading', { name: 'Открытые' })).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: firstQuestion })).toHaveFocus();
+      expect(screen.getByText('Сезон завершён без итога голосования.')).toBeVisible();
+      expect(screen.getByText('Хорроры', { exact: true })).toBeVisible();
+      expect(screen.getByText('Стратегии', { exact: true })).toBeVisible();
+      expect(screen.getByText('Твой голос: Хорроры')).toBeVisible();
+      expect(screen.queryByText('Голосование закрыто')).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Итог:/)).not.toBeInTheDocument();
+      expect(screen.queryByText('Счёт скрыт до закрытия')).not.toBeInTheDocument();
+      expect(screen.queryByText('Счёт появится после подведения итогов.')).not.toBeInTheDocument();
+      if (visibility === 'visible') {
+        expect(screen.getByText('2 голоса', { exact: true })).toBeVisible();
+        expect(screen.getByText('0 голосов', { exact: true })).toBeVisible();
+      } else {
+        expect(screen.queryByText(/^\d+ голос/)).not.toBeInTheDocument();
+      }
+      expectNoEnabledVote();
+      expect(server.sent('POST', '/vote')).toHaveLength(0);
+    },
+  );
+
+  it('keeps a poll with an expired ballot in open while its result is still pending', async () => {
+    serve([
+      poll({
+        counts: null,
+        voting: { canVote: false, reason: 'poll.closed', allowChangeVote: true },
+      }),
+    ]);
+    render(<PollsScreen seasonId={seasonA} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByRole('heading', { name: 'Открытые' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Завершённые' })).not.toBeInTheDocument();
+    expect(screen.getByText('Приём голосов завершён.')).toBeVisible();
+    expect(screen.getByText('Счёт появится после подведения итогов.')).toBeVisible();
+    expectNoEnabledVote();
+  });
+
   it('keeps focus outside the poll if the player moves it while a closing refresh is pending', async () => {
     const closing = deferred<Response>();
     let closed = false;

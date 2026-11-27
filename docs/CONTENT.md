@@ -48,7 +48,7 @@
 | Поле | Значения |
 | --- | --- |
 | `target` | `selector`: `self`, `chosen`, `randomActive`, `all`, `leader`, `higherPoints`, `lowerPoints`, `withinCells`, `nearestBehind`; `among` — ограничить выбор для `chosen` и `randomActive`: `higherPoints`, `lowerPoints`; `excludeSelf` — исключить себя; у `withinCells` — `cells`: все в пределах стольких клеток по рёбрам карты в обе стороны, стоящие на клетке использующего — при `includeSameCell`; `nearestBehind` — ближайший позади по расстоянию до финиша, при равенстве — все (D-480) |
-| `trigger` | для эффектов: `beforeRoll`, `afterRoll`, `runCompleted`, `beforeDice`, `afterDice`, `moveStep` (на каждой вошедшей клетке хода), `stop`, `pass` (на каждой пройденной клетке, D-488), `drop`, `techReroll`, `time`, `hostileIncoming`, `runEnded` (прохождение или дроп, D-479) |
+| `trigger` | для эффектов: `beforeRoll`, `afterRoll`, `runCompleted`, `beforeDice`, `afterDice`, `moveStep` (на каждой вошедшей клетке хода), `stop`, `pass` (на каждой пройденной клетке, D-488), `drop`, `techReroll`, `time`, `hostileIncoming`, `runEnded` (прохождение или дроп, D-479), `proofApproved` (только сезонное достижение за длинную игру, D-927) |
 | `duration` | `{ "uses": N }`, `{ "hours": N }`, `{ "runs": N }` или `{ "untilTriggered": true }` |
 | `condition` | условие срабатывания, см. «Условия» |
 | `intercept` | что гасит эффект (пассивная защита): `hostile` — входящий враждебный эффект; `badEvent` — плохой ивент, выпавший игроку клеткой, предметом, сложностью или вытянутый на него другим (не плату реролла и не штраф дропа, D-484). Одно значение — строкой, несколько — списком: `["badEvent", "hostile"]` (Бабл, D-555) |
@@ -84,7 +84,7 @@
 | Фильтр игры | `{ "tags": ["Horror"], "maxHours": 10, "minHours": 2, "releaseYearBefore": 2005 }`; `games`: список id игр в формате `N` (32 шестнадцатеричных символа без дефисов) или ссылок `$choice` / `$result` — только эти игры. Фильтр снимается с записью в лог, только если среди указанных игр больше нет ни одной доступной (`roll-modifiers-applied.dropped`, D-512, D-721). Игра, временно отброшенная текущим рероллом, не считается потерянной: фильтр ждёт. `$choice` требует предшествующего вопроса, `$result` разрешён только в `onResult` голосования |
 | Фильтр объектов (`takeObject`, `transformObject`) | `{ "kind": "item", "rarity": "epic", "objectId": "orange", "hostile": true, "hasCounter": true, "excludeTags": ["rat"] }`; `excludeTags` пропускает объекты с любым из этих тегов (D-470), `hasCounter` — только объекты со счётчиком или без (D-479) |
 | Условие на прохождение | `{ "difficultyAtLeast": "hard" }`, `{ "difficultyAtMost": "easy" }`, обе границы вместе (`difficultyAtLeast` не выше `difficultyAtMost`, D-506) |
-| Статистика игрока | `{ "stat": "hostileReceived", "gte": 5 }`, `{ "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 }`, `{ "stat": "allDiceMax", "minDice": 3 }`, `{ "stat": "runHours", "gte": 30 }`, `{ "stat": "coins", "gte": 0, "lte": 0 }` (монетки владельца: `gte` и/или `lte`, D-483) |
+| Статистика игрока | `{ "stat": "hostileReceived", "gte": 5 }`, `{ "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 }`, `{ "stat": "allDiceMax", "minDice": 3 }`, `{ "stat": "runHours", "gt": 30 }` (награда за длинную игру при одобрении пруфа, D-927), `{ "stat": "runHours", "gte": 15 }` (включительный порог для обычного эффекта), `{ "stat": "coins", "gte": 0, "lte": 0 }` (монетки владельца: `gte` и/или `lte`, D-483) |
 
 Набор статистик расширяется по мере надобности; каждая новая статистика — отдельная задача с тестом.
 
@@ -551,6 +551,16 @@
   "effect": { "trigger": "hostileIncoming", "condition": { "stat": "hostileReceived", "gte": 5 }, "actions": [{ "type": "changeResource", "resource": "coins", "amount": 5 }] }
 }
 ```
+
+```json
+{
+  "id": "long-run", "kind": "achievement", "name": "Длинная игра",
+  "description": "Пройди игру длиннее 30 часов.", "scope": "season",
+  "effect": { "trigger": "proofApproved", "condition": { "stat": "runHours", "gt": 30 }, "actions": [{ "type": "changeResource", "resource": "coins", "amount": 5 }] }
+}
+```
+
+В примере денежная часть награды настроена в пакете. Условие проверяет сохранённые часы при одобрении пруфа. Поздняя правка часов награду не меняет.
 
 ## Зона, клетки, голосование, челлендж недели
 

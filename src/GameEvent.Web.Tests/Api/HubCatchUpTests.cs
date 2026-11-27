@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net.Http.Json;
+using System.Text.Json;
 using GameEvent.Engine.Seasons;
 using GameEvent.Web.Realtime;
 using Microsoft.AspNetCore.Http.Connections;
@@ -49,6 +50,46 @@ public sealed class HubCatchUpTests : IAsyncLifetime
 
         await petya.DisposeAsync();
         await admin.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_comment_broadcast_names_only_its_public_thread_and_resume_omits_the_hint()
+    {
+        await Queue.EventsTestSupport.RulesAsync(_site, rules => rules with
+        {
+            Features = rules.Features with { Comments = true },
+        });
+        var writer = await _site.SignedInAsync("vasya");
+        var target = Guid.NewGuid();
+        await PostOkAsync(writer, Url("roll"), new { commandId = target });
+        var (connection, updates) = await WatcherAsync<JsonElement>("zritel");
+        await using var watcher = connection;
+        var season = SiteFactory.SeasonId;
+        var start = (await watcher.InvokeAsync<SeasonJoin>(nameof(SeasonHub.Join), season, Ct)).LastSequence;
+
+        await PostOkAsync(writer, Url($"feed/{target}/comments"), new
+        {
+            commandId = Guid.NewGuid(),
+            commentId = Guid.NewGuid(),
+            text = "Отличный ход!",
+        });
+
+        var update = await WaitForAsync(updates);
+        while (update.GetProperty("toSequence").GetInt64() <= start && updates.TryDequeue(out _))
+        {
+            update = await WaitForAsync(updates);
+        }
+
+        Assert.Equal(start + 1, update.GetProperty("fromSequence").GetInt64());
+        Assert.Equal("comment-posted", Assert.Single(update.GetProperty("types").EnumerateArray()).GetString());
+        var hint = update.GetProperty("commentTarget");
+        Assert.Equal(target, hint.GetProperty("id").GetGuid());
+        Assert.Equal("feedEntry", hint.GetProperty("kind").GetString());
+        Assert.Equal(2, hint.EnumerateObject().Count());
+
+        var resumed = await watcher.InvokeAsync<JsonElement>(nameof(SeasonHub.Resume), season, start, Ct);
+        var missed = Assert.Single(resumed.GetProperty("missed").EnumerateArray());
+        Assert.False(missed.TryGetProperty("commentTarget", out _));
     }
 
     [Fact]
@@ -219,7 +260,10 @@ public sealed class HubCatchUpTests : IAsyncLifetime
 
     // ---- Helpers ----
 
-    private async Task<(HubConnection Connection, ConcurrentQueue<SeasonUpdate> Updates)> WatcherAsync(string login)
+    private Task<(HubConnection Connection, ConcurrentQueue<SeasonUpdate> Updates)> WatcherAsync(string login) =>
+        WatcherAsync<SeasonUpdate>(login);
+
+    private async Task<(HubConnection Connection, ConcurrentQueue<T> Updates)> WatcherAsync<T>(string login)
     {
         var cookie = await SessionCookieAsync(login);
         var connection = new HubConnectionBuilder()
@@ -230,8 +274,8 @@ public sealed class HubCatchUpTests : IAsyncLifetime
                 o.Headers["Cookie"] = cookie;
             })
             .Build();
-        var updates = new ConcurrentQueue<SeasonUpdate>();
-        connection.On<SeasonUpdate>(SeasonHub.UpdateMethod, updates.Enqueue);
+        var updates = new ConcurrentQueue<T>();
+        connection.On<T>(SeasonHub.UpdateMethod, updates.Enqueue);
         await connection.StartAsync(Ct);
         return (connection, updates);
     }

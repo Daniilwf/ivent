@@ -37,6 +37,7 @@ internal static class Conditions
         {
             null => true,
             ContentStat.HostileReceived => state.Players[ownerId].Wallet.HostileReceived >= condition.Gte,
+            ContentStat.RunHours when condition.Gt is { } threshold => run?.Hours > threshold,
             ContentStat.RunHours => run?.Hours >= condition.Gte,
             ContentStat.AllDiceMax => run is not null && AllMax(run, condition.MinDice ?? 1),
             ContentStat.CompletedStreakWithTag => Streak(state, pool, ownerId, condition.Tag!) >= condition.Gte,
@@ -52,9 +53,10 @@ internal static class Conditions
         return dice.Count >= minDice && dice.All(d => d.Value == d.Sides);
     }
 
-    // The owner's completed runs from the latest back, while their games have the tag; a split coop run is his too (D-716).
+    // With equal times, the stable sort retains reverse journal order (D-927). Split coop counts for both (D-716).
     private static int Streak(SeasonState state, Pool.IPoolView pool, Guid ownerId, string tag) =>
-        state.Runs.Values
+        Enumerable.Reverse(state.RunCompletionOrder)
+            .Select(id => state.Runs[id])
             .Where(r => r.Status == RunStatus.Completed && RunShares.Players(r).Contains(ownerId))
             .OrderByDescending(r => r.CompletedAt)
             .TakeWhile(r => pool.Games.FirstOrDefault(g => g.Id == r.GameId)?.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase) == true)

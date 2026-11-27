@@ -142,6 +142,74 @@ test('an anonymous poll shows each player their own vote and reveals the result 
   await expect(firstCard).toHaveCount(0);
 });
 
+test('an unfinished vote moves to ended without revealing the result when the season finishes', async ({
+  browser,
+}, info) => {
+  const phone = info.project.name === 'phone';
+  const world = await setUpSeason({ players: ['Лена'], start: false });
+  const [player] = world.players;
+  if (!player) throw new Error('No player.');
+  const admin = `/api/admin/seasons/${world.seasonId}`;
+  const question = 'Какой момент сезона обсудим?';
+  const firstChoice = 'Финиш на последнем кубике';
+  const secondChoice = 'Неожиданная игра с колеса';
+  await setFeatures(world, { polls: true });
+  await world.adminApi.post(`${admin}/status`, { to: 'active' });
+  await world.adminApi.post(`${admin}/polls`, {
+    poll: {
+      question,
+      options: { list: [firstChoice, secondChoice] },
+      anonymous: true,
+      showLiveCounts: false,
+      voters: 'players',
+      closesInHours: 168,
+    },
+  });
+
+  const page = await signIn(browser, player);
+  await page.goto(`/seasons/${world.seasonId}/polls`);
+  const card = page.getByRole('article', { name: question });
+  await expect(page.getByRole('region', { name: 'Открытые' }).getByRole('article')).toHaveCount(1);
+  await activate(card.getByText(firstChoice, { exact: true }), phone);
+  await activate(card.getByRole('button', { name: 'Голосовать', exact: true }), phone);
+  await expect(card.getByText(`Твой голос: ${firstChoice}`)).toBeVisible(live);
+  await expect(card.getByText('Счёт скрыт до закрытия')).toBeVisible();
+  const savedVote = card.getByRole('radio', { name: firstChoice });
+  const unsentVote = card.getByRole('radio', { name: secondChoice });
+  await expect(savedVote).toBeEnabled(live);
+  await savedVote.press('ArrowRight');
+  await expect(unsentVote).toBeFocused();
+
+  await world.adminApi.post(`${admin}/status`, { to: 'closing' });
+  await world.adminApi.post(`${admin}/status`, { to: 'finished' });
+
+  const finished = page.getByRole('region', { name: 'Завершённые' });
+  await expect(finished.getByRole('article', { name: question })).toBeVisible(live);
+  await expect(page.getByRole('region', { name: 'Открытые' })).toHaveCount(0);
+  await expect(card.getByText('Сезон завершён без итога голосования.')).toBeVisible();
+  await expect(card.getByText(`Твой голос: ${firstChoice}`)).toBeVisible();
+  await expect(savedVote).toBeChecked();
+  await expect(unsentVote).toBeDisabled();
+  await expect(card.getByText('Счёт скрыт до закрытия')).toHaveCount(0);
+  await expect(card.getByText(/^Итог:/)).toHaveCount(0);
+  const heading = card.getByRole('heading', { name: question });
+  await expect(heading).toBeFocused();
+  expect(await heading.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    phone ? 390 : 1440,
+  );
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({
+    path: info.outputPath(`poll-without-result-${info.project.name}.png`),
+    scale: 'css',
+  });
+
+  await world.adminApi.post(`${admin}/status`, { to: 'archived' });
+  await page.reload();
+  await expect(finished.getByRole('article', { name: question })).toBeVisible();
+  await expect(card.getByText('Сезон завершён без итога голосования.')).toBeVisible();
+});
+
 test('a spectator joins an everyone poll after a rule change and votes only once across tabs', async ({
   browser,
 }, info) => {

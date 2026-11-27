@@ -7,16 +7,88 @@ import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { EmptyState, ErrorState, Notice } from '../ui/States';
 import { Panel } from '../ui/Surface';
+import { CommentThread } from './CommentThread';
+import { isCommentEvent } from './commentApi';
 import { FeedList, FeedSkeleton } from './FeedList';
 import { emptyRefs, feedDays, mergeEntries, withRefs, type FeedRefs } from './feedModel';
-import { fetchFeedPage } from './feedApi';
+import {
+  FEED_PAGE,
+  FEED_REACTION_BATCH,
+  fetchFeedPage,
+  fetchFeedReactions,
+  setFeedReaction,
+  type FeedReactionMap,
+} from './feedApi';
+import { ReactionButtons, type ChangeReaction } from './ReviewReactionButtons';
 
 type Entry = Schemas['FeedEntryView'];
+type ReactionRow = { values: FeedReactionMap[string]; revision: number; stale: boolean };
+type FeedReactions = { enabledAt: number; rows: Map<string, ReactionRow> };
 
 /** `pages`: how many pages are shown */
-type Feed = { entries: Entry[]; refs: FeedRefs; nextBefore: number | null; pages: number };
+type Feed = {
+  entries: Entry[];
+  refs: FeedRefs;
+  nextBefore: number | null;
+  pages: number;
+  reactions: FeedReactions | null;
+  commentTargets: ReadonlyMap<string, boolean> | null;
+};
 type State =
   { kind: 'loading' } | { kind: 'failed' } | { kind: 'notFound' } | ({ kind: 'ready' } & Feed);
+
+// A live refresh can use both feed reads, which share the season's 60-per-minute budget.
+const liveRefreshIntervalMs = 3000;
+const commandIdsOf = (entries: readonly Entry[]) => [...new Set(entries.map((e) => e.commandId))];
+
+function mergeCommentTargets(
+  previous: ReadonlyMap<string, boolean> | null,
+  pageIds: readonly string[],
+  allowed: readonly string[],
+): ReadonlyMap<string, boolean> {
+  const next = new Map(previous);
+  const eligible = new Set(allowed);
+  for (const id of pageIds) next.set(id, eligible.has(id));
+  return next;
+}
+
+function markUndone(entries: Entry[], page: readonly Entry[]): Entry[] {
+  const targets = new Set<string>();
+  for (const { type, data } of page) {
+    if (
+      type === 'command-undone' &&
+      data !== null &&
+      typeof data === 'object' &&
+      'commandId' in data &&
+      typeof data.commandId === 'string'
+    ) {
+      targets.add(data.commandId);
+    }
+  }
+  // The newest page carries the undo summary even when its target is on an older page.
+  return targets.size
+    ? entries.map((entry) =>
+        !entry.undone && targets.has(entry.commandId) ? { ...entry, undone: true } : entry,
+      )
+    : entries;
+}
+
+function reconcileReactions(
+  previous: FeedReactions | null,
+  requested: readonly string[],
+  result: FeedReactionMap,
+  revision: number,
+): FeedReactions | null {
+  if (previous === null || revision < previous.enabledAt) return previous;
+  const rows = new Map(previous.rows);
+  for (const id of requested) {
+    // A page or live read may have started before the last acknowledged write to this row.
+    if ((rows.get(id)?.revision ?? 0) > revision) continue;
+    // The server omits ineligible rows. Keep their revision so older answers cannot restore them.
+    rows.set(id, { values: result[id] ?? [], revision, stale: false });
+  }
+  return { ...previous, rows };
+}
 
 /** The season's feed (H5, SPEC «Лента»): everything that happened, as lines, by day, newest first, page by page */
 export function FeedScreen({
@@ -35,13 +107,95 @@ export function FeedScreen({
   const [announced, setAnnounced] = useState('');
   // What is shown, for the callbacks that run after an await: they build on the latest, not on their render's
   const current = useRef<State>({ kind: 'loading' });
+  const lifetime = useRef<AbortController | null>(null);
+  const newestPage = useRef<AbortController | null>(null);
+  const revision = useRef(0);
+  const headRevision = useRef(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    lifetime.current = controller;
+    return () => {
+      controller.abort();
+      newestPage.current?.abort();
+    };
+  }, []);
+
   const show = useCallback((next: State) => {
     current.current = next;
     setState(next);
   }, []);
 
+  const refreshReactions = useCallback(
+    async (ids: string[], signal: AbortSignal) => {
+      let complete = true;
+      // Read one bounded batch at a time so scrolling farther back does not fan out a burst of requests.
+      for (let i = 0; i < ids.length; i += FEED_REACTION_BATCH) {
+        const targets = ids.slice(i, i + FEED_REACTION_BATCH);
+        const started = ++revision.current;
+        const result = await fetchFeedReactions(seasonId, targets, signal);
+        if (signal.aborted) return false;
+        if (result.kind === 'signedOut') {
+          onSignedOut();
+          return true;
+        }
+        const latest = current.current;
+        if (latest.kind !== 'ready' || latest.reactions === null) return true;
+        if (result.kind === 'failed' && result.tooOften) return false;
+        if (result.kind !== 'ready') {
+          complete = false;
+          continue;
+        }
+        show({
+          ...latest,
+          reactions: reconcileReactions(latest.reactions, targets, result.value, started),
+        });
+      }
+      return complete;
+    },
+    [seasonId, onSignedOut, show],
+  );
+
+  const refreshCommentTargets = useCallback(
+    async (before: number, oldest: number, signal: AbortSignal) => {
+      let cursor: number | null = before;
+      // Enabling comments only covers the latest page at first. Read the older open pages as well.
+      while (cursor !== null && cursor > oldest) {
+        const result = await fetchFeedPage(seasonId, cursor, FEED_PAGE, signal);
+        if (signal.aborted) return;
+        if (result.kind === 'signedOut') {
+          onSignedOut();
+          return;
+        }
+        const latest = current.current;
+        if (
+          result.kind !== 'ready' ||
+          result.value.commentTargets == null ||
+          latest.kind !== 'ready' ||
+          latest.commentTargets === null
+        )
+          return;
+        const page = result.value;
+        show({
+          ...latest,
+          commentTargets: mergeCommentTargets(
+            latest.commentTargets,
+            commandIdsOf(page.entries),
+            result.value.commentTargets,
+          ),
+        });
+        cursor = page.nextBefore;
+      }
+    },
+    [seasonId, onSignedOut, show],
+  );
+
   const load = useCallback(async () => {
-    const result = await fetchFeedPage(seasonId, null);
+    newestPage.current?.abort();
+    const request = new AbortController();
+    newestPage.current = request;
+    const started = ++revision.current;
+    const result = await fetchFeedPage(seasonId, null, FEED_PAGE, request.signal);
+    if (request.signal.aborted) return;
     if (result.kind === 'signedOut') {
       onSignedOut();
       return;
@@ -53,6 +207,26 @@ export function FeedScreen({
       return;
     }
     const page = result.value;
+    headRevision.current = started;
+    const pageIds = commandIdsOf(page.entries);
+    const commentTargets =
+      page.commentTargets == null
+        ? null
+        : mergeCommentTargets(
+            before.kind === 'ready' ? before.commentTargets : null,
+            pageIds,
+            page.commentTargets,
+          );
+    const previousReactions = before.kind === 'ready' ? before.reactions : null;
+    const reactions =
+      page.reactions == null
+        ? null
+        : reconcileReactions(
+            previousReactions ?? { enabledAt: started, rows: new Map() },
+            pageIds,
+            page.reactions,
+            started,
+          );
     if (before.kind !== 'ready') {
       show({
         kind: 'ready',
@@ -60,6 +234,8 @@ export function FeedScreen({
         refs: withRefs(emptyRefs(), page),
         nextBefore: page.nextBefore,
         pages: 1,
+        reactions,
+        commentTargets,
       });
       return;
     }
@@ -71,48 +247,126 @@ export function FeedScreen({
         .filter((e) => e.sequence > newest && !known.has(e.commandId))
         .map((e) => e.commandId),
     );
+    const entries = markUndone(mergeEntries(before.entries, page.entries), page.entries);
     show({
       ...before,
-      entries: mergeEntries(before.entries, page.entries),
+      entries,
       refs: withRefs(before.refs, page),
+      reactions,
+      commentTargets,
     });
     if (arrived.size) {
       setFresh(arrived);
       setAnnounced(ru.feed.fresh(arrived.size));
     }
-  }, [seasonId, onSignedOut, show]);
+    if (commentTargets && page.nextBefore !== null) {
+      const oldestUnchecked = entries.findLast(
+        (entry) => !entry.undone && !commentTargets.has(entry.commandId),
+      );
+      if (oldestUnchecked)
+        void refreshCommentTargets(page.nextBefore, oldestUnchecked.sequence, request.signal);
+    }
+    if (reactions !== null) {
+      const pageCommands = new Set(pageIds);
+      const olderIds = commandIdsOf(entries.filter((entry) => !entry.undone)).filter(
+        (id) => !pageCommands.has(id),
+      );
+      void refreshReactions(olderIds, request.signal);
+    }
+  }, [seasonId, onSignedOut, refreshCommentTargets, refreshReactions, show]);
 
   // Others' actions come in without a reload (DESIGN.md «Обновления в реальном времени»)
-  const version = useSeasonVersion(seasonId);
+  const version = useSeasonVersion(seasonId, {
+    refreshOnJoin: true,
+    throttleMs: liveRefreshIntervalMs,
+    relevant: (update) => update.types.some((type) => !isCommentEvent(type)),
+  });
   useEffect(() => {
     void load();
   }, [load, version]);
 
   async function loadMore() {
     const shown = current.current;
-    if (shown.kind !== 'ready' || shown.nextBefore === null) return;
+    const signal = lifetime.current?.signal;
+    if (shown.kind !== 'ready' || shown.nextBefore === null || !signal) return;
     setMore('loading');
-    const result = await fetchFeedPage(seasonId, shown.nextBefore);
-    if (result.kind === 'signedOut') {
-      onSignedOut();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const headAtStart = headRevision.current;
+      const started = ++revision.current;
+      const result = await fetchFeedPage(seasonId, shown.nextBefore, FEED_PAGE, signal);
+      if (signal.aborted) return;
+      if (result.kind === 'signedOut') {
+        onSignedOut();
+        return;
+      }
+      if (result.kind !== 'ready') break;
+      // A live refresh may contain an undo of a command on this still-hidden page.
+      if (headAtStart !== headRevision.current) continue;
+      const latest = current.current;
+      if (latest.kind === 'ready') {
+        const page = result.value;
+        const pageIds = commandIdsOf(page.entries);
+        show({
+          ...latest,
+          entries: mergeEntries(latest.entries, page.entries),
+          refs: withRefs(latest.refs, page),
+          nextBefore: page.nextBefore,
+          pages: latest.pages + 1,
+          reactions:
+            page.reactions == null
+              ? latest.reactions
+              : reconcileReactions(latest.reactions, pageIds, page.reactions, started),
+          commentTargets:
+            latest.commentTargets && page.commentTargets != null
+              ? mergeCommentTargets(latest.commentTargets, pageIds, page.commentTargets)
+              : latest.commentTargets,
+        });
+        if (latest.reactions && page.reactions == null) void refreshReactions(pageIds, signal);
+      }
+      setMore('idle');
       return;
     }
-    if (result.kind !== 'ready') {
-      setMore('failed');
-      return;
-    }
-    const latest = current.current;
-    if (latest.kind === 'ready') {
-      show({
-        ...latest,
-        entries: mergeEntries(latest.entries, result.value.entries),
-        refs: withRefs(latest.refs, result.value),
-        nextBefore: result.value.nextBefore,
-        pages: latest.pages + 1,
-      });
-    }
-    setMore('idle');
+    setMore('failed');
   }
+
+  const changeReaction: ChangeReaction = async (id, emoji, selected) => {
+    const signal = lifetime.current?.signal;
+    if (!signal) return null;
+    const aborted = () => signal.aborted;
+    if (aborted()) return null;
+    const outcome = await setFeedReaction(seasonId, id, emoji, selected, signal);
+    if (aborted()) return null;
+    if (outcome === 'signedOut') {
+      onSignedOut();
+      return null;
+    }
+    if (outcome !== 'saved') return outcome;
+
+    const latest = current.current;
+    if (latest.kind !== 'ready' || latest.reactions === null) return null;
+    const row = latest.reactions.rows.get(id);
+    if (!row?.values.length) return null;
+    const saved = ++revision.current;
+    const values = row.values.map((reaction) =>
+      reaction.emoji === emoji && reaction.selected !== selected
+        ? { ...reaction, count: reaction.count + (selected ? 1 : -1), selected }
+        : reaction,
+    );
+    show({
+      ...latest,
+      reactions: reconcileReactions(latest.reactions, [id], { [id]: values }, saved),
+    });
+
+    if (!(await refreshReactions([id], signal)) && !aborted()) {
+      const shown = current.current;
+      if (shown.kind === 'ready' && shown.reactions?.rows.get(id)?.revision === saved) {
+        const rows = new Map(shown.reactions.rows);
+        rows.set(id, { values, revision: saved, stale: true });
+        show({ ...shown, reactions: { ...shown.reactions, rows } });
+      }
+    }
+    return null;
+  };
 
   // Back to the feed: the older pages shown before come again, one after another
   const restoring = state.kind === 'ready' && state.nextBefore !== null && state.pages < pages;
@@ -121,10 +375,9 @@ export function FeedScreen({
   });
   useRestoredScroll(state.kind === 'ready' && !restoring);
 
-  const days = useMemo(
-    () => (state.kind === 'ready' ? feedDays(state.entries, state.refs) : []),
-    [state],
-  );
+  const entries = state.kind === 'ready' ? state.entries : null;
+  const refs = state.kind === 'ready' ? state.refs : null;
+  const days = useMemo(() => (entries && refs ? feedDays(entries, refs) : []), [entries, refs]);
 
   return (
     <main className="mx-auto grid max-w-180 content-start gap-4 px-4 pt-4 pb-10 desk:px-8 desk:pt-8">
@@ -184,7 +437,42 @@ export function FeedScreen({
         />
       ) : (
         <Panel>
-          <FeedList days={days} fresh={fresh} />
+          <FeedList
+            days={days}
+            fresh={fresh}
+            renderReactions={(id) => {
+              const row = state.reactions?.rows.get(id);
+              return row?.values.length ? (
+                <ReactionButtons
+                  targetId={id}
+                  groupLabel={ru.feed.reactionGroup}
+                  reactions={row.values}
+                  changeReaction={changeReaction}
+                  stale={row.stale}
+                  compact
+                />
+              ) : null;
+            }}
+            renderComments={(item) => {
+              if (!state.commentTargets?.get(item.id)) return null;
+              const title = item.line
+                .map((part) =>
+                  typeof part === 'string'
+                    ? part
+                    : part.kind === 'player'
+                      ? part.player.name
+                      : part.game.title,
+                )
+                .join('');
+              return (
+                <CommentThread
+                  target={{ kind: 'feed', seasonId, targetCommandId: item.id }}
+                  label={ru.comments.feedLabel(title)}
+                  onSignedOut={onSignedOut}
+                />
+              );
+            }}
+          />
           <div className="grid justify-items-center gap-3 pt-2">
             {more === 'failed' ? <Notice tone="danger">{ru.feed.moreError}</Notice> : null}
             {state.nextBefore === null ? (

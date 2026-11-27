@@ -1,11 +1,13 @@
 import {
   BookOpen,
+  Images,
   KeyRound,
   Library,
   LogOut,
   Map as MapIcon,
   MessagesSquare,
   ShieldCheck,
+  Trophy,
   UserRound,
   Vote,
 } from 'lucide-react';
@@ -29,33 +31,47 @@ const sections: { kind: Route['kind'] & keyof typeof ru.nav; to: string; icon: R
   { kind: 'feed', to: paths.feed(), icon: <MessagesSquare size={18} aria-hidden /> },
   { kind: 'pool', to: paths.pool(), icon: <Library size={18} aria-hidden /> },
   { kind: 'rules', to: paths.rules(), icon: <BookOpen size={18} aria-hidden /> },
+  { kind: 'hallOfFame', to: paths.hallOfFame(), icon: <Trophy size={18} aria-hidden /> },
 ];
 
 /**
- * The site's sections (H5–H7): the season (map, turn, leaderboard), its feed, the pool and the rules. One row: under
- * the name on a phone (the icons stay out, the four words fit 390 px), between the name and my menu on a desktop
+ * The site's sections go under the name on a phone, between the name and my menu on a desktop.
+ * Compact labels leave room for the five common sections on a phone. Extra sections wrap.
  */
-function SiteNav({ admin, pollsSeasonId }: { admin: boolean; pollsSeasonId: string | null }) {
+function SiteNav({
+  admin,
+  pollsSeasonId,
+  gallerySeasonId,
+}: {
+  admin: boolean;
+  pollsSeasonId: string | null;
+  gallerySeasonId: string | null;
+}) {
   const found = routeOf(usePath());
   // Anyone but the admin at the admin's address sees the game: its section is the current one
   const route: Route = found.kind === 'admin' && !admin ? { kind: 'season' } : found;
-  const shown = pollsSeasonId
-    ? [
-        ...sections,
-        {
-          kind: 'polls' as const,
-          to: paths.polls(pollsSeasonId),
-          icon: <Vote size={18} aria-hidden />,
-        },
-      ]
-    : sections;
+  const shown = [...sections];
+  if (gallerySeasonId) {
+    shown.splice(2, 0, {
+      kind: 'gallery',
+      to: paths.gallery(gallerySeasonId),
+      icon: <Images size={18} aria-hidden />,
+    });
+  }
+  if (pollsSeasonId) {
+    shown.push({
+      kind: 'polls',
+      to: paths.polls(pollsSeasonId),
+      icon: <Vote size={18} aria-hidden />,
+    });
+  }
   return (
     <nav
       aria-label={ru.nav.label}
       data-testid="site-nav"
-      className="order-last -mx-1 w-full overflow-x-auto p-1 desk:order-none desk:mx-0 desk:mr-auto desk:w-auto"
+      className="order-last -mx-1 w-full min-w-0 p-1 desk:order-none desk:mx-0 desk:mr-auto desk:w-auto"
     >
-      <ul className="flex gap-1">
+      <ul className="flex flex-wrap gap-1">
         {shown.map((section) => {
           const current = route.kind === section.kind;
           return (
@@ -65,8 +81,7 @@ function SiteNav({ admin, pollsSeasonId }: { admin: boolean; pollsSeasonId: stri
                 aria-current={current ? 'page' : undefined}
                 data-testid={`nav-${section.kind}`}
                 className={cx(
-                  'inline-flex min-h-11 items-center gap-2 rounded-full font-medium whitespace-nowrap transition duration-(--duration-fast) desk:px-3',
-                  pollsSeasonId ? 'px-2 text-sm desk:text-base' : 'px-4',
+                  'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-2 text-sm font-medium whitespace-nowrap transition duration-(--duration-fast) desk:px-3 desk:text-base',
                   // The current section: filled, not by colour alone
                   current ? 'bg-ink text-on-color' : 'text-ink is-hover:bg-muted',
                 )}
@@ -90,6 +105,7 @@ export function Shell({
   user,
   seasonId = null,
   pollsSeasonId = null,
+  gallerySeasonId = null,
   onChangePassword,
   onLogout,
   offline,
@@ -100,6 +116,7 @@ export function Shell({
   /** The current season: the admin's count of proofs to check is its (D-263) */
   seasonId?: string | null;
   pollsSeasonId?: string | null;
+  gallerySeasonId?: string | null;
   onChangePassword: () => void;
   onLogout: () => void;
   /** The styleguide shows the lost connection without losing it */
@@ -127,7 +144,7 @@ export function Shell({
           >
             {ru.app.title}
           </Link>
-          <SiteNav admin={admin} pollsSeasonId={pollsSeasonId} />
+          <SiteNav admin={admin} pollsSeasonId={pollsSeasonId} gallerySeasonId={gallerySeasonId} />
           {online ? null : <ConnectionLost compact />}
           <BugReportButton />
           <Menu

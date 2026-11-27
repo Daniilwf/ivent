@@ -107,6 +107,22 @@ public partial class EventFormatTests
         { "poll-started", Poll(PollSource.Admin), "\"source\":\"admin\"" },
         { "poll-started", Poll(PollSource.GlobalEvent), "\"source\":\"globalEvent\"" },
         { "poll-closed", new PollClosed(s_run, PollCloseReason.Admin, "Horror", [new PollCount("Horror", 1)], [], 0), "\"reason\":\"admin\"" },
+        {
+            "command-undone",
+            new Engine.Undo.CommandUndone(s_run, "Correction", [], [], [], [], [], [], null,
+                Polls: [new Poll(s_run, PollSource.Nomination, "", [new PollOption(s_game.ToString("D"), "")],
+                    PollVoters.Everyone, false, false, s_at, s_at.AddHours(3), PollStatus.Open, [])
+                    { Nomination = VotedNomination.GameOfSeason }]),
+            "\"source\":\"nomination\",\"question\":\"\""
+        },
+        {
+            "nomination-poll-started",
+            new NominationPollStarted(s_run, VotedNomination.BestReview, [s_game], PollVoters.Everyone, false, false, s_at, s_at.AddHours(3))
+            {
+                ReviewVersions = [NominationReviewVersion.Capture(s_game, " A public review ")],
+            },
+            """{"candidateId":"20000000-0000-0000-0000-000000000001","textHash":"4E854CE649340BB7B5C4A342D63D9066F8171476C5ED1A30CF0DFCEEE1A2DB8E"}"""
+        },
 
         // Suggestions: of an event and of an item, approved, and waiting as an undo stores it
         { "suggestion-submitted", new Engine.Suggestions.SuggestionSubmitted(s_challenge, s_player, s_user, Engine.Suggestions.SuggestionKind.Event, "Ивент «Тишина»", null, s_at), "\"kind\":\"event\",\"text\":\"Ивент «Тишина»\",\"game\":null" },

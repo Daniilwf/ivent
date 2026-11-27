@@ -125,6 +125,14 @@ public static class RejectionCodes
     public const string UndoCellNotOnMap = "undo.cellNotOnMap";
     public const string InvalidRating = "review.invalidRating";
     public const string ReviewTooLong = "review.tooLong";
+    public const string ReviewReactionReviewUnknown = "reviewReaction.reviewUnknown";
+    public const string ReviewReactionInvalidUser = "reviewReaction.invalidUser";
+    public const string ReviewReactionInvalidEmoji = "reviewReaction.invalidEmoji";
+    public const string FeedReactionTargetUnknown = "feedReaction.targetUnknown";
+    public const string FeedReactionInvalidUser = "feedReaction.invalidUser";
+    public const string FeedReactionInvalidEmoji = "feedReaction.invalidEmoji";
+    public const string GalleryReactionInvalidUser = "galleryReaction.invalidUser";
+    public const string GalleryReactionInvalidEmoji = "galleryReaction.invalidEmoji";
     public const string ContentInvalid = "content.invalid";
     public const string ContentUnchanged = "content.unchanged";
 
@@ -276,6 +284,11 @@ public static class RejectionCodes
 
     /// <summary>A poll needs at least two options to choose from when it starts (D-720).</summary>
     public const string PollNoOptions = "poll.noOptions";
+    public const string NominationNeedsClosing = "poll.nominationNeedsClosing";
+    public const string NominationCandidatesInvalid = "poll.nominationCandidatesInvalid";
+    public const string NominationAlreadyStarted = "poll.nominationAlreadyStarted";
+    public const string SeasonNominationPollsOpen = "season.nominationPollsOpen";
+    public const string NominationInPlay = "poll.nominationInPlay";
 
     // Global events (stage 5, D-517, D-518, D-750)
     public const string GlobalEventUnknown = "globalEvent.unknown";

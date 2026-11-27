@@ -1,0 +1,52 @@
+{
+  "objects": [
+    {
+      "id": "horror-marathon",
+      "kind": "achievement",
+      "name": "Хоррор-марафон",
+      "description": "Пройди три хоррора подряд.",
+      "scope": "season",
+      "effect": {
+        "trigger": "runCompleted",
+        "condition": { "stat": "completedStreakWithTag", "tag": "Horror", "gte": 3 },
+        "actions": [{ "type": "changeResource", "resource": "coins", "amount": 5 }]
+      }
+    },
+    {
+      "id": "unbreakable",
+      "kind": "achievement",
+      "name": "Непробиваемый",
+      "description": "Переживи пять атак за сезон.",
+      "scope": "season",
+      "effect": {
+        "trigger": "hostileIncoming",
+        "condition": { "stat": "hostileReceived", "gte": 5 },
+        "actions": [{ "type": "changeResource", "resource": "coins", "amount": 5 }]
+      }
+    },
+    {
+      "id": "jackpot",
+      "kind": "achievement",
+      "name": "Джекпот",
+      "description": "Выбрось максимум на всех кубиках, когда их хотя бы три.",
+      "scope": "allTime",
+      "effect": {
+        "trigger": "afterDice",
+        "condition": { "stat": "allDiceMax", "minDice": 3 },
+        "actions": [{ "type": "changeResource", "resource": "coins", "amount": 10 }]
+      }
+    },
+    {
+      "id": "long-run",
+      "kind": "achievement",
+      "name": "Длинная игра",
+      "description": "Пройди игру длиннее 30 часов.",
+      "scope": "season",
+      "effect": {
+        "trigger": "proofApproved",
+        "condition": { "stat": "runHours", "gt": 30 },
+        "actions": [{ "type": "changeResource", "resource": "coins", "amount": 5 }]
+      }
+    }
+  ]
+}

@@ -5,6 +5,8 @@ import { ru } from '../i18n/ru';
 import { ProfileScreen } from './ProfileScreen';
 import { fakeServer, json } from '../test/fakeServer';
 
+vi.mock('../api/realtime', () => ({ watchSeason: () => vi.fn() }));
+
 // H5: a player's profile (SPEC «Профиль», «Отзыв … виден в ленте, профиле и на странице игры», D-124) — name,
 // avatar, completed games, seasons with points and place, reviews; every state.
 
@@ -12,7 +14,7 @@ const userId = 'aaaaaaaa-0000-0000-0000-000000000001';
 const gameId = '33333333-3333-3333-3333-333333333333';
 const seasonId = '99999999-9999-9999-9999-999999999999';
 
-const profile: Schemas['ProfileView'] = {
+const profile: Omit<Schemas['ProfileView'], 'achievements'> = {
   id: userId,
   name: 'Капитан_Пельмень',
   avatar: { id: 'f', url: '/api/files/f', thumbnailUrl: '/api/files/f/thumbnail' },
@@ -79,6 +81,7 @@ describe('ProfileScreen', () => {
       '/api/files/f',
     );
     expect(screen.getByTestId('profile-completed')).toHaveTextContent('Пройдено 5 игр');
+    expect(screen.queryByRole('heading', { name: 'Достижения' })).not.toBeInTheDocument();
 
     const seasons = within(screen.getByTestId('profile-seasons')).getAllByRole('listitem');
     expect(seasons[0]).toHaveTextContent('Осень');
@@ -102,8 +105,98 @@ describe('ProfileScreen', () => {
     expect(review).toHaveTextContent('Осень, 12.09');
   });
 
+  it('shows the earned badges in server order with their descriptions, season and date', async () => {
+    const badge = {
+      objectId: 'unbreakable',
+      name: 'Непробиваемый',
+      description: 'Переживи пять атак за сезон.',
+    };
+    serve(() =>
+      json(200, {
+        ...profile,
+        achievements: [
+          { ...badge, seasonId: 's2', earnedAt: '2026-12-12T22:00:00Z' },
+          { ...badge, seasonId, earnedAt: '2026-09-12T10:00:00Z' },
+        ],
+      }),
+    );
+
+    render(<ProfileScreen userId={userId} meId="spectator" onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByRole('heading', { name: 'Достижения' })).toBeInTheDocument();
+    const badges = within(screen.getByTestId('profile-achievements')).getAllByRole('listitem');
+    expect(badges).toHaveLength(2);
+    expect(badges[0]).toHaveTextContent(badge.name);
+    expect(badges[0]).toHaveTextContent(badge.description);
+    expect(badges[0]).toHaveTextContent('Зима, 13.12');
+    expect(badges[1]).toHaveTextContent('Осень, 12.09');
+  });
+
+  it('labels an account achievement as lifetime and keeps its award date', async () => {
+    serve(() =>
+      json(200, {
+        ...profile,
+        achievements: [
+          {
+            objectId: 'jackpot',
+            name: 'Джекпот',
+            description: 'Выбрось максимум на всех кубиках, когда их хотя бы три.',
+            scope: 'allTime',
+            seasonId,
+            earnedAt: '2026-09-12T10:00:00Z',
+          },
+        ],
+      }),
+    );
+
+    render(<ProfileScreen userId={userId} meId="spectator" onSignedOut={vi.fn()} />);
+
+    const badge = within(await screen.findByTestId('profile-achievements')).getByRole('listitem');
+    expect(badge).toHaveTextContent('Джекпот');
+    expect(badge).toHaveTextContent('За всё время, 12.09');
+  });
+
+  it('marks saved first places in finished and archived seasons as championships', async () => {
+    const seasons: [string, Schemas['ProfileSeasonView']['status'], number | null][] = [
+      ['Итоговый сезон', 'finished', 1],
+      ['Прошлый сезон', 'archived', 1],
+      ['Текущий сезон', 'active', 1],
+      ['Проверка пруфов', 'closing', 1],
+      ['Второе место', 'finished', 2],
+      ['Итоги неизвестны', 'archived', null],
+    ];
+    serve(() =>
+      json(200, {
+        ...profile,
+        seasons: seasons.map(([seasonName, status, place], index) => ({
+          seasonId: `season-${index}`,
+          playerId: `player-${index}`,
+          seasonName,
+          status,
+          place,
+          points: 42,
+          token: 6,
+        })),
+      }),
+    );
+
+    render(<ProfileScreen userId={userId} meId="spectator" onSignedOut={vi.fn()} />);
+
+    const list = await screen.findByTestId('profile-seasons');
+    const rows = within(list).getAllByRole('listitem');
+    for (const row of rows.slice(0, 2)) {
+      expect(within(row).getByText('Чемпион сезона')).toBeInTheDocument();
+      expect(within(row).getByText('1 место')).toBeInTheDocument();
+    }
+    for (const row of rows.slice(2)) {
+      expect(within(row).queryByText('Чемпион сезона')).not.toBeInTheDocument();
+    }
+  });
+
   it('marks my own page and calls me to write the first review', async () => {
-    serve(() => json(200, { ...profile, reviews: [], seasons: [], completed: 1 }));
+    serve(() =>
+      json(200, { ...profile, reviews: [], seasons: [], completed: 1, achievements: [] }),
+    );
 
     render(<ProfileScreen userId={userId} meId={userId} onSignedOut={vi.fn()} />);
 
@@ -111,6 +204,27 @@ describe('ProfileScreen', () => {
     expect(screen.getByTestId('profile-completed')).toHaveTextContent('Пройдена 1 игра');
     expect(screen.getByRole('heading', { name: ru.profile.noSeasonsTitle })).toBeInTheDocument();
     expect(screen.getByText(ru.profile.noReviewsMine)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Достижения' })).not.toBeInTheDocument();
+  });
+
+  it('links only the owner to the recap of an enabled season', async () => {
+    const first = profile.seasons[0];
+    if (!first) throw new Error('Missing profile season fixture.');
+    serve(() =>
+      json(200, {
+        ...profile,
+        seasons: [{ ...first, seasonRecapAvailable: true }, profile.seasons[1]],
+      }),
+    );
+
+    const view = render(<ProfileScreen userId={userId} meId={userId} onSignedOut={vi.fn()} />);
+    expect(
+      await screen.findByRole('link', { name: ru.seasonRecap.profileLink(first.seasonName) }),
+    ).toHaveAttribute('href', `/seasons/${seasonId}/recap`);
+    expect(screen.getAllByRole('link', { name: /Твой сезон/ })).toHaveLength(1);
+
+    view.rerender(<ProfileScreen userId={userId} meId="someone-else" onSignedOut={vi.fn()} />);
+    expect(screen.queryByRole('link', { name: /Твой сезон/ })).toBeNull();
   });
 
   it('says a deleted or unknown player has no page and leads back to the season', async () => {

@@ -4,11 +4,14 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 // link changes the address without reloading the page (Link.tsx); the browser's back and forward buttons work as usual.
 
 export type Route =
-  | { kind: 'season' }
+  | { kind: 'season'; seasonId?: string }
   | { kind: 'feed'; seasonId: string | null }
+  | { kind: 'gallery'; seasonId: string | null }
   | { kind: 'polls'; seasonId: string | null }
   | { kind: 'interactions'; seasonId: string | null }
   | { kind: 'profile'; userId: string }
+  | { kind: 'seasonRecap'; seasonId: string }
+  | { kind: 'hallOfFame' }
   | { kind: 'game'; gameId: string }
   | { kind: 'pool' }
   | { kind: 'rules' }
@@ -17,31 +20,42 @@ export type Route =
   | { kind: 'notFound' };
 
 const id = '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})';
+const season = new RegExp(`^/seasons/${id}$`);
 const seasonFeed = new RegExp(`^/seasons/${id}/feed$`);
+const seasonGallery = new RegExp(`^/seasons/${id}/gallery$`);
 const seasonPolls = new RegExp(`^/seasons/${id}/polls$`);
 const seasonInteractions = new RegExp(`^/seasons/${id}/interactions$`);
+const seasonRecap = new RegExp(`^/seasons/${id}/recap$`);
 const profile = new RegExp(`^/users/${id}$`);
 const game = new RegExp(`^/games/${id}$`);
 const admin = /^\/admin(?:\/([a-z]+))?$/;
 
 /**
- * What page an address opens: `/`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}`,
- * `/pool`, `/rules`, `/polls`, `/seasons/{id}/polls`, `/admin` and `/admin/{section}`
+ * What page an address opens: `/`, `/seasons/{id}`, `/feed` (the current season), `/seasons/{id}/feed`, `/users/{id}`, `/games/{id}`,
+ * `/pool`, `/rules`, `/hall-of-fame`, `/polls`, `/seasons/{id}/polls`, `/admin` and `/admin/{section}`
  */
 export function routeOf(path: string): Route {
   const clean = path.replace(/\/+$/, '') || '/';
   if (clean === '/') return { kind: 'season' };
   if (clean === '/feed') return { kind: 'feed', seasonId: null };
+  if (clean === '/gallery') return { kind: 'gallery', seasonId: null };
   if (clean === '/polls') return { kind: 'polls', seasonId: null };
   if (clean === '/interactions') return { kind: 'interactions', seasonId: null };
   if (clean === '/pool') return { kind: 'pool' };
   if (clean === '/rules') return { kind: 'rules' };
-  let match = seasonFeed.exec(clean);
+  if (clean === '/hall-of-fame') return { kind: 'hallOfFame' };
+  let match = season.exec(clean);
+  if (match?.[1]) return { kind: 'season', seasonId: match[1].toLowerCase() };
+  match = seasonFeed.exec(clean);
   if (match?.[1]) return { kind: 'feed', seasonId: match[1] };
+  match = seasonGallery.exec(clean);
+  if (match?.[1]) return { kind: 'gallery', seasonId: match[1] };
   match = seasonPolls.exec(clean);
   if (match?.[1]) return { kind: 'polls', seasonId: match[1] };
   match = seasonInteractions.exec(clean);
   if (match?.[1]) return { kind: 'interactions', seasonId: match[1] };
+  match = seasonRecap.exec(clean);
+  if (match?.[1]) return { kind: 'seasonRecap', seasonId: match[1] };
   match = profile.exec(clean);
   if (match?.[1]) return { kind: 'profile', userId: match[1] };
   match = game.exec(clean);
@@ -52,12 +66,15 @@ export function routeOf(path: string): Route {
 }
 
 export const paths = {
-  season: () => '/',
+  season: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}` : '/'),
   feed: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}/feed` : '/feed'),
+  gallery: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}/gallery` : '/gallery'),
   polls: (seasonId?: string) => (seasonId ? `/seasons/${seasonId}/polls` : '/polls'),
   interactions: (seasonId?: string) =>
     seasonId ? `/seasons/${seasonId}/interactions` : '/interactions',
   profile: (userId: string) => `/users/${userId}`,
+  seasonRecap: (seasonId: string) => `/seasons/${seasonId}/recap`,
+  hallOfFame: () => '/hall-of-fame',
   game: (gameId: string) => `/games/${gameId}`,
   pool: () => '/pool',
   rules: () => '/rules',

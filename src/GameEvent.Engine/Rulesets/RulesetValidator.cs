@@ -234,6 +234,28 @@ public static class RulesetValidator
             Error("polls.gameOptions", $"must be 2–{MaxPollGameOptions}");
         }
 
+        var nominations = ruleset.Nominations;
+        if (ruleset.Features.SeasonNominations && ruleset.Features.Polls && nominations.Voted.Count > 0
+            && (nominations.DurationHours is null || nominations.MinCandidates is null || nominations.MaxCandidates is null))
+        {
+            Error("nominations", "durationHours, minCandidates and maxCandidates are required for nomination ballots");
+        }
+
+        if (nominations.DurationHours is < 1 or > MaxAnswerTimeoutHours)
+        {
+            Error("nominations.durationHours", $"must be 1–{MaxAnswerTimeoutHours}");
+        }
+
+        if (nominations.MinCandidates is < 2 or > MaxChoiceCount)
+        {
+            Error("nominations.minCandidates", $"must be 2–{MaxChoiceCount}");
+        }
+
+        if (nominations.MaxCandidates is < 2 or > MaxChoiceCount || nominations.MaxCandidates < nominations.MinCandidates)
+        {
+            Error("nominations.maxCandidates", $"must be 2–{MaxChoiceCount} and at least minCandidates");
+        }
+
         // Duels (D-525, D-540): the section comes with the flag; the bounds keep every moment of a duel on the calendar
         if (ruleset.Features.Duels && ruleset.Duels is null)
         {
@@ -389,6 +411,16 @@ public static class RulesetValidator
         if (reactions.Count == 0 || reactions.Any(string.IsNullOrWhiteSpace) || reactions.Distinct(StringComparer.Ordinal).Count() != reactions.Count)
         {
             Error("social.reactions", "must be a non-empty list without repeats");
+        }
+
+        if (ruleset.Features.Comments)
+        {
+            NotNegative("social.commentsPerDay", ruleset.Social.CommentsPerDay);
+        }
+
+        if (ruleset.Features.Gallery)
+        {
+            NotNegative("social.galleryUploadsPerDay", ruleset.Social.GalleryUploadsPerDay);
         }
 
         var bets = ruleset.Bets;

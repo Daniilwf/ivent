@@ -35,8 +35,8 @@ public sealed record ContentVersionInfo(
     IReadOnlyList<string> Removed);
 
 /// <summary>
-/// The season's content in the editor (4.12, D-490): whether items are on (the editor works either way, a pack is
-/// published only with <c>features.items</c>), the season's status, the version in force, the pack in force as content
+/// The season's content in the editor (4.12, D-490): which kinds may be published, the season's status,
+/// the version in force, the pack in force as content
 /// JSON (CONTENT.md; null fields left out), the definitions deleted on the way and the versions, newest first.
 /// <c>eventsEnabled</c> — whether events are on (<c>features.events</c>, D-823): the pack's events and decks play only then;
 /// always set, optional for older clients.
@@ -48,7 +48,8 @@ public sealed record AdminContentView(
     JsonElement Pack,
     IReadOnlyList<DeletedObjectView> Deleted,
     IReadOnlyList<ContentVersionInfo> History,
-    bool EventsEnabled = false);
+    bool EventsEnabled = false,
+    bool AchievementsEnabled = false);
 
 /// <summary>One version's pack, for the history and the export of an older version.</summary>
 public sealed record ContentVersionView(int Version, JsonElement Pack);
@@ -206,7 +207,8 @@ public static partial class AdminContentEndpoints
             Compact(previous),
             [.. deleted.Values.OrderBy(d => d.Id, StringComparer.Ordinal)],
             history,
-            rules.Features.Events));
+            rules.Features.Events,
+            rules.Features.Achievements));
     }
 
     private static async Task<Results<Ok<ContentVersionView>, NotFound>> GetVersionAsync(
@@ -233,13 +235,11 @@ public static partial class AdminContentEndpoints
         return TypedResults.Ok(new ContentCheckView(problems.Count == 0, problems));
     }
 
-    // A pack holds events and decks only while the season plays them (D-532), an event's vote only with polls (D-512): the
-    // editor checks as the engine will
-    private static async Task<(bool Events, bool Polls)> FlagsAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
+    // The editor checks the same feature requirements as publication in the engine.
+    private static async Task<Features?> FlagsAsync(GameEventDbContext db, Guid seasonId, CancellationToken ct)
     {
         var json = await db.Seasons.AsNoTracking().Where(s => s.Id == seasonId).Select(s => s.RulesetJson).SingleOrDefaultAsync(ct);
-        var features = json is null ? null : JsonSerializer.Deserialize<Ruleset>(json, EngineJson.Options)!.Features;
-        return (features?.Events ?? false, features?.Polls ?? false);
+        return json is null ? null : JsonSerializer.Deserialize<Ruleset>(json, EngineJson.Options)?.Features;
     }
 
     private static async Task<Results<Ok<CommandResponse>, JsonHttpResult<ContentProblem>, ProblemHttpResult, ValidationProblem, NotFound, ForbidHttpResult>> PublishAsync(
@@ -294,7 +294,7 @@ public static partial class AdminContentEndpoints
     }
 
     /// <summary>The problems of a pack: its types (the first one the strict reader meets), then every content rule.</summary>
-    private static List<ContentProblemView> Problems(JsonObject json, (bool Events, bool Polls) flags, out ContentPack? pack)
+    private static List<ContentProblemView> Problems(JsonObject json, Features? flags, out ContentPack? pack)
     {
         // The reader lets a null list item through at any depth (nullable annotations do not reach list items, CE-SEC-1)
         var nulls = NullItems(json, "$").Select(at => new ContentProblemView(Path(at), NullItem)).ToList();
@@ -336,7 +336,13 @@ public static partial class AdminContentEndpoints
 
         if (problems.Count == 0)
         {
-            problems.AddRange(ContentPublishing.Check(pack, flags.Events, flags.Polls).Select(e => new ContentProblemView(Path(e.Path), e.Message)));
+            if (flags is { Achievements: true, Items: false } && !ContentPublishing.CanPublishWithoutItems(pack))
+            {
+                problems.Add(new ContentProblemView("objects", "Without items the pack can contain only achievements."));
+            }
+
+            problems.AddRange(ContentPublishing.Check(pack, flags?.Events == true, flags?.Polls == true, flags?.Achievements == true)
+                .Select(e => new ContentProblemView(Path(e.Path), e.Message)));
         }
 
         return problems;

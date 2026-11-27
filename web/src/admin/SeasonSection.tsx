@@ -14,6 +14,7 @@ import { moscowInput } from '../app/time';
 import { newCommandId } from '../api/commands';
 import { AsyncState } from '../ui/AsyncState';
 import { answerOf, useLoaded } from '../app/useLoaded';
+import { NominationSection } from './NominationSection';
 
 const t = ru.admin.season;
 
@@ -72,6 +73,9 @@ export function SeasonSection({
             {season && seasonId ? (
               <>
                 <StatusPanel seasonId={seasonId} season={season} onDone={done} onFailed={failed} />
+                {season.status === 'closing' ? (
+                  <NominationSection key={seasonId} seasonId={seasonId} version={version} />
+                ) : null}
                 <DeadlinePanel
                   seasonId={seasonId}
                   season={season}

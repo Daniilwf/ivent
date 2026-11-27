@@ -4,12 +4,13 @@ import { api, rejectionCode, type Schemas } from '../api/client';
 import { newCommandId } from '../api/commands';
 import { usePageHeading, useRestoredScroll } from '../app/router';
 import { answerOf, type Answer } from '../app/useLoaded';
-import { useSeasonVersion } from '../app/useSeasonVersion';
+import { usePoolVersion, useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Progress';
 import { EmptyState, Notice } from '../ui/States';
 import { PollCard } from './PollCard';
+import { isOpenPoll } from './pollView';
 
 type Poll = Schemas['PollView'];
 type ReadAnswer = Answer<Poll[]> | { kind: 'disabled' };
@@ -31,6 +32,7 @@ const refreshEvents = new Set([
   'vote-cast',
   'vote-changed',
   'poll-started',
+  'nomination-poll-started',
   'poll-closed',
   'poll-cancelled',
   'ruleset-changed',
@@ -39,6 +41,11 @@ const refreshEvents = new Set([
   'player-finished',
   'player-finish-revoked',
   'season-status-changed',
+  'run-reviewed',
+  'proof-submitted',
+  'proof-rejected',
+  'gallery-moment-hidden',
+  'gallery-proof-consent-withdrawn',
 ]);
 
 function isActive(session: Session) {
@@ -171,10 +178,13 @@ function SeasonPolls({ seasonId, onSignedOut }: PollsScreenProps) {
       update.seasonId.toLowerCase() === seasonId &&
       update.types.some((type) => refreshEvents.has(type)),
   });
+  const poolVersion = usePoolVersion(
+    state.kind === 'ready' && state.value.some((poll) => poll.nomination != null),
+  );
   const refreshForVersion = useEffectEvent(() => void refresh());
   useEffect(() => {
     refreshForVersion();
-  }, [version]);
+  }, [poolVersion, version]);
   useRestoredScroll(state.kind !== 'loading');
 
   async function vote(pollId: string, optionId: string) {
@@ -275,13 +285,13 @@ function SeasonPolls({ seasonId, onSignedOut }: PollsScreenProps) {
         <>
           <PollGroup
             title={t.openGroup}
-            polls={state.value.filter((poll) => poll.status === 'open')}
+            polls={state.value.filter(isOpenPoll)}
             pending={voting}
             onVote={vote}
           />
           <PollGroup
             title={t.endedGroup}
-            polls={state.value.filter((poll) => poll.status !== 'open')}
+            polls={state.value.filter((poll) => !isOpenPoll(poll))}
             pending={voting}
             onVote={vote}
           />
@@ -314,7 +324,7 @@ function PollGroup({
           key={poll.id}
           poll={poll}
           level={3}
-          pending={pending && poll.status === 'open'}
+          pending={pending && isOpenPoll(poll)}
           onVote={(optionId) => onVote(poll.id, optionId)}
         />
       ))}

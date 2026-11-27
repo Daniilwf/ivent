@@ -17,7 +17,9 @@
     "suggestions": false,
     "coop": false,
     "globalEvents": false,
-    "duels": false
+    "duels": false,
+    "seasonStatistics": false,
+    "seasonNominations": false
   },
   "season": {
     "timezone": "Europe/Moscow",
@@ -115,7 +117,10 @@
   },
   "nominations": {
     "auto": ["mostHours", "mostRuns", "unluckiestDice", "mostDrops", "mostAttacks"],
-    "voted": ["bestReview", "gameOfSeason", "funniestMoment"]
+    "voted": ["bestReview", "gameOfSeason", "funniestMoment"],
+    "durationHours": 24,
+    "minCandidates": 2,
+    "maxCandidates": 20
   },
   "weeklyChallenge": {
     "defaultRewardCoins": 10,

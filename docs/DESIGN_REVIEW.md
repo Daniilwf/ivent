@@ -1,5 +1,68 @@
 # Дизайн-ревью
 
+## Этап 6. Итоговое голосование и архив номинаций (2026-11-20)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Подготовка итогового бюллетеня | [Телефон](../test-artifacts/design/s6-final-nominations/phone-final-ballot-composer.png) | [Десктоп](../test-artifacts/design/s6-final-nominations/desktop-final-ballot-composer.png) |
+| Результаты архивного сезона | [Телефон](../test-artifacts/design/s6-final-nominations/phone-final-nomination-results.png) | [Десктоп](../test-artifacts/design/s6-final-nominations/desktop-final-nomination-results.png) |
+| Материалы победителя скрыты | [Телефон](../test-artifacts/design/s6-final-nominations/phone-final-nomination-hidden-winner.png) | [Десктоп](../test-artifacts/design/s6-final-nominations/desktop-final-nomination-hidden-winner.png) |
+
+Независимое ревью проверило выбор кандидатов, подтверждение и архив на двух размерах. Контраст проверенных сочетаний составил 4,83:1–6,98:1. Playwright подтвердил, что после скрытия активной ссылки фокус переходит на заголовок её номинации. При повторном чтении фокус на неизменившихся автоматических победителях сохраняется. Подпись кадра отделена от ссылки «Открыть галерею». Лента показывает завершение голосования понятной строкой. [Финальный браузерный прогон](../test-artifacts/stage6-final-nomination-design-e2e.log)
+
+## Этап 6. Кадр пруфа, личная сводка и большой бросок (2026-11-20)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Выбор одобренного кадра | [Телефон](../test-artifacts/design/s6-proofs-rolls-and-all-time/phone-proof-picker.png) | [Десктоп](../test-artifacts/design/s6-proofs-rolls-and-all-time/desktop-proof-picker.png) |
+| Подтверждение отзыва в архиве | [Телефон](../test-artifacts/design/s6-proofs-rolls-and-all-time/phone-proof-withdrawal.png) | [Десктоп](../test-artifacts/design/s6-proofs-rolls-and-all-time/desktop-proof-withdrawal.png) |
+| Скрытые кадры автора | [Телефон](../test-artifacts/design/s6-proofs-rolls-and-all-time/phone-hidden-owner.png) | [Десктоп](../test-artifacts/design/s6-proofs-rolls-and-all-time/desktop-hidden-owner.png) |
+| Сводка за всё время | [Телефон](../test-artifacts/design/s6-proofs-rolls-and-all-time/phone-all-time-recap.png) | [Десктоп](../test-artifacts/design/s6-proofs-rolls-and-all-time/desktop-all-time-recap.png) |
+| Самый большой бросок | [Телефон](../test-artifacts/design/s6-proofs-rolls-and-all-time/phone-largest-roll.png) | [Десктоп](../test-artifacts/design/s6-proofs-rolls-and-all-time/desktop-largest-roll.png) |
+
+Независимое ревью проверило сетку, читаемость, фокус и контраст от 4,83:1 до 16,10:1. Кнопки подтверждения отзыва на телефоне выровнены в колонку. Дата скрытого кадра связана с кнопкой для экранного чтеца. Подписи выбора кадра и диапазона броска используют запятые. После правок прошли 10 сценариев Playwright и 18 визуальных проверок в Chromium, Firefox и WebKit. [Playwright](../test-artifacts/stage6-extended-e2e-final.log) · [Эталоны](../test-artifacts/stage6-extended-visual-final.log)
+
+## Этап 6. Часы и быстрейший финиш (2026-11-20)
+
+В сводке «Твой сезон» показатели `1 280` и `2 345,75` целиком читаются на обоих размерах. При нехватке места переносится весь показатель. PNG использует тот же текст и раскладывает числа по измеренной ширине. Playwright проверил обновление часов после правки и фактическую отрисовку числа в PNG. [Телефон](../e2e/visual/__screenshots__/chromium-phone/season-recap.png) · [Десктоп](../e2e/visual/__screenshots__/chromium-desktop/season-recap.png)
+
+В «Зале славы» время читается с точностью до миллисекунды. API сохраняет точное сравнение и все равные финиши. «К рекордам» переводит фокус на начало блока, если видны два рекорда. При одном рекорде ссылка ведёт к нему. [Телефон 390×844](../test-artifacts/design/s6-hours-and-fastest/fastest-phone.png) · [Десктоп 1440×900](../test-artifacts/design/s6-hours-and-fastest/fastest-desktop.png)
+
+## Этап 6. Голосование без итога (2026-11-20)
+
+После завершения сезона статус карточки, варианты и свой голос читаются целиком на обоих размерах. Горизонтальной прокрутки нет. Контраст проверенных сочетаний от 6,98:1 до 16,10:1. Playwright перевёл выбор стрелкой, подтвердил видимое кольцо на вопросе после перемещения карточки и проверил её повторное открытие из архива. [Телефон 390×844](../test-artifacts/design/s6-unfinished-poll/poll-without-result-phone.png) · [Десктоп 1440×900](../test-artifacts/design/s6-unfinished-poll/poll-without-result-desktop.png)
+
+## Этап 6. Сезонные достижения и титул в профиле (2026-11-20)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Первое достижение | [Телефон](../test-artifacts/design/s6-dense-profile/seasonal-achievement-phone.png) | [Десктоп](../test-artifacts/design/s6-dense-profile/seasonal-achievement-desktop.png) |
+| Два достижения и титул чемпиона | [Телефон](../test-artifacts/design/s6-dense-profile/profile-badges-and-champion-phone.png) | [Десктоп](../test-artifacts/design/s6-dense-profile/profile-badges-and-champion-desktop.png) |
+
+На обоих размерах целиком видны значки, описания, даты, очки, первое место и титул. Длинное название переносится на телефоне на две строки. Горизонтальной прокрутки нет. Tab возвращает видимый фокус на ссылку сезона. Проверенные сочетания имеют контраст от 6,98:1 до 16,10:1. Состояния загрузки, ошибки и пустого профиля проверяет `web/src/feed/ProfileScreen.test.tsx`.
+
+В свежем демосезоне зритель открыл профиль Лисы из «Зала славы». На первом экране видны «Непробиваемый», название архивного сезона и «Чемпион сезона». Ширина документа совпадает с экраном. [Телефон 390×844](../test-artifacts/stage6-d927-demo-badge/browser/archived-champion-badge-phone.png) · [Десктоп 1440×900](../test-artifacts/stage6-d927-demo-badge/browser/archived-champion-badge-desktop.png)
+
+## Этап 6. Зал славы (2026-11-20)
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Макет Б | [Телефон](../test-artifacts/design/s6-hall-previews/b-phone.png) | [Десктоп](../test-artifacts/design/s6-hall-previews/b-desktop.png) |
+| Рабочий экран | [Архив](../test-artifacts/design/s6-hall-live/phone.png), [переход к рекорду](../test-artifacts/design/s6-hall-live/phone-record.png) | [Обе панели](../test-artifacts/design/s6-hall-live/desktop.png) |
+
+Независимое ревью подтвердило перенос длинных заголовков, читаемость очков и равных рекордов. В мобильной шапке разделы переносятся целиком. При переходе по Enter заголовок рекорда прокручивается ниже шапки и получает видимое кольцо фокуса. Браузерный тест проверил положение после двух кадров анимации и открыл карточку рекордной игры.
+
+## Этап 6. Галерея и «Твой сезон» (2026-11-20)
+
+| Экран | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Галерея моментов | [Сетка](../test-artifacts/design/s6-gallery-live/grid-phone.png), [полный кадр](../test-artifacts/design/s6-gallery-live/moment-phone.png) | [Сетка](../test-artifacts/design/s6-gallery-live/grid-desktop.png), [полный кадр](../test-artifacts/design/s6-gallery-live/moment-desktop.png) |
+| Твой сезон | [Карточка](../test-artifacts/design/s6-stats-live/phone.png) | [Карточка](../test-artifacts/design/s6-stats-live/desktop.png) |
+
+Для обоих экранов принят вариант Б по независимому сравнению. В галерее кнопка публикации и фильтры видны над сеткой. Полный кадр помещается в свою рамку и возвращает фокус на карточку при закрытии. После исправления ширина навигации на телефоне совпала с шириной её содержимого при включённых галерее и голосованиях. Загружаемый кадр сохраняет положение действий в окне.
+
+Карточка «Твой сезон» и [скачанный PNG](../test-artifacts/design/s6-stats-live/chat-phone.png) показывают одинаковые числа и подписи. Проверены длинное название сезона, имя без пробелов, числа от четырёх знаков, видимый фокус и загрузка с клавиатуры. Для двух экранов предусмотрены эталоны на Chromium, Firefox и WebKit.
+
 Находки `design-reviewer` и самопроверки по чек-листу docs/DESIGN.md и что с ними сделано.
 
 ## G3 «Дизайн-система», `/styleguide` (2026-09-26)

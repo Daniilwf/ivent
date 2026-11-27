@@ -20,4 +20,25 @@ public sealed record EngineContext(
 {
     /// <summary>The levels of the command's own events above 0, set for each command by <see cref="SeasonEngine.Execute"/> (D-559 (1)).</summary>
     internal Effects.CommandLevels? Levels { get; init; }
+
+    /// <summary>The queue checked that the current reaction's target is a public, active feed row in this season.</summary>
+    public bool FeedReactionTargetAvailable { get; init; }
+
+    /// <summary>The queue checked that the comment's feed target is a public, active row in this season.</summary>
+    public bool CommentTargetAvailable { get; init; }
+
+    /// <summary>Active account awards supplied by the command queue, including those earned in another season.</summary>
+    public IReadOnlySet<Achievements.AccountAchievementKey>? AccountAchievements { get; init; }
+
+    /// <summary>The queue prepared a protected image for this gallery publication.</summary>
+    public Guid? PreparedGalleryFileId { get; init; }
+
+    /// <summary>The queue verified the approval command matches the proof attachment prepared for publication.</summary>
+    public Guid? GalleryProofApprovalCommandId { get; init; }
+
+    /// <summary>Effective landed attacks loaded by the queue when it records season results.</summary>
+    public IReadOnlyList<Inventory.HostileReceived>? EffectiveAttacks { get; init; }
+
+    /// <summary>The queue verified that these candidates of the requested category are public in this season.</summary>
+    public IReadOnlySet<Guid>? AvailableNominationCandidates { get; init; }
 }

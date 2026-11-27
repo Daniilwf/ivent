@@ -196,12 +196,15 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
   [
     'poll-closed',
     (d) => {
-      // A player or a game won by its id: the poll's page names it (5.22), the feed says only that there is a result
+      // The poll page resolves an entity's name. The feed reports the result without printing its id.
       const result = text(d, 'result');
+      const entityId =
+        result !== null &&
+        /^(?:[0-9a-f]{32}|[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})$/i.test(result);
       return {
         icon: 'effect',
         actor: null,
-        line: L.pollClosed(result, result !== null && /^[0-9a-f]{32}$/.test(result)),
+        line: L.pollClosed(result, entityId),
       };
     },
   ],

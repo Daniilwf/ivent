@@ -97,6 +97,10 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
     ? (['uses', 'hours', 'runs', 'untilTriggered'].find((k) => k in duration) ?? 'none')
     : 'none';
   const actions = effect && Array.isArray(effect.actions) ? (effect.actions as unknown[]) : null;
+  const triggerWords = t.values.trigger ?? {};
+  const triggers = Object.keys(triggerWords).filter(
+    (trigger) => trigger !== 'proofApproved' || value.kind === 'achievement',
+  );
 
   return (
     <div className="grid gap-5" data-testid="content-form">
@@ -148,7 +152,7 @@ export function ObjectForm({ value, problems, schemas, ids, disabled, onChange }
       <fieldset className="grid gap-4 rounded-md border-2 border-muted p-4" disabled={disabled}>
         <legend className="px-1 font-display text-lg font-heavy">{f.effect}</legend>
         <div className="grid gap-4 desk:grid-cols-2">
-          {choice(['effect', 'trigger'], f.trigger ?? '', t.values.trigger ?? {})}
+          {choice(['effect', 'trigger'], f.trigger ?? '', triggerWords, triggers)}
           {/* Several kinds at once (the Бабл, D-555) are a list: shown as it is, edited in the JSON view */}
           {Array.isArray(getIn(value, ['effect', 'intercept'])) ? (
             <InJson

@@ -23,6 +23,7 @@ import { PlayerSuggestions } from '../suggestions/PlayerSuggestions';
 import { EconomySection } from './Inventory';
 import { RunActions } from './RunActions';
 import { MyFinish } from './MyFinish';
+import { NominationResults } from './NominationResults';
 import { seasonPicture } from './seasonView';
 import { linearBoard } from '../board/linearBoard';
 import { Cover, RunCard } from '../board/GameCards';
@@ -289,9 +290,10 @@ export function SeasonScreen({
 
   const navigationId = season?.id;
   const pollsEnabled = season?.pollsEnabled === true;
+  const galleryEnabled = season?.galleryEnabled === true;
   useEffect(() => {
-    if (navigationId) onNavigationLoaded?.({ id: navigationId, pollsEnabled });
-  }, [navigationId, onNavigationLoaded, pollsEnabled]);
+    if (navigationId) onNavigationLoaded?.({ id: navigationId, pollsEnabled, galleryEnabled });
+  }, [navigationId, onNavigationLoaded, pollsEnabled, galleryEnabled]);
 
   // Load now, after every committed command of the season (another player's move included), after every
   // reconnection to the hub (names and avatars live outside the season log) and after a catch-up (D-122).
@@ -1313,6 +1315,9 @@ export function SeasonScreen({
         <p className="text-sm text-ink-soft">{ru.board.rule}</p>
         <Leaderboard rows={shownRows} />
       </Panel>
+      {finished && season.nominationsEnabled === true ? (
+        <NominationResults seasonId={season.id} onSignedOut={onSignedOut} />
+      ) : null}
       {season.globalEvents?.length ? (
         <div className="min-w-0 desk:col-start-1 desk:w-96">
           <GlobalEventBanner events={season.globalEvents} />

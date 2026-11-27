@@ -132,14 +132,18 @@ public static class Timers
 /// </summary>
 internal static class Settlements
 {
-    public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events, EngineContext context) =>
-        Each(state, events, (s, e) => (s.Rules.Features.Bets ? Betting.Settle(s, e) : [])
+    public static IReadOnlyList<IGameEvent> After(SeasonState state, IReadOnlyList<IGameEvent> events, EngineContext context)
+    {
+        var settled = Each(state, events, (s, e) => (s.Rules.Features.Bets ? Betting.Settle(s, e) : [])
             .Concat(s.Rules.Features.WeeklyChallenge ? Challenges.WeeklyChallenges.Settle(s, context.Pool, e) : [])
             .Concat(Interactions.Coop.Settle(s, e, context.Clock.UtcNow))
             .Concat(Interactions.PartnerBoard.Settle(s, e, context.Clock.UtcNow))
             .Concat(s.Rules.Features.Duels ? Duels.Dueling.Settle(s, e, context.Clock.UtcNow) : [])
             .Concat(s.Rules.Features.Shop ? ShopReset(s, e) : [])
             .Concat(GlobalEvents.GlobalEventing.IsOn(s) ? GlobalEvents.GlobalEventing.Settle(s, e, context) : []));
+        settled.AddRange(Polls.NominationPolling.After(state, events));
+        return settled;
+    }
 
     /// <summary>
     /// After the effects fired: an object living for some runs counts one down when a run of its owner ends, so it still

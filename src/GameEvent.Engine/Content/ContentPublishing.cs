@@ -1,3 +1,5 @@
+using GameEvent.Engine.Achievements;
+using GameEvent.Engine.Effects.Actions;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Seasons;
 
@@ -20,8 +22,9 @@ public static class ContentPublishing
     /// The problems of <paramref name="pack"/>, each with its JSON path; empty when it can be published. With
     /// <paramref name="events"/> off (<c>features.events</c>) the pack holds no events and no decks, and draws only
     /// «good» and «bad» by hand (D-10, D-532); on, it may hold events and their decks (D-501).
+    /// <paramref name="achievements"/> enables supported seasonal achievements.
     /// </summary>
-    public static IReadOnlyList<ContentError> Check(ContentPack pack, bool events = false, bool polls = false)
+    public static IReadOnlyList<ContentError> Check(ContentPack pack, bool events = false, bool polls = false, bool achievements = false)
     {
         ArgumentNullException.ThrowIfNull(pack);
         var errors = new List<ContentError>();
@@ -33,6 +36,7 @@ public static class ContentPublishing
         var objects = pack.Objects.Where(o => o is not null).ToList();
         var ids = objects.Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
         var eventIds = objects.Where(o => o.Kind == ObjectKind.Event).Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
+        var achievementIds = objects.Where(o => o.Kind == ObjectKind.Achievement).Select(o => o.Id).ToHashSet(StringComparer.Ordinal);
         var wheels = pack.Wheels.Where(w => w is not null && w.Deck is null).Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
         var decks = pack.Wheels.Where(w => w is not null && w.Deck is not null).Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
         foreach (var duplicate in objects.GroupBy(o => o.Id).Where(g => g.Count() > 1))
@@ -55,10 +59,10 @@ public static class ContentPublishing
 
             var at = $"$.objects[{i}]";
             errors.AddRange(ContentValidator.Check(definition).Select(e => new ContentError(at + e.Path[1..], e.Message)));
-            Supported(definition, at, events, polls, Error);
+            Supported(definition, at, events, polls, achievements, Error);
             if (definition.Effect is { } effect)
             {
-                References(effect, $"{at}.effect", ids, eventIds, wheels, decks, Error);
+                References(effect, $"{at}.effect", ids, eventIds, achievementIds, wheels, decks, Error);
             }
         }
 
@@ -89,7 +93,7 @@ public static class ContentPublishing
                 Error($"{at}.name", $"1–{ContentValidator.MaxNameLength} characters.");
             }
 
-            Deck(wheel, at, events, eventIds, Error);
+            Deck(wheel, at, events, eventIds, achievementIds, Error);
         }
 
         return errors;
@@ -106,15 +110,26 @@ public static class ContentPublishing
         }
     }
 
-    // What this build plays (D-402): the rest waits for its stage and is refused rather than silently ignored. Events
-    // play once features.events is on (D-532).
-    private static void Supported(ObjectDefinition definition, string at, bool events, bool polls, Action<string, string> error)
+    // What this build plays (D-402): unsupported content is refused rather than silently ignored.
+    private static void Supported(ObjectDefinition definition, string at, bool events, bool polls, bool achievements, Action<string, string> error)
     {
-        if (definition.Kind == ObjectKind.Achievement || (definition.Kind == ObjectKind.Event && !events))
+        if (definition.Kind == ObjectKind.Achievement)
         {
-            error($"{at}.kind", definition.Kind == ObjectKind.Event
-                ? "Events are played once features.events is on."
-                : $"{definition.Kind} objects come with their stage (achievements — 6).");
+            if (!achievements)
+            {
+                error($"{at}.kind", "Achievements are played once features.achievements is on.");
+            }
+            else
+            {
+                Achievement(definition, at, error);
+            }
+
+            return;
+        }
+
+        if (definition.Kind == ObjectKind.Event && !events)
+        {
+            error($"{at}.kind", "Events are played once features.events is on.");
             return;
         }
 
@@ -241,6 +256,66 @@ public static class ContentPublishing
         }
     }
 
+    private static void Achievement(ObjectDefinition definition, string at, Action<string, string> error)
+    {
+        if (definition.Manual || definition.Hostile)
+        {
+            error(at, "An achievement is awarded automatically to the player whose condition holds.");
+        }
+
+        if (definition.Effect is not { } effect)
+        {
+            error($"{at}.effect", "An achievement needs a trigger, a condition and a coin reward.");
+            return;
+        }
+
+        if (definition.Scope == AchievementScope.AllTime)
+        {
+            if (effect.Trigger != Trigger.AfterDice)
+            {
+                error($"{at}.effect.trigger", "Lifetime achievements support «afterDice».");
+            }
+            else if (!LifetimeAchievements.Supports(effect.Condition))
+            {
+                error($"{at}.effect.condition", "A lifetime throw achievement needs «allDiceMax» and a positive «minDice».");
+            }
+        }
+        else if (effect.Trigger is not (Trigger.HostileIncoming or Trigger.RunCompleted or Trigger.ProofApproved))
+        {
+            error($"{at}.effect.trigger", "Seasonal achievements support «hostileIncoming», «runCompleted» and «proofApproved».");
+        }
+        else if (!SeasonalAchievements.Supports(effect.Trigger, effect.Condition))
+        {
+            error($"{at}.effect.condition", effect.Trigger switch
+            {
+                Trigger.HostileIncoming => "A landed attack achievement needs a positive «hostileReceived» threshold.",
+                Trigger.RunCompleted => "A tag streak achievement needs a tag and a positive «completedStreakWithTag» threshold.",
+                _ => "A proof approval achievement needs a strict «gt» bound on «runHours».",
+            });
+        }
+
+        if (effect.Target is not (null or { Selector: TargetSelector.Self, ExcludeSelf: false }))
+        {
+            error($"{at}.effect.target", "An achievement rewards the player who earned it.");
+        }
+
+        if (effect.Outcomes is not null || effect.Actions.Count == 0
+            || effect.Actions.Any(action => action is not ChangeResourceAction
+            {
+                Resource: ChangeResourceHandler.Coins,
+                Amount: { Kind: ContentValueKind.Number, Number: > 0 },
+                Reflect: false,
+            }))
+        {
+            error($"{at}.effect.actions", "An achievement's reward is one or more positive fixed coin grants.");
+        }
+
+        if (effect.Actions.Count >= Limits.MaxEventsPerCommand)
+        {
+            error($"{at}.effect.actions", "An achievement's badge and coin grants must fit within the hard event limit.");
+        }
+    }
+
     // What an event plays (D-536, D-511, 5.3): its effect at once, from the one who drew it — on him, on the players its
     // selector picks, or on a player he picks (a chosen target is a question that waits for his answer); a text by hand
     // (manual: true) waits for resolution (D-410). It is hostile only when another player's hostile item drew it (D-504),
@@ -268,7 +343,8 @@ public static class ContentPublishing
 
     // A deck holds events only, and a loot wheel none (D-501): a drawn event is played, never kept. The standard decks are
     // the wheels named like the kinds, and of that kind.
-    private static void Deck(WheelDefinition wheel, string at, bool events, HashSet<string> eventIds, Action<string, string> error)
+    private static void Deck(
+        WheelDefinition wheel, string at, bool events, HashSet<string> eventIds, HashSet<string> achievementIds, Action<string, string> error)
     {
         if (wheel.Deck is { } kind)
         {
@@ -299,6 +375,10 @@ public static class ContentPublishing
                 {
                     error($"{at}.entries[{j}].objectId", $"«{wheel.Entries[j].ObjectId}» is an event: events are drawn from decks, not won.");
                 }
+                else if (achievementIds.Contains(wheel.Entries[j].ObjectId))
+                {
+                    error($"{at}.entries[{j}].objectId", $"«{wheel.Entries[j].ObjectId}» is an achievement: achievements are awarded by their trigger.");
+                }
             }
         }
 
@@ -310,7 +390,8 @@ public static class ContentPublishing
 
     // giveObject, transformObject, spinWheel and drawEvent name objects, wheels and decks of the same pack.
     private static void References(
-        EffectSpec effect, string at, HashSet<string> ids, HashSet<string> eventIds, HashSet<string> wheels, HashSet<string> decks, Action<string, string> error)
+        EffectSpec effect, string at, HashSet<string> ids, HashSet<string> eventIds, HashSet<string> achievementIds,
+        HashSet<string> wheels, HashSet<string> decks, Action<string, string> error)
     {
         var actions = effect.Actions.Select((a, i) => (a, $"{at}.actions[{i}]"))
             .Concat(effect.Outcomes?.Cases.SelectMany((c, ci) => c.Actions.Select((a, i) => (a, $"{at}.outcomes.cases[{ci}].actions[{i}]"))) ?? []);
@@ -323,6 +404,12 @@ public static class ContentPublishing
                     break;
                 case TransformObjectAction { Mode: TransformMode.Transform, Into: { } eventInto } when eventIds.Contains(eventInto):
                     error($"{path}.into", $"«{eventInto}» is an event: events are drawn from decks, not kept.");
+                    break;
+                case GiveObjectAction give when achievementIds.Contains(give.ObjectId):
+                    error($"{path}.objectId", $"«{give.ObjectId}» is an achievement: achievements are awarded by their trigger.");
+                    break;
+                case TransformObjectAction { Mode: TransformMode.Transform, Into: { } achievementInto } when achievementIds.Contains(achievementInto):
+                    error($"{path}.into", $"«{achievementInto}» is an achievement: achievements are awarded by their trigger.");
                     break;
                 case GiveObjectAction give when !ids.Contains(give.ObjectId):
                     error($"{path}.objectId", $"«{give.ObjectId}» is not an object of the pack.");
@@ -344,6 +431,9 @@ public static class ContentPublishing
         }
     }
 
+    public static bool CanPublishWithoutItems(ContentPack pack) =>
+        pack.Wheels.Count == 0 && !pack.Objects.Any(definition => definition is { Kind: not ObjectKind.Achievement });
+
     internal static Decision Decide(SeasonState state, PublishContent command)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -352,7 +442,8 @@ public static class ContentPublishing
             return Decision.Reject(RejectionCodes.SeasonNotCreated, "Create the season first.");
         }
 
-        if (!state.Rules.Features.Items)
+        var features = state.Rules.Features;
+        if (!features.Items && !features.Achievements)
         {
             return Decision.Reject(RejectionCodes.FeatureDisabled, "Items are off in this season: turn features.items on first.");
         }
@@ -365,6 +456,11 @@ public static class ContentPublishing
         if (TooLarge(command.Pack) is { } tooLarge)
         {
             return Decision.Reject(RejectionCodes.ContentTooLarge, tooLarge);
+        }
+
+        if (!features.Items && !CanPublishWithoutItems(command.Pack))
+        {
+            return Decision.Reject(RejectionCodes.FeatureDisabled, "Without items the pack can contain only achievements.");
         }
 
         if (string.IsNullOrWhiteSpace(command.Comment))
@@ -384,7 +480,7 @@ public static class ContentPublishing
                 $"The content changed while it was edited: version {state.Catalog.Version} is in force, the pack was made from {expected}.");
         }
 
-        var errors = Check(command.Pack, state.Rules.Features.Events, state.Rules.Features.Polls);
+        var errors = Check(command.Pack, features.Events, features.Polls, features.Achievements);
         if (errors.Count > 0)
         {
             return Decision.Reject(RejectionCodes.ContentInvalid, string.Join("; ", errors.Select(e => $"{e.Path}: {e.Message}")));

@@ -8,9 +8,9 @@ namespace GameEvent.Web.Seasons;
 
 /// <summary>
 /// A split coop run as the partner's own (D-716, D-793): the run, its partner, when he joined it (where it stands among his
-/// own runs, as <see cref="DropStreak.Before"/> places it) and its status now.
+/// own runs, as <see cref="DropStreak.Before"/> places it), its status and its saved hours.
 /// </summary>
-internal sealed record CoopPartnerRun(Guid SeasonId, Guid RunId, Guid PartnerId, DateTimeOffset JoinedAt, RunStatus Status);
+internal sealed record CoopPartnerRun(Guid SeasonId, Guid RunId, Guid PartnerId, DateTimeOffset JoinedAt, RunStatus Status, decimal? Hours);
 
 /// <summary>
 /// The split coop runs of the partners, for the screens that read the projection (D-716, D-793): the run table names only
@@ -47,10 +47,13 @@ internal static class CoopPartnerRuns
         }
 
         var runIds = splits.Select(x => x.Split.RunId).ToList();
-        var status = await db.Runs.AsNoTracking().Where(r => runIds.Contains(r.Id)).ToDictionaryAsync(r => r.Id, r => r.Status, ct);
+        var runs = await db.Runs.AsNoTracking().Where(r => runIds.Contains(r.Id))
+            .Select(r => new { r.Id, r.Status, r.Hours })
+            .ToDictionaryAsync(r => r.Id, r => (r.Status, r.Hours), ct);
         return [.. splits
-            .Where(x => status.ContainsKey(x.Split.RunId) && joined.ContainsKey((x.Split.RunId, x.Split.PartnerId)))
+            .Where(x => runs.ContainsKey(x.Split.RunId) && joined.ContainsKey((x.Split.RunId, x.Split.PartnerId)))
             .Select(x => new CoopPartnerRun(
-                x.SeasonId, x.Split.RunId, x.Split.PartnerId, joined[(x.Split.RunId, x.Split.PartnerId)], status[x.Split.RunId]))];
+                x.SeasonId, x.Split.RunId, x.Split.PartnerId, joined[(x.Split.RunId, x.Split.PartnerId)],
+                runs[x.Split.RunId].Status, runs[x.Split.RunId].Hours))];
     }
 }
