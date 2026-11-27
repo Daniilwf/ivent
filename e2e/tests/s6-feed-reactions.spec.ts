@@ -53,11 +53,11 @@ test('a player and a spectator react live to an existing feed row until its comm
     await rollAndStart(api, world.seasonId);
     await api.dispose();
   }
-  const rollId = commandId();
-  await playerApi.post(`${seasonPath}/roll`, { commandId: rollId });
-  const revealId = (await seasonOf(playerApi, world.seasonId)).me?.roll?.revealId;
-  if (!revealId) throw new Error('The feed row requires a saved roll.');
-  await playerApi.post(`${seasonPath}/roll/reveal`, { revealId });
+  await playerApi.post(`${seasonPath}/roll`);
+  const offer = (await seasonOf(playerApi, world.seasonId)).me?.offer;
+  if (!offer) throw new Error('Starting the run requires a saved offer.');
+  const entryCommandId = commandId();
+  await playerApi.post(`${seasonPath}/start`, { commandId: entryCommandId, gameId: offer.id });
   await playerApi.dispose();
 
   const [playerPage, spectatorPage] = await Promise.all([
@@ -67,8 +67,8 @@ test('a player and a spectator react live to an existing feed row until its comm
   // Use the season-specific feed so parallel scenarios can create other seasons.
   const path = `/seasons/${world.seasonId}/feed`;
   await Promise.all([playerPage.goto(path), spectatorPage.goto(path)]);
-  const playerRow = playerPage.getByTestId(`feed-item-${rollId}`);
-  const spectatorRow = spectatorPage.getByTestId(`feed-item-${rollId}`);
+  const playerRow = playerPage.getByTestId(`feed-item-${entryCommandId}`);
+  const spectatorRow = spectatorPage.getByTestId(`feed-item-${entryCommandId}`);
   const playerGroup = reactionGroup(playerRow);
   const spectatorGroup = reactionGroup(spectatorRow);
   for (const row of [playerRow, spectatorRow]) {
@@ -167,7 +167,7 @@ test('a player and a spectator react live to an existing feed row until its comm
   await capture(spectatorPage, info, 'choices');
 
   await spectatorPage.route(
-    `${seasonPath}/feed/${rollId}/reactions`,
+    `${seasonPath}/feed/${entryCommandId}/reactions`,
     async (route) => {
       await route.fulfill({ status: 409, json: { title: 'Test refusal' } });
     },
@@ -189,7 +189,7 @@ test('a player and a spectator react live to an existing feed row until its comm
   await showState(spectatorFire, true, '1 реакция');
 
   await world.adminApi.post(`${adminPath}/undo`, {
-    targetCommandId: rollId,
+    targetCommandId: entryCommandId,
     comment: 'Проверка отката записи с реакцией',
   });
   for (const row of [playerRow, spectatorRow]) {

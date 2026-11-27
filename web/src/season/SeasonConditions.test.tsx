@@ -194,19 +194,26 @@ describe('events and run conditions on the season screen', () => {
       }),
     );
     const turn = await screen.findByTestId('turn');
+    const waiting = within(turn).getByTestId('waiting-events');
+    const summary = within(waiting).getByText('Ждут своего часа');
+    expect(summary).toBeVisible();
+    expect(waiting).not.toHaveAttribute('open');
+    await userEvent.click(summary);
 
-    expect(within(turn).getByRole('heading', { name: titles[0] })).toBeVisible();
-    expect(within(turn).getByRole('heading', { name: titles[1] })).toBeVisible();
+    const events = within(within(waiting).getByRole('region', { name: titles[0] }));
+    const conditions = within(within(waiting).getByRole('region', { name: titles[1] }));
+    expect(events.getByRole('heading', { name: titles[0] })).toBeVisible();
+    expect(conditions.getByRole('heading', { name: titles[1] })).toBeVisible();
     for (const event of waitingEvents) {
-      expect(within(turn).getByText(event.name)).toBeVisible();
-      await userEvent.click(within(turn).getByText(`Текст ивента: «${event.name}»`));
-      expect(within(turn).getByText(event.description)).toBeVisible();
+      expect(events.getByText(event.name)).toBeVisible();
+      await userEvent.click(events.getByText(`Текст ивента: «${event.name}»`));
+      expect(events.getByText(event.description)).toBeVisible();
     }
-    const first = within(turn).getByText('Попутный ветер');
-    const second = within(turn).getByText('Долгая дорога');
+    const first = events.getByText('Попутный ветер');
+    const second = events.getByText('Долгая дорога');
     expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(turn).getByText('Даже не вспотел')).toBeVisible();
-    expect(within(turn).getByText('Спокойная игра')).toBeVisible();
+    expect(conditions.getByText('Даже не вспотел')).toBeVisible();
+    expect(conditions.getByText('Спокойная игра')).toBeVisible();
     expect(turn).toHaveTextContent(/Не ниже:\s*Сложная/);
     expect(turn).toHaveTextContent(/Не выше:\s*Нормальная/);
   });
@@ -246,11 +253,19 @@ describe('events and run conditions on the season screen', () => {
     );
     const turn = await screen.findByTestId('turn');
     const roll = within(turn).getByTestId('roll');
+    const disclosure = within(turn).getByTestId('waiting-events');
     const history = within(turn).getByTestId('after');
     expect(history).toHaveTextContent('Silent Hill');
+    expect(
+      roll.compareDocumentPosition(disclosure) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      disclosure.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await userEvent.click(within(disclosure).getByText('Ждут своего часа'));
 
     for (const title of ['Накопленные ивенты', 'Условия следующей игры']) {
-      const waiting = within(turn).getByRole('heading', { name: title });
+      const waiting = within(disclosure).getByRole('heading', { name: title });
       expect(roll.compareDocumentPosition(waiting) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(
         waiting.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -266,6 +281,7 @@ describe('events and run conditions on the season screen', () => {
     async (check, label) => {
       open(season({ lastCompleted: completedRun(check) }));
       const turn = await screen.findByTestId('turn');
+      await userEvent.click(within(turn).getByTestId('last-dice'));
 
       expect(within(turn).getByRole('heading', { name: 'Условия прохождения' })).toBeVisible();
       expect(within(turn).getByText('Даже не вспотел')).toBeVisible();
@@ -293,6 +309,7 @@ describe('events and run conditions on the season screen', () => {
     for (const title of titles) {
       expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument();
     }
+    expect(screen.queryByTestId('waiting-events')).not.toBeInTheDocument();
     expect(screen.queryByText('Попутный ветер')).not.toBeInTheDocument();
     expect(screen.queryByText('Даже не вспотел')).not.toBeInTheDocument();
   });
@@ -310,11 +327,16 @@ describe('events and run conditions on the season screen', () => {
     for (const title of titles) {
       expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument();
     }
+    expect(screen.queryByTestId('waiting-events')).not.toBeInTheDocument();
   });
 
   it('hides already visible waiting sections when a hub refresh turns events off', async () => {
     const { model, server } = open(season({ waitingEvents, waitingConditions: runConditions }));
-    expect(await screen.findByRole('heading', { name: 'Накопленные ивенты' })).toBeVisible();
+    const waiting = await screen.findByTestId('waiting-events');
+    await userEvent.click(within(waiting).getByText('Ждут своего часа'));
+    for (const title of [titles[0], titles[1]]) {
+      expect(within(waiting).getByRole('heading', { name: title })).toBeVisible();
+    }
     await vi.waitFor(() => {
       expect(hubChange).not.toBeNull();
     });
@@ -326,6 +348,7 @@ describe('events and run conditions on the season screen', () => {
 
     await vi.waitFor(() => {
       expect(server.sent('GET', `/seasons/${seasonId}`).length).toBeGreaterThan(1);
+      expect(screen.queryByTestId('waiting-events')).not.toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Накопленные ивенты' })).not.toBeInTheDocument();
       expect(
         screen.queryByRole('heading', { name: 'Условия следующей игры' }),

@@ -218,15 +218,21 @@ describe('the season screen on the graph map', () => {
     );
     expect(within(cells).getByTestId('cell-b1')).toHaveTextContent(ru.map.bonusAmount(3));
     expect(within(cells).getByTestId('cell-a1')).toHaveTextContent(ru.map.inZone('Болото ужаса'));
-    const zone = screen.getByTestId('zone-swamp');
+    // The map marks the teleport's jump
+    expect(document.querySelectorAll('[data-teleport]')).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole('button', { name: ru.map.legend.title }));
+    const legend = await screen.findByRole('dialog', { name: ru.map.legend.title });
+    const zone = within(legend).getByTestId('zone-swamp');
+    expect(zone).toBeVisible();
     expect(zone).toHaveTextContent(ru.map.zones.here);
     expect(zone).toHaveTextContent(ru.map.zones.filter(ru.map.zones.tags(['Horror'])));
     expect(zone).toHaveTextContent(ru.map.zones.diceAdd(1));
     expect(zone).toHaveTextContent(ru.map.zones.drop(1.5));
-    expect(screen.getByTestId('map-symbols')).toHaveTextContent(ru.map.legend.teleport);
-    expect(screen.getByTestId('map-symbols')).toHaveTextContent(ru.map.legend.checkpoint);
-    // The map marks the teleport's jump
-    expect(document.querySelectorAll('[data-teleport]')).toHaveLength(1);
+    const symbols = within(legend).getByTestId('map-symbols');
+    expect(symbols).toBeVisible();
+    expect(symbols).toHaveTextContent(ru.map.legend.teleport);
+    expect(symbols).toHaveTextContent(ru.map.legend.checkpoint);
   });
 
   it('asks for the branch in the turn card on a phone, with where each leads, and sends the pick', async () => {
@@ -292,14 +298,25 @@ describe('the season screen on the graph map', () => {
     );
   });
 
-  it('puts who leads before the map legend on a desktop (K2-7)', async () => {
+  it('shows who leads before opening the map legend on a desktop (K2-7)', async () => {
     onDesktop();
     fakeServer({ ...common, 'GET /api/seasons/*': season('a1') });
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    const legend = await screen.findByTestId('map-legend');
-    const leaders = screen.getByRole('heading', { name: ru.leaderboard.title });
-    expect(leaders.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const leaders = await screen.findByRole('heading', { name: ru.leaderboard.title });
+    expect(leaders).toBeVisible();
+    expect(screen.queryByTestId('map-legend')).not.toBeInTheDocument();
+
+    const opener = screen.getByRole('button', { name: ru.map.legend.title });
+    opener.focus();
+    await userEvent.keyboard('{Enter}');
+    const dialog = await screen.findByRole('dialog', { name: ru.map.legend.title });
+    expect(within(dialog).getByTestId('map-legend')).toBeVisible();
+
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: ru.map.legend.title })).not.toBeInTheDocument();
+    expect(leaders).toBeVisible();
+    await vi.waitFor(() => expect(opener).toHaveFocus());
   });
 
   it('asks for the branch on the map on a desktop and points there from the turn card', async () => {

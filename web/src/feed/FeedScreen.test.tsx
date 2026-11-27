@@ -835,7 +835,7 @@ describe('FeedScreen', () => {
     expect(await group.findByRole('button', { name: fireName, pressed: false })).toHaveFocus();
     expect(add).toHaveAccessibleDescription('3 реакции');
     await user.keyboard('{Escape}');
-      expect(add).toHaveFocus();
+    expect(add).toHaveFocus();
     await user.tab();
     expect(comments).toHaveFocus();
   });
@@ -865,7 +865,7 @@ describe('FeedScreen', () => {
     await user.tab();
     await user.keyboard('{Enter}');
     const fireButton = await group.findByRole('button', { name: fireName, pressed: true });
-      expect(fireButton).toHaveFocus();
+    expect(fireButton).toHaveFocus();
     expect(chooser).toHaveAccessibleDescription('1 реакция');
     await user.keyboard('{Escape}');
     expect(chooser).toHaveFocus();
