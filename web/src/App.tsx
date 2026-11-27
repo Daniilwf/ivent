@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api, refreshCsrf, SIGNED_OUT_EVENT, type Schemas } from './api/client';
 import { CalendarClock, LoaderCircle } from 'lucide-react';
 import { ChangePasswordForm } from './app/ChangePasswordForm';
@@ -9,7 +9,6 @@ import { adminPlayersSeason, onReopen, routeOf, usePath } from './app/router';
 import { UpdateBanner } from './app/WhatsNew';
 import { NotFoundPage } from './app/NotFound';
 import { Shell } from './app/Shell';
-import { answerOf, useLoaded } from './app/useLoaded';
 import { useSeasonVersion } from './app/useSeasonVersion';
 import { ru } from './i18n/ru';
 import { Button } from './ui/Button';
@@ -80,11 +79,30 @@ function askCurrentSeason() {
 
 export function App() {
   const [state, setState] = useState<State>({ kind: 'loading' });
-  const [homeNavigation, setHomeNavigation] = useState<Schemas['SeasonNavigationView'] | null>(
-    null,
-  );
+  const [navigationSnapshot, setNavigationSnapshot] = useState<
+    Schemas['SeasonNavigationView'] | null
+  >(null);
   const path = usePath();
   const route = routeOf(path);
+  const frame = useRef<HTMLDivElement>(null);
+  const banners = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const layout = frame.current;
+    const strip = banners.current;
+    if (!layout || !strip) return;
+
+    const measure = () => {
+      layout.style.setProperty(
+        '--shell-banner-height',
+        `${strip.getBoundingClientRect().height}px`,
+      );
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(strip, { box: 'border-box' });
+    return () => observer?.disconnect();
+  }, []);
 
   const signedOut = useCallback(() => {
     setState({ kind: 'signedOut' });
@@ -97,7 +115,8 @@ export function App() {
           route.kind === 'feed' ||
           route.kind === 'gallery' ||
           route.kind === 'polls' ||
-          route.kind === 'interactions'
+          route.kind === 'interactions' ||
+          route.kind === 'seasonRecap'
             ? route.seasonId
             : null) ?? state.seasonId
         )?.toLowerCase() ?? null)
@@ -106,8 +125,7 @@ export function App() {
     state.kind === 'signedIn' &&
     state.ownPassword !== path &&
     (route.kind === 'season' || (route.kind === 'admin' && state.user.role !== 'admin'));
-  // The home view already refreshes on its own subscription and includes the flag.
-  if (!showingHome && homeNavigation !== null) setHomeNavigation(null);
+  // The home view supplies the same flags from its own read and subscription.
   const remoteNavigationSeason = showingHome ? null : navigationSeason;
   const navigationVersion = useSeasonVersion(remoteNavigationSeason, {
     refreshOnJoin: true,
@@ -115,29 +133,37 @@ export function App() {
       update.seasonId.toLowerCase() === remoteNavigationSeason &&
       update.types.some((type) => type === 'ruleset-changed' || type === 'command-undone'),
   });
-  const loadNavigation = useCallback(async () => {
-    if (!remoteNavigationSeason) return { kind: 'loading' } as const;
-    return answerOf(
-      await api.GET('/api/seasons/{seasonId}/navigation', {
+  useEffect(() => {
+    if (!remoteNavigationSeason) return;
+    const request = new AbortController();
+    void api
+      .GET('/api/seasons/{seasonId}/navigation', {
         params: { path: { seasonId: remoteNavigationSeason } },
-      }),
-    );
-  }, [remoteNavigationSeason]);
-  const remoteNavigation = useLoaded(loadNavigation, {
-    version: navigationVersion,
-    onSignedOut: signedOut,
-  });
-  const navigation = showingHome
-    ? homeNavigation
-    : remoteNavigation.kind === 'ready'
-      ? remoteNavigation.value
-      : null;
-  const gallerySeasonId =
-    navigation?.id.toLowerCase() === navigationSeason && navigation.galleryEnabled
-      ? navigationSeason
-      : null;
-  const pollsSeasonId =
-    navigation?.id.toLowerCase() === navigationSeason && navigation.pollsEnabled
+        signal: request.signal,
+      })
+      .then(({ data, response }) => {
+        if (request.signal.aborted) return;
+        if (data?.id.toLowerCase() === remoteNavigationSeason) setNavigationSnapshot(data);
+        else if (response.status === 404) setNavigationSnapshot(null);
+        else if (response.status === 401) signedOut();
+      })
+      .catch(() => {
+        // Keep the most recent successful snapshot for this season on a temporary read failure.
+      });
+    return () => {
+      request.abort();
+    };
+  }, [remoteNavigationSeason, navigationVersion, signedOut]);
+
+  const navigation =
+    navigationSnapshot?.id.toLowerCase() === navigationSeason ? navigationSnapshot : null;
+  const gallerySeasonId = navigation?.galleryEnabled ? navigationSeason : null;
+  const pollsSeasonId = navigation?.pollsEnabled ? navigationSeason : null;
+  const features = navigation?.interactionFeatures;
+  const interactionsSeasonId =
+    features?.duels ||
+    features?.partnerBoard ||
+    (state.kind === 'signedIn' && state.user.role === 'player' && features?.coop)
       ? navigationSeason
       : null;
 
@@ -162,10 +188,9 @@ export function App() {
     }
 
     const { data, response } = await (asked ?? askCurrentSeason());
-    if (data) {
-      setHomeNavigation(null);
-      setState({ kind: 'signedIn', user, seasonId: data.id });
-    } else if (response.status === 404) setState({ kind: 'signedIn', user, seasonId: null });
+    setNavigationSnapshot(null);
+    if (data) setState({ kind: 'signedIn', user, seasonId: data.id });
+    else if (response.status === 404) setState({ kind: 'signedIn', user, seasonId: null });
     else if (response.status === 401) setState({ kind: 'signedOut' });
     else setState({ kind: 'failed' });
   }, []);
@@ -207,12 +232,14 @@ export function App() {
   // Every screen: which copy of the site this is (none on the live site) and the maintenance banner on top; a
   // signed-in page stands in the shell (the bug report is in its header)
   return (
-    <>
-      <EnvironmentBanner />
-      <MaintenanceBanner />
-      <UpdateBanner />
+    <div ref={frame}>
+      <div ref={banners}>
+        <EnvironmentBanner />
+        <MaintenanceBanner />
+        <UpdateBanner />
+      </div>
       {screen()}
-    </>
+    </div>
   );
 
   // Back from the password form, the focus returns to the menu that opened it
@@ -303,6 +330,7 @@ export function App() {
         seasonId={signedIn.seasonId}
         pollsSeasonId={pollsSeasonId}
         gallerySeasonId={gallerySeasonId}
+        interactionsSeasonId={interactionsSeasonId}
         onChangePassword={() => {
           setState({ ...signedIn, ownPassword: path });
         }}
@@ -355,6 +383,13 @@ export function App() {
           key={route.userId}
           userId={route.userId}
           meId={signedIn.user.id}
+          onAvatarChanged={(avatar) => {
+            setState((current) =>
+              current.kind === 'signedIn' && current.user.id === signedIn.user.id
+                ? { ...current, user: { ...current.user, avatar } }
+                : current,
+            );
+          }}
           onSignedOut={signedOut}
         />
       ) : route.kind === 'seasonRecap' ? (
@@ -410,7 +445,7 @@ export function App() {
           seasonId={shownSeasonId}
           role={signedIn.user.role}
           onSignedOut={signedOut}
-          onNavigationLoaded={setHomeNavigation}
+          onNavigationLoaded={setNavigationSnapshot}
         />
       ) : (
         <main className="mx-auto grid max-w-110 px-4 py-10" data-testid="no-season">

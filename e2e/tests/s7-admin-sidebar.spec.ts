@@ -2,7 +2,7 @@ import { expect, test, type Locator } from '@playwright/test';
 import { seedAdmin, type Schemas } from '../support/api.ts';
 import { signInHere } from '../support/world.ts';
 
-test('the desktop admin sidebar stays visible when the site header wraps while scrolled', async ({
+test('the desktop admin sidebar stays visible when seasonal navigation becomes available', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'The phone uses a sheet instead of the sidebar.');
@@ -58,6 +58,7 @@ test('the desktop admin sidebar stays visible when the site header wraps while s
           throw new Error('The two navigation bars must be present.');
         return {
           headerBottom: header.getBoundingClientRect().bottom,
+          headerHeight: header.getBoundingClientRect().height,
           sidebarTop: sidebar.getBoundingClientRect().top,
           sidebarBottom: sidebar.getBoundingClientRect().bottom,
           proofTop: proofs.getBoundingClientRect().top,
@@ -73,24 +74,22 @@ test('the desktop admin sidebar stays visible when the site header wraps while s
     expect(compact.sidebarTop).toBeGreaterThanOrEqual(compact.headerBottom);
 
     revealNavigation();
-    await expect(header.getByTestId('nav-gallery')).toBeVisible();
-    await expect(header.getByTestId('nav-polls')).toBeVisible();
-    await expect
-      .poll(async () => (await getBounds()).headerBottom)
-      .toBeGreaterThan(compact.headerBottom);
+    const more = header.getByRole('button', { name: 'Ещё', exact: true });
+    await expect(more).toBeVisible();
+    expect((await getBounds()).headerHeight).toBe(compact.headerHeight);
     await players.focus();
     await page.keyboard.press('Shift+Tab');
     await expect(proofs).toBeFocused();
     await expect(title).toBeVisible();
     await expect
       .poll(async () => {
-        const wrapped = await getBounds();
-        return wrapped.sidebarTop - wrapped.headerBottom;
+        const ready = await getBounds();
+        return ready.sidebarTop - ready.headerBottom;
       })
       .toBeGreaterThanOrEqual(0);
-    const wrapped = await getBounds();
-    expect(wrapped.proofTop).toBeGreaterThanOrEqual(wrapped.headerBottom);
-    expect(wrapped.sidebarBottom).toBeLessThanOrEqual(wrapped.viewportBottom);
+    const ready = await getBounds();
+    expect(ready.proofTop).toBeGreaterThanOrEqual(ready.headerBottom);
+    expect(ready.sidebarBottom).toBeLessThanOrEqual(ready.viewportBottom);
 
     const measureOutline = async (focusedLink: Locator) => {
       const outline = await focusedLink.evaluate((link) => {
@@ -127,7 +126,7 @@ test('the desktop admin sidebar stays visible when the site header wraps while s
     };
 
     const firstOutline = await measureOutline(proofs);
-    await page.screenshot({ path: testInfo.outputPath('sidebar-below-wrapped-header.png') });
+    await page.screenshot({ path: testInfo.outputPath('sidebar-below-header.png') });
 
     const testTools = sidebar.getByTestId('admin-nav-test');
     await expect(testTools).toBeAttached();
@@ -139,8 +138,13 @@ test('the desktop admin sidebar stays visible when the site header wraps while s
     const lastOutline = await measureOutline(testTools);
     await page.screenshot({ path: testInfo.outputPath('sidebar-bottom-focus.png') });
 
+    await more.click();
+    await expect(page.getByTestId('nav-gallery')).toBeVisible();
+    await expect(page.getByTestId('nav-polls')).toBeVisible();
+    await page.keyboard.press('Escape');
+
     await testInfo.attach('sticky sidebar bounds', {
-      body: JSON.stringify({ compact, wrapped, firstOutline, lastOutline }, null, 2),
+      body: JSON.stringify({ compact, ready, firstOutline, lastOutline }, null, 2),
       contentType: 'application/json',
     });
   } finally {

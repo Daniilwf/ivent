@@ -352,9 +352,10 @@ describe('the last drawn event as compact history', () => {
 
     const tasks = await screen.findByTestId('manual-effects');
     const proof = screen.getByTestId('proof-details');
-    expect(within(tasks).getByRole('button', { name: ru.effects.applied })).toBeVisible();
+    expect(within(tasks).getByRole('button', { name: ru.effects.played })).toBeVisible();
     expect(within(proof).getByText(ru.turn.proofToSend)).toBeVisible();
     const details = foldOf(await screen.findByText(historyLabel()));
+    expect(details).not.toHaveAttribute('open');
     expect(details).not.toContainElement(tasks);
     expect(details).not.toContainElement(proof);
   });

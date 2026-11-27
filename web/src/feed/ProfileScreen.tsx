@@ -16,6 +16,7 @@ import { EmptyState } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
 import { AllTimeStatisticsPanel } from './AllTimeStatisticsPanel';
+import { AvatarSection } from './AvatarSection';
 import { Quote } from './Review';
 import { SessionsPanel } from './SessionsPanel';
 import { answerOf, useLoaded, type Answer } from '../app/useLoaded';
@@ -26,11 +27,13 @@ type Profile = Schemas['ProfileView'];
 export function ProfileScreen({
   userId,
   meId,
+  onAvatarChanged,
   onSignedOut,
 }: {
   userId: string;
   /** The signed-in user: their own page says «ты» */
   meId: string;
+  onAvatarChanged?: (avatar: Schemas['FileLinkView'] | null) => void;
   onSignedOut: () => void;
 }) {
   const load = useCallback(async (): Promise<Answer<Profile>> => {
@@ -69,6 +72,17 @@ export function ProfileScreen({
                 profile={profile}
                 mine={mine}
                 headingRef={heading}
+                avatarEditor={
+                  mine ? (
+                    <AvatarSection
+                      avatar={profile.avatar}
+                      onChanged={(avatar) => {
+                        onAvatarChanged?.(avatar);
+                        state.reload();
+                      }}
+                    />
+                  ) : null
+                }
                 recap={
                   mine ? (
                     <AllTimeStatisticsPanel
@@ -93,12 +107,14 @@ export function ProfileDetails({
   profile,
   mine,
   headingRef,
+  avatarEditor,
   recap,
 }: {
   profile: Profile;
   mine: boolean;
   /** The page's heading, for the focus when the page is opened (usePageHeading) */
   headingRef?: Ref<HTMLHeadingElement>;
+  avatarEditor?: ReactNode;
   recap?: ReactNode;
 }) {
   const achievements = Array.isArray(profile.achievements) ? profile.achievements : [];
@@ -141,6 +157,7 @@ export function ProfileDetails({
         </div>
       </header>
 
+      {avatarEditor}
       {recap}
 
       {achievements.length === 0 ? null : (

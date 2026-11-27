@@ -1,9 +1,12 @@
-import { useEffect, useState, type ChangeEvent, type SyntheticEvent } from 'react';
+import { useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { newCommandId } from '../api/commands';
 import { uploadFile, UploadError } from '../api/files';
 import { ru } from '../i18n/ru';
-import { FilePicker } from '../ui/Field';
+import { Button } from '../ui/Button';
+import { Field, FilePicker } from '../ui/Field';
+import { Notice } from '../ui/States';
+import { Panel } from '../ui/Surface';
 
 const pictureTypes = 'image/png,image/jpeg,image/webp,image/gif';
 
@@ -24,40 +27,27 @@ function isGifPage(url: string): boolean {
  * by link from Tenor, Giphy or Klipy (the server downloads it), or none. The avatar is on the account, so it stays across
  * seasons; it is read from the account itself, not from a season.
  */
-export function AvatarSection({ onChanged }: { onChanged: () => void }) {
-  const [avatar, setAvatar] = useState<Schemas['FileLinkView'] | null>(null);
+export function AvatarSection({
+  avatar,
+  onChanged,
+}: {
+  avatar: Schemas['FileLinkView'] | null;
+  onChanged: (avatar: Schemas['FileLinkView'] | null) => void;
+}) {
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // The account's avatar: read at start and after every change (the version moves)
-  const [version, setVersion] = useState(0);
-  useEffect(() => {
-    let active = true;
-    api
-      .GET('/api/auth/me')
-      .then(({ data }) => {
-        if (active) setAvatar(data?.avatar ?? null);
-      })
-      .catch(() => {
-        // No answer leaves the avatar as it was shown: the season screen reports the lost connection itself
-      });
-    return () => {
-      active = false;
-    };
-  }, [version]);
-
   async function use(fileId: string | null) {
-    const { error: refused } = await api.PUT('/api/auth/me/avatar', {
+    const { data, error: refused } = await api.PUT('/api/auth/me/avatar', {
       body: { commandId: newCommandId(), fileId },
     });
-    if (refused) {
+    if (!data) {
       const code = rejectionCode(refused);
       setError((code && ru.rejection[code]) ?? ru.rejection.unknown);
       return;
     }
-    setVersion((v) => v + 1);
-    onChanged();
+    onChanged(data.avatar);
   }
 
   async function run(step: () => Promise<void>) {
@@ -118,23 +108,27 @@ export function AvatarSection({ onChanged }: { onChanged: () => void }) {
   }
 
   return (
-    <section aria-labelledby="avatar-title" data-testid="avatar">
-      <h2 id="avatar-title">{ru.avatar.title}</h2>
+    <Panel title={ru.avatar.title} aria-label={ru.avatar.title} data-testid="avatar">
       {avatar ? (
-        <p>
-          <img src={avatar.thumbnailUrl} alt={ru.avatar.current} width={64} height={64} />
-          <button
-            type="button"
+        <div className="flex flex-wrap items-center gap-3">
+          <img
+            src={avatar.thumbnailUrl}
+            alt={ru.avatar.current}
+            width={64}
+            height={64}
+            className="size-16 rounded-full object-cover"
+          />
+          <Button
             disabled={busy}
             onClick={() => {
               void run(() => use(null));
             }}
           >
             {ru.avatar.remove}
-          </button>
-        </p>
+          </Button>
+        </div>
       ) : (
-        <p>{ru.avatar.none}</p>
+        <p className="text-sm text-ink-soft">{ru.avatar.none}</p>
       )}
       {/* A Russian button over the browser's own field (H4, the H2 design review) */}
       <FilePicker
@@ -144,25 +138,25 @@ export function AvatarSection({ onChanged }: { onChanged: () => void }) {
         busy={busy}
         onChange={pick}
       />
-      <form onSubmit={byLink} noValidate>
-        <label>
-          {ru.avatar.link}
-          <input
-            data-testid="avatar-link"
-            type="url"
-            maxLength={2000}
-            value={link}
-            onChange={(e) => {
-              setLink(e.target.value);
-            }}
-          />
-        </label>
-        <button type="submit" disabled={busy}>
+      <form onSubmit={byLink} noValidate className="grid min-w-0 gap-2">
+        <Field
+          data-testid="avatar-link"
+          label={ru.avatar.link}
+          type="url"
+          maxLength={2000}
+          value={link}
+          onChange={(e) => {
+            setLink(e.target.value);
+          }}
+        />
+        <Button type="submit" disabled={busy} className="justify-self-start">
           {ru.avatar.useLink}
-        </button>
+        </Button>
       </form>
-      <p role="status">{busy ? ru.upload.uploading : ''}</p>
-      {error && <p role="alert">{error}</p>}
-    </section>
+      <p role="status" className={busy ? undefined : 'sr-only'}>
+        {busy ? ru.upload.uploading : ''}
+      </p>
+      {error && <Notice tone="danger">{error}</Notice>}
+    </Panel>
   );
 }

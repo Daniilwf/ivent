@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import type { Schemas } from '../support/api.ts';
+import { openEconomy } from '../support/economy.ts';
 import { apiOf, rollAndStart, setUpSeason, signIn } from '../support/world.ts';
 
 // Stage 4 (4.11c, D-447): the shop and a bet on the season screen. The admin turns items, the shop and bets on, loads
@@ -66,7 +67,7 @@ test('the shop and a bet: roll, buy a lot, bet on a run', async ({ browser }, te
   const rollPrice = before.shop?.price ?? 0;
 
   // The shop: no lots yet, the roll says its price
-  const shop = page.getByTestId('shop');
+  const shop = await openEconomy(page, 'shop');
   await expect(shop).toContainText('Лотов пока нет');
   const roll = shop.getByTestId('shop-roll');
   await expect(roll).toContainText('Ролл магазина за');
@@ -84,13 +85,14 @@ test('the shop and a bet: roll, buy a lot, bet on a run', async ({ browser }, te
 
   await expect(shop.getByRole('status')).toHaveText(`Куплено: «${lot.name}». Уже в инвентаре.`);
   await expect(shop.getByTestId(`lot-${String(lot.lot)}`)).toContainText('Куплено');
+  await openEconomy(page, 'inventory');
   await expect(page.getByTestId(`item-${lot.objectId}`)).toBeVisible();
   const bought = await economy();
   expect(bought.coins).toBe(start - rollPrice - lot.price);
   await expect(page.getByTestId('coins')).toHaveText(new RegExp(`^${String(bought.coins)} `));
 
   // The bet: Петя's run is open, the sheet says the win, the bet is listed open
-  const bets = page.getByTestId('bets');
+  const bets = await openEconomy(page, 'bets');
   await expect(bets).toContainText('Ставки');
   await bets.getByTestId(`bet-on-${petya.playerId}`).click();
   const sheet = page.getByTestId('bet-sheet');
@@ -113,7 +115,9 @@ test('the shop and a bet: roll, buy a lot, bet on a run', async ({ browser }, te
     stake: 2,
     status: 'open',
   });
-  await expect(page.getByTestId('coins')).toHaveText(new RegExp(`^${String(after.coins)} `));
   await bets.screenshot({ path: shot('bets-placed') });
+  await openEconomy(page, 'inventory');
+  await expect(page.getByTestId('coins')).toHaveText(new RegExp(`^${String(after.coins)} `));
+  await openEconomy(page, 'shop');
   await shop.screenshot({ path: shot('shop-bought') });
 });

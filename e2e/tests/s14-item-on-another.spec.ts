@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import type { Schemas } from '../support/api.ts';
+import { openEconomy } from '../support/economy.ts';
 import { apiOf, live, setUpSeason, signIn } from '../support/world.ts';
 
 // Stage 4 (4.11b, D-441): an item on another player, both browsers live. The admin turns items on in the season's rules,
@@ -51,10 +52,12 @@ test('an item on another player: the target is offered, the use is seen live by 
 
   const vasyaPage = await signIn(browser, vasya);
   const petyaPage = await signIn(browser, petya);
+  await openEconomy(petyaPage, 'inventory');
   await expect(petyaPage.getByTestId('coins')).toHaveText(/^10 /);
   await expect(petyaPage.getByTestId('inventory')).toContainText('В инвентаре пусто');
 
   // Вася: the inventory, «Использовать», the only target offered is Петя (Вася himself is not)
+  await openEconomy(vasyaPage, 'inventory');
   const thief = vasyaPage.getByTestId('item-bird-thief');
   await expect(thief).toContainText('Птичкерс');
   await thief.getByTestId('use-bird-thief').click();

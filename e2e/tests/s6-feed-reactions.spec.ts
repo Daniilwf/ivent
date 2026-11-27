@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { commandId, type Schemas } from '../support/api.ts';
-import { apiOf, live, rollAndStart, setUpSeason, signIn } from '../support/world.ts';
+import { apiOf, live, rollAndStart, seasonOf, setUpSeason, signIn } from '../support/world.ts';
 
 function reactionGroup(row: Locator) {
   return row.getByRole('group', { name: 'Реакции на запись' });
@@ -53,8 +53,11 @@ test('a player and a spectator react live to an existing feed row until its comm
     await rollAndStart(api, world.seasonId);
     await api.dispose();
   }
-  const rollId = commandId();
-  await playerApi.post(`${seasonPath}/roll`, { commandId: rollId });
+  await playerApi.post(`${seasonPath}/roll`);
+  const offer = (await seasonOf(playerApi, world.seasonId)).me?.offer;
+  if (!offer) throw new Error('Starting the run requires a saved offer.');
+  const entryCommandId = commandId();
+  await playerApi.post(`${seasonPath}/start`, { commandId: entryCommandId, gameId: offer.id });
   await playerApi.dispose();
 
   const [playerPage, spectatorPage] = await Promise.all([
@@ -64,8 +67,8 @@ test('a player and a spectator react live to an existing feed row until its comm
   // Use the season-specific feed so parallel scenarios can create other seasons.
   const path = `/seasons/${world.seasonId}/feed`;
   await Promise.all([playerPage.goto(path), spectatorPage.goto(path)]);
-  const playerRow = playerPage.getByTestId(`feed-item-${rollId}`);
-  const spectatorRow = spectatorPage.getByTestId(`feed-item-${rollId}`);
+  const playerRow = playerPage.getByTestId(`feed-item-${entryCommandId}`);
+  const spectatorRow = spectatorPage.getByTestId(`feed-item-${entryCommandId}`);
   const playerGroup = reactionGroup(playerRow);
   const spectatorGroup = reactionGroup(spectatorRow);
   for (const row of [playerRow, spectatorRow]) {
@@ -88,6 +91,7 @@ test('a player and a spectator react live to an existing feed row until its comm
   }
 
   const playerChooser = chooser(playerGroup);
+  const spectatorChooser = chooser(spectatorGroup);
   const playerFire = fire(playerGroup);
   const spectatorFire = fire(spectatorGroup);
   const playerComments = playerRow.getByRole('button', { name: /^Комментарии к записи/ });
@@ -121,28 +125,32 @@ test('a player and a spectator react live to an existing feed row until its comm
     await playerPage.keyboard.press('Enter');
   }
   await showState(playerFire, true, '1 реакция');
+  await expect(playerChooser).toHaveAccessibleDescription('1 реакция', live);
+  await expect(spectatorChooser).toHaveAccessibleDescription('1 реакция', live);
+  await spectatorChooser.click();
   await showState(spectatorFire, false, '1 реакция');
-  await expect(playerChooser).toHaveAttribute('aria-expanded', 'false');
-  if (!phone) await expect(playerChooser).toBeFocused();
+  await expect(playerChooser).toHaveAttribute('aria-expanded', 'true');
+  if (!phone) await expect(playerFire).toBeFocused();
 
   if (phone) await spectatorFire.tap();
   else await spectatorFire.click();
   await showState(spectatorFire, true, '2 реакции');
   await showState(playerFire, true, '2 реакции');
 
-  const spectatorChooser = chooser(spectatorGroup);
-  if (phone) {
-    const comments = spectatorRow.getByRole('button', { name: /^Комментарии к записи/ });
-    const [counterBox, chooserBox] = await Promise.all([
-      spectatorFire.boundingBox(),
-      spectatorChooser.boundingBox(),
-    ]);
-    expect(counterBox?.y).toBe(chooserBox?.y);
-    for (const button of [spectatorFire, spectatorChooser, comments]) {
-      const box = await button.boundingBox();
-      expect(box?.width).toBeGreaterThanOrEqual(44);
-      expect(box?.height).toBeGreaterThanOrEqual(44);
-    }
+  await spectatorChooser.click();
+  const comments = spectatorRow.getByRole('button', { name: /^Комментарии к записи/ });
+  await expect(comments).toHaveAccessibleDescription('0 комментариев');
+  const [commentBox, chooserBox, timeBox] = await Promise.all([
+    comments.boundingBox(),
+    spectatorChooser.boundingBox(),
+    spectatorRow.locator('time').boundingBox(),
+  ]);
+  if (!commentBox || !chooserBox || !timeBox) throw new Error('The feed metadata must be visible.');
+  expect(commentBox.y).toBe(chooserBox.y);
+  expect(timeBox.y + timeBox.height / 2).toBeCloseTo(chooserBox.y + chooserBox.height / 2);
+  for (const box of [commentBox, chooserBox]) {
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
   }
   expect(
     await spectatorPage.getByRole('group', { name: 'Реакции на запись' }).count(),
@@ -159,7 +167,7 @@ test('a player and a spectator react live to an existing feed row until its comm
   await capture(spectatorPage, info, 'choices');
 
   await spectatorPage.route(
-    `${seasonPath}/feed/${rollId}/reactions`,
+    `${seasonPath}/feed/${entryCommandId}/reactions`,
     async (route) => {
       await route.fulfill({ status: 409, json: { title: 'Test refusal' } });
     },
@@ -169,7 +177,7 @@ test('a player and a spectator react live to an existing feed row until its comm
   if (phone) await refused.tap();
   else await refused.click();
   await expect(spectatorRow).toContainText('Реакция не сохранилась. Попробуй ещё раз.');
-  await expect(refused).toHaveCount(0);
+  await showState(refused, false, '0 реакций');
   await capture(spectatorPage, info, 'error');
 
   if (phone) await playerFire.tap();
@@ -181,7 +189,7 @@ test('a player and a spectator react live to an existing feed row until its comm
   await showState(spectatorFire, true, '1 реакция');
 
   await world.adminApi.post(`${adminPath}/undo`, {
-    targetCommandId: rollId,
+    targetCommandId: entryCommandId,
     comment: 'Проверка отката записи с реакцией',
   });
   for (const row of [playerRow, spectatorRow]) {

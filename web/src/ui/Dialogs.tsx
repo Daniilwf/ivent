@@ -217,6 +217,7 @@ export function BottomSheet({
   trigger,
   title,
   children,
+  full = false,
   open,
   onOpenChange,
   returnFocus,
@@ -224,6 +225,8 @@ export function BottomSheet({
   trigger: ReactNode;
   title: string;
   children: ReactNode;
+  /** A map fills the viewport below its own accessible heading. */
+  full?: boolean;
   /** Held by the page when a choice inside closes the sheet: the admin's list of sections */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -242,7 +245,10 @@ export function BottomSheet({
           onCloseAutoFocus={(event) => {
             if (returnFocus && !returnFocus()) event.preventDefault();
           }}
-          className="fixed inset-x-0 bottom-0 z-20 grid max-h-4/5 gap-3 overflow-auto rounded-t-lg border-t-3 border-ink bg-card px-4 pt-3 pb-6"
+          className={cx(
+            'fixed inset-x-0 bottom-0 z-20 grid grid-rows-[auto_auto_minmax(0,1fr)] gap-3 bg-card px-4 pt-3 pb-6',
+            full ? 'h-dvh' : 'max-h-4/5 rounded-t-lg border-t-3 border-ink',
+          )}
         >
           <span className="h-1 w-11 justify-self-center rounded-full bg-ink" aria-hidden />
           <div className="flex items-center justify-between gap-3">
@@ -254,7 +260,18 @@ export function BottomSheet({
             </Dialog.Close>
           </div>
           <Dialog.Description className="sr-only">{title}</Dialog.Description>
-          {children}
+          {full ? (
+            children
+          ) : (
+            <div
+              className="-m-2 min-h-0 min-w-0 overflow-y-auto overscroll-contain scroll-py-2 p-2"
+              onFocus={(event) => {
+                event.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+              }}
+            >
+              {children}
+            </div>
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

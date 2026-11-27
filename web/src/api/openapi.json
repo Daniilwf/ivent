@@ -15774,6 +15774,16 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          "commentCounts": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         },
         "description": "A page of the feed, newest first; `nextBefore` — the sequence to ask before for the next page, none at the start of\nthe log. `players` — every player of the season; `games` and `runs` — those the page's events name (D-150);\n`objects` — the content objects they name (the drawn events)."
@@ -20714,6 +20724,16 @@
             "type": [
               "null",
               "boolean"
+            ]
+          },
+          "interactionFeatures": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InteractionFeaturesView"
+              }
             ]
           }
         },

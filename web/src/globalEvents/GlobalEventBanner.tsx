@@ -1,10 +1,14 @@
 import type { Schemas } from '../api/client';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
+import { Summary } from '../ui/Disclosure';
 import { Chip } from '../ui/Marks';
+import { cx } from '../ui/cx';
 
 export type GlobalEventBannerProps = {
   events?: readonly Schemas['GlobalEventView'][] | null;
+  /** Keeps the event name and current progress in the season header. */
+  compact?: boolean;
 };
 
 export function GlobalEventBanner(props: GlobalEventBannerProps) {
@@ -19,49 +23,90 @@ export function GlobalEventBanner(props: GlobalEventBannerProps) {
           : '';
         const share =
           goal && goal.target > 0 ? Math.min(Math.max(goal.progress / goal.target, 0), 1) : 0;
+        const deadline = (
+          <p className="text-sm text-ink-soft">
+            {t.until} <time dateTime={event.endsAt}>{moscowTime(event.endsAt)}</time>
+          </p>
+        );
+        const description = event.description ? (
+          <p className="max-w-prose wrap-anywhere">{event.description}</p>
+        ) : null;
+        const meter = goal ? (
+          <div
+            role="progressbar"
+            aria-label={t.goal(event.name)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={share * 100}
+            aria-valuetext={progressText}
+            className="h-2 overflow-hidden rounded-full bg-muted"
+          >
+            <span
+              className="block h-full rounded-full bg-info"
+              style={{ width: `${share * 100}%` }}
+            />
+          </div>
+        ) : null;
+        const reached = goal?.reached ? <Chip tone="success">{t.reached}</Chip> : null;
+        const titleId = `global-event-${event.id}`;
+
         return (
           <section
             key={event.id}
-            aria-labelledby={`global-event-${event.id}`}
-            className="grid min-w-0 gap-3 rounded-lg bg-info-soft p-4"
+            aria-labelledby={titleId}
+            className={cx(
+              'min-w-0 rounded-lg bg-info-soft',
+              props.compact ? 'px-3' : 'grid gap-3 p-4',
+            )}
           >
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <h2
-                id={`global-event-${event.id}`}
-                className="min-w-0 font-display text-lg font-heavy wrap-anywhere"
-              >
-                {event.name}
-              </h2>
-              <p className="text-sm text-ink-soft">
-                {t.until} <time dateTime={event.endsAt}>{moscowTime(event.endsAt)}</time>
-              </p>
-            </div>
-            {event.description ? (
-              <p className="max-w-prose wrap-anywhere">{event.description}</p>
-            ) : null}
-            {goal ? (
-              <div className="grid gap-2">
-                <p className="text-sm font-bold">{t.goalTitle}</p>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium tabular-nums">{progressText}</p>
-                  {goal.reached ? <Chip tone="success">{t.reached}</Chip> : null}
+            {props.compact ? (
+              <details>
+                <Summary>
+                  <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span
+                      id={titleId}
+                      role="heading"
+                      aria-level={2}
+                      className="font-bold wrap-anywhere"
+                    >
+                      {event.name}
+                    </span>
+                    {goal ? (
+                      <span className="text-sm font-medium tabular-nums">{progressText}</span>
+                    ) : null}
+                    {reached}
+                  </span>
+                </Summary>
+                <div className="grid gap-2 pb-3">
+                  {description}
+                  {deadline}
+                  {meter}
                 </div>
-                <div
-                  role="progressbar"
-                  aria-label={t.goal(event.name)}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={share * 100}
-                  aria-valuetext={progressText}
-                  className="h-2 overflow-hidden rounded-full bg-muted"
-                >
-                  <span
-                    className="block h-full rounded-full bg-info"
-                    style={{ width: `${share * 100}%` }}
-                  />
+              </details>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <h2
+                    id={titleId}
+                    className="min-w-0 font-display text-lg font-heavy wrap-anywhere"
+                  >
+                    {event.name}
+                  </h2>
+                  {deadline}
                 </div>
-              </div>
-            ) : null}
+                {description}
+                {goal ? (
+                  <div className="grid gap-2">
+                    <p className="text-sm font-bold">{t.goalTitle}</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium tabular-nums">{progressText}</p>
+                      {reached}
+                    </div>
+                    {meter}
+                  </div>
+                ) : null}
+              </>
+            )}
           </section>
         );
       })}

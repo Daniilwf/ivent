@@ -143,13 +143,7 @@ test('speed: events-on demo renders waiting conditions, a future throw and an IR
           [...scope.querySelectorAll('span,p,h2,h3,h4,button')].some(
             (element) => text(element) === expected && rendered(element),
           );
-        const section = (name: string) =>
-          [...document.querySelectorAll('section[aria-labelledby]')].find((element) => {
-            const label = element.getAttribute('aria-labelledby');
-            return label !== null && document.getElementById(label)?.textContent === name;
-          }) ?? null;
-        const conditions = section('Условия следующей игры');
-        const events = section('Накопленные ивенты');
+        const waiting = document.querySelector('[data-testid="waiting-events"] summary');
         const irl = document.querySelector(`[data-testid="manual-effect-${karaokeId}"]`);
         const map = document.querySelector('svg[role="application"]');
         const ready =
@@ -158,10 +152,8 @@ test('speed: events-on demo renders waiting conditions, a future throw and an IR
           rendered(document.querySelector('[data-testid="turn"]')) &&
           rendered(map) &&
           map?.querySelector('[data-player]') !== null &&
-          exactText(conditions, trial) &&
-          exactText(conditions, 'Не ниже: Сложная') &&
-          exactText(events, trial) &&
-          exactText(events, 'Ждёт броска') &&
+          exactText(waiting, 'Ждут своего часа') &&
+          exactText(waiting, trial) &&
           rendered(irl) &&
           exactText(irl, 'Караоке') &&
           exactText(irl, 'Отправить пруф');
@@ -189,8 +181,12 @@ test('speed: events-on demo renders waiting conditions, a future throw and an IR
       return `scripts ${String(done(/\.js$/))} ms, season ${String(done(/^\/api\/seasons\/[0-9a-f-]{36}$/))} ms`;
     }, elapsed);
     await expect(page.getByTestId('turn')).toBeVisible();
+    const waiting = page.getByTestId('waiting-events');
+    await waiting.getByText('Ждут своего часа', { exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Условия следующей игры' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Накопленные ивенты' })).toBeVisible();
+    await expect(waiting.getByText('Не ниже: Сложная', { exact: true })).toBeVisible();
+    await expect(waiting.getByText('Ждёт броска', { exact: true })).toBeVisible();
     await expect(
       page
         .getByTestId(`manual-effect-${prepared.karaokeId}`)

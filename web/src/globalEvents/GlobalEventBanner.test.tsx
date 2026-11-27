@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { GlobalEventBanner } from './GlobalEventBanner';
 
@@ -41,6 +42,46 @@ function progressFraction(bar: HTMLElement): number {
 }
 
 describe('global events on the season screen (EV18/EV19/EV39)', () => {
+  it('keeps the name and progress visible and opens the other details on demand (DR7-27)', async () => {
+    const running = event();
+    const { container, rerender } = render(<GlobalEventBanner compact events={[running]} />);
+
+    const banner = screen.getByRole('region', { name: running.name });
+    const name = within(banner).getByRole('heading', { level: 2, name: running.name });
+    const summary = name.closest('summary');
+    expect(summary).toBeVisible();
+    expect(summary).toHaveTextContent(/12,5\s*(?:из|\/)\s*50/);
+    const description = screen.getByText(running.description);
+    const deadline = container.querySelector(`time[datetime="${running.endsAt}"]`);
+    expect(description).not.toBeVisible();
+    expect(deadline).not.toBeVisible();
+
+    await userEvent.click(name);
+    expect(description).toBeVisible();
+    expect(deadline).toBeVisible();
+    expect(progressFraction(screen.getByRole('progressbar'))).toBeCloseTo(0.25);
+
+    rerender(
+      <GlobalEventBanner compact events={[{ ...running, goal: goal({ progress: 16.25 }) }]} />,
+    );
+    expect(summary).toHaveTextContent(/16,25\s*(?:из|\/)\s*50/);
+    expect(description).toBeVisible();
+
+    await userEvent.click(name);
+    expect(description).not.toBeVisible();
+  });
+
+  it('keeps a compact goal-less event expandable without inventing progress', async () => {
+    const running = event({ goal: null });
+    render(<GlobalEventBanner compact events={[running]} />);
+
+    const name = screen.getByText(running.name);
+    expect(name.closest('summary')).toHaveTextContent(running.name);
+    await userEvent.click(name);
+    expect(screen.getByText(running.description)).toBeVisible();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
   it.each(['omitted', 'null', 'empty'] as const)(
     'renders no empty banner when events are %s',
     (state) => {

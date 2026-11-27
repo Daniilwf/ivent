@@ -11,7 +11,6 @@ import { ru } from '../i18n/ru';
 import { CompleteForm, type Completion } from './CompleteForm';
 import { ChoiceCard, OfferCard, RollGenre, rollGameButton, rollResultTitle } from './RollResult';
 import { CompletionMoment } from './CompletionMoment';
-import { AvatarSection } from './AvatarSection';
 import { ProofSection } from './ProofForm';
 import { DrawnEventHistory } from './DrawnEventHistory';
 import { EventChoice } from './EventChoice';
@@ -25,6 +24,7 @@ import { RunActions } from './RunActions';
 import { MyFinish } from './MyFinish';
 import { NominationResults } from './NominationResults';
 import { seasonPicture } from './seasonView';
+import { CompletionRulesLink } from '../rules/CompletionRulesLink';
 import { linearBoard } from '../board/linearBoard';
 import { Cover, RunCard } from '../board/GameCards';
 import { branchOptions, legsPath } from '../board/graphBoard';
@@ -43,7 +43,7 @@ import type { Point } from '../board/types';
 import { WheelMoment, type WheelRoll } from '../board/Wheel';
 import { Button } from '../ui/Button';
 import { standaloneLink } from '../ui/buttonStyles';
-import { BottomSheet } from '../ui/Dialogs';
+import { BottomSheet, FormDialog } from '../ui/Dialogs';
 import { Chip } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
 import { ErrorState, Notice } from '../ui/States';
@@ -87,6 +87,8 @@ type Walking = { sequence: number; legs: Legs; before: Season };
 const lastDiceId = 'last-dice';
 const phoneMomentClass =
   'fixed inset-x-4 bottom-20 z-20 grid max-h-[calc(100dvh-var(--spacing)*24)] gap-3 overflow-y-auto rounded-lg border-3 border-ink bg-card p-3 shadow-lift';
+const desktopDrawClass =
+  'season-draw-panel fixed bottom-20 left-1/2 z-20 grid -translate-x-1/2 gap-3 overflow-y-auto rounded-lg border-3 border-ink bg-card p-3 shadow-lift';
 
 function focusPhoneMoment(panel: HTMLDivElement | null) {
   if (panel && document.activeElement === document.body)
@@ -213,6 +215,12 @@ export function SeasonScreen({
   // Back to the season from another page of the site: the reader starts at its name
   const heading = usePageHeading(season !== null);
   const [pending, setPending] = useState(false);
+  const [completionDraftRun, setCompletionDraftRun] = useState<string | null>(null);
+  const completionOpener = useRef<HTMLButtonElement>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
+  const legendOpener = useRef<HTMLButtonElement>(null);
+  const [leadersOpen, setLeadersOpen] = useState(false);
+  const leadersOpener = useRef<HTMLButtonElement>(null);
   const content = useRef<HTMLElement>(null);
   const [scrollFloor, setScrollFloor] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
@@ -276,6 +284,7 @@ export function SeasonScreen({
         setSeason(loaded.season);
         // The roll the page opened with is shown at once; only a roll that comes while it is open spins (D-136)
         const view = loaded.season;
+        setCompletionDraftRun((draft) => (draft === view.me?.activeRun?.id ? draft : null));
         const roll = view.me?.roll;
         const opened = roll?.sequence ?? null;
         const continued = alreadyPlayedRoll.current;
@@ -373,9 +382,11 @@ export function SeasonScreen({
   const navigationId = season?.id;
   const pollsEnabled = season?.pollsEnabled === true;
   const galleryEnabled = season?.galleryEnabled === true;
+  const interactionFeatures = season?.interactionFeatures ?? null;
   useEffect(() => {
-    if (navigationId) onNavigationLoaded?.({ id: navigationId, pollsEnabled, galleryEnabled });
-  }, [navigationId, onNavigationLoaded, pollsEnabled, galleryEnabled]);
+    if (navigationId)
+      onNavigationLoaded?.({ id: navigationId, pollsEnabled, galleryEnabled, interactionFeatures });
+  }, [navigationId, onNavigationLoaded, pollsEnabled, galleryEnabled, interactionFeatures]);
 
   // Load now, after every committed command of the season (another player's move included), after every
   // reconnection to the hub (names and avatars live outside the season log) and after a catch-up (D-122).
@@ -405,7 +416,7 @@ export function SeasonScreen({
     setCelebration(null);
     arrivedAt.current = null;
     // Keep the current viewport reachable if this action replaces a tall form with a fixed moment.
-    if (content.current)
+    if (!desk && content.current)
       setScrollFloor(
         Math.max(0, Math.ceil(window.innerHeight - content.current.getBoundingClientRect().top)),
       );
@@ -579,6 +590,11 @@ export function SeasonScreen({
     ((me?.phase === 'rolling' && !me.offer && !me.choice) ||
       (me?.phase === 'playing' && !me.activeRun));
   const turnsOpen = season.status === 'active' && !pastDeadline;
+  const completableRun =
+    turnsOpen && !effectChoice && me?.phase === 'playing' && !me.isCoopPartner
+      ? me.activeRun
+      : null;
+  const completing = completableRun !== null && completableRun.id === completionDraftRun;
   const choice =
     turnsOpen && me?.phase === 'rolling' && me.choice?.kind === 'game' ? me.choice : null;
   // A branch choice is part of a throw made before the deadline: it is answered after it too (D-305)
@@ -617,15 +633,16 @@ export function SeasonScreen({
   const walked = !throwing && mine ? walkingPath : null;
   // A walk the page cannot draw (a cell it does not know) is not played
   const moving = walked ? walking : null;
-  const phoneDraw =
-    !desk &&
+  const drawOnStage =
     newDraw &&
     !throwing &&
     !moving &&
     drawnSequence !== readDraw &&
     drawnSequence > historyFold.through;
-  const closePhoneDraw =
-    phoneDraw && !drawPending ? (
+  // The same card stays mounted when it leaves the stage for the turn's history or question.
+  const drawStageClass = drawOnStage ? (desk ? desktopDrawClass : phoneMomentClass) : undefined;
+  const closeDraw =
+    drawOnStage && !drawPending ? (
       <Button
         variant="quiet"
         className="justify-self-start"
@@ -655,6 +672,8 @@ export function SeasonScreen({
   const shownRows = momentRows ?? rows;
   const shownMine = shownPlayers.find((p) => p.me);
   const myRow = shownRows.find((r) => r.player.me);
+  const topRows = shownRows.slice(0, 5);
+  if (myRow && !topRows.includes(myRow)) topRows.push(myRow);
   const leader = shownRows[0];
   const routeLength = graphMode
     ? Math.max(cellsToFinish(board, 1), 1)
@@ -718,7 +737,7 @@ export function SeasonScreen({
       >
         <h3 id="after-title" className="font-display font-heavy">
           {manualEffects.length > 0
-            ? ru.turn.todo(manualEffects.length)
+            ? ru.effects.taskTitle
             : stepFirst && me.lastCompleted
               ? ru.turn.afterGame(me.lastCompleted.game.title)
               : me.lastCompleted || me.lastEvent
@@ -726,17 +745,13 @@ export function SeasonScreen({
                 : ru.turn.checksTitle}
         </h3>
         {manualEffects.length > 0 && (
-          <section
-            aria-labelledby="effects-title"
-            data-testid="manual-effects"
-            className="legacy-screens"
-          >
-            <h4 id="effects-title">{ru.effects.title}</h4>
-            <ul>
-              {manualEffects.map((effect) => (
+          <section aria-labelledby="after-title" data-testid="manual-effects">
+            <ul className="grid gap-2">
+              {manualEffects.map((effect, index) => (
                 <ManualEffectItem
                   key={effect.id}
                   effect={effect}
+                  primary={manualFirst && index === 0}
                   pending={pending}
                   resolvable={season.status === 'active' || season.status === 'closing'}
                   onResolve={(outcome, comment) =>
@@ -757,8 +772,36 @@ export function SeasonScreen({
                 {thrownResult.text}
               </p>
             ) : null}
-            <div className="flex items-start gap-3">
-              {/* Beside a line of text only a real cover, as in the feed: a placeholder would be noise (D-222) */}
+            <details
+              id={`proof-${me.lastCompleted.id}`}
+              data-testid="proof-details"
+              data-proof-run={me.lastCompleted.id}
+              open={finishProof?.id === me.lastCompleted.id}
+              className="grid gap-2"
+            >
+              <Summary className="text-sm">
+                <span id={lastDiceId} data-testid="last-dice" className="font-medium">
+                  {me.lastCompleted.status === 'rejected'
+                    ? ru.turn.lastRejected(me.lastCompleted.game.title)
+                    : ru.turn.lastDice(
+                        me.lastCompleted.game.title,
+                        [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
+                          (d) => d.value,
+                        ),
+                        me.lastCompleted.total,
+                        [
+                          ...new Set(
+                            [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
+                              (d) => d.sides,
+                            ),
+                          ),
+                        ],
+                      )}
+                </span>{' '}
+                <span className="text-ink-soft">
+                  {me.lastCompleted.proof ? ru.turn.proofSummary : ru.turn.proofToSend}
+                </span>
+              </Summary>
               {me.lastCompleted.game.cover ? (
                 <Cover
                   game={{
@@ -769,60 +812,26 @@ export function SeasonScreen({
                   className="mt-1 ml-1"
                 />
               ) : null}
-              <p
-                id={lastDiceId}
-                data-testid="last-dice"
-                tabIndex={-1}
-                className="min-w-0 font-medium focus:outline-none"
-              >
-                {me.lastCompleted.status === 'rejected'
-                  ? ru.turn.lastRejected(me.lastCompleted.game.title)
-                  : ru.turn.lastDice(
-                      me.lastCompleted.game.title,
-                      [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
-                        (d) => d.value,
-                      ),
-                      me.lastCompleted.total,
-                      [
-                        ...new Set(
-                          [...me.lastCompleted.dice, ...me.lastCompleted.challengeDice].map(
-                            (d) => d.sides,
-                          ),
-                        ),
-                      ],
-                    )}
-              </p>
-            </div>
-            {me.lastCompleted.challengeDice.length > 0 && (
-              <p data-testid="last-challenge-dice" className="text-sm text-ink-soft">
-                {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
-              </p>
-            )}
-            {me.lastCompleted.review && (
-              <p data-testid="last-review" className="text-sm text-ink-soft wrap-anywhere">
-                {ru.turn.lastReview(
-                  me.lastCompleted.review.rating,
-                  me.lastCompleted.review.text ?? null,
-                )}
-              </p>
-            )}
-            {me.eventsEnabled === true ? (
-              <RunConditions
-                conditions={me.lastCompleted.conditions ?? null}
-                check={me.lastCompleted.conditionCheck ?? null}
-                resultNote={conditionResultNote(me.lastCompleted)}
-              />
-            ) : null}
-            <details
-              id={`proof-${me.lastCompleted.id}`}
-              data-testid="proof-details"
-              data-proof-run={me.lastCompleted.id}
-              open={finishProof?.id === me.lastCompleted.id}
-              className="grid gap-2"
-            >
-              <Summary className="font-bold">
-                {me.lastCompleted.proof ? ru.turn.proofSummary : ru.turn.proofToSend}
-              </Summary>
+              {me.lastCompleted.challengeDice.length > 0 && (
+                <p data-testid="last-challenge-dice" className="text-sm text-ink-soft">
+                  {ru.turn.lastChallengeDice(me.lastCompleted.challengeDice.map((d) => d.value))}
+                </p>
+              )}
+              {me.lastCompleted.review && (
+                <p data-testid="last-review" className="text-sm text-ink-soft wrap-anywhere">
+                  {ru.turn.lastReview(
+                    me.lastCompleted.review.rating,
+                    me.lastCompleted.review.text ?? null,
+                  )}
+                </p>
+              )}
+              {me.eventsEnabled === true ? (
+                <RunConditions
+                  conditions={me.lastCompleted.conditions ?? null}
+                  check={me.lastCompleted.conditionCheck ?? null}
+                  resultNote={conditionResultNote(me.lastCompleted)}
+                />
+              ) : null}
               <ProofSection
                 key={`${me.lastCompleted.id}:${JSON.stringify(me.lastCompleted.proof ?? null)}`}
                 proof={me.lastCompleted.proof ?? null}
@@ -917,8 +926,8 @@ export function SeasonScreen({
             drawn={me.lastEvent}
             fresh={freshDraw}
             revealing={drawPending}
-            className={phoneDraw ? phoneMomentClass : undefined}
-            actions={closePhoneDraw}
+            className={drawStageClass}
+            actions={closeDraw}
             initiallyOpen={newDraw && me.lastEvent.sequence > historyFold.through}
             onShown={noteDrawShown}
             onSettled={newDraw ? setSettledDraw : undefined}
@@ -1132,7 +1141,10 @@ export function SeasonScreen({
           const active = document.activeElement;
           if (!active || active === document.body || active.closest('[data-testid="dice"]'))
             requestAnimationFrame(() => {
-              document.getElementById(lastDiceId)?.focus({ preventScroll: true });
+              document
+                .getElementById(lastDiceId)
+                ?.closest('summary')
+                ?.focus({ preventScroll: true });
             });
         }}
       />
@@ -1202,12 +1214,13 @@ export function SeasonScreen({
     <main
       ref={content}
       style={{
-        minHeight: scrollFloor > 0 ? scrollFloor : undefined,
+        minHeight: !desk && scrollFloor > 0 ? scrollFloor : undefined,
         overflowAnchor: pending || beforeMoment ? 'none' : undefined,
       }}
       className={cx(
-        'mx-auto grid max-w-300 grid-cols-1 gap-4 px-4 pt-4 pb-28 desk:grid-cols-[auto_minmax(0,1fr)] desk:items-start desk:gap-6 desk:px-8 desk:pb-8',
-        scrollFloor > 0 && 'content-start',
+        'mx-auto grid max-w-400 grid-cols-1 items-start gap-4 px-4 pt-4 pb-28',
+        'desk:season-frame desk:items-stretch desk:overflow-hidden desk:pb-4',
+        !desk && scrollFloor > 0 && 'content-start',
       )}
     >
       {celebration === 'playing' && me?.finish && !finished && finishPoint ? (
@@ -1230,314 +1243,351 @@ export function SeasonScreen({
           }}
         />
       ) : null}
-      <header className="grid gap-2 min-w-0 desk:col-start-1 desk:w-96">
-        <h1
-          ref={heading}
-          tabIndex={-1}
-          className="font-display text-xl font-heavy text-balance outline-none"
-        >
-          {season.name}
-        </h1>
-        <div className="flex flex-wrap gap-2">
-          {season.deadline ? (
-            <span data-testid="season-deadline">
-              <Chip icon={<CalendarClock size={16} aria-hidden />}>
-                {ru.season.deadline(moscowTime(season.deadline))}
-              </Chip>
-            </span>
-          ) : null}
-          {me?.coins != null ? (
-            <span data-testid="my-coins">
-              <Chip icon={<Coins size={16} aria-hidden />}>{ru.season.coins(me.coins)}</Chip>
-            </span>
-          ) : null}
-          {closing || finished ? (
-            <span data-testid="season-status">
-              <Chip icon={<Flag size={16} aria-hidden />}>
-                {finished ? ru.season.finished : ru.season.closing}
-              </Chip>
-            </span>
-          ) : null}
-        </div>
-      </header>
-      {loadFailed ? (
-        <div className="min-w-0 desk:col-start-1 desk:w-96">
-          <Notice tone="danger">{ru.app.loadError}</Notice>
-        </div>
-      ) : null}
-
-      <section
-        aria-labelledby="turn-title"
-        data-testid="turn"
-        className="grid min-w-0 grid-cols-1 gap-4 rounded-lg bg-card p-4 desk:col-start-1 desk:w-96"
+      <div
+        data-testid="season-left"
+        className="grid min-w-0 content-start gap-4 desk:min-h-0 desk:overflow-y-auto desk:overscroll-contain desk:px-1"
       >
-        <h2 id="turn-title" className="font-display text-lg font-heavy">
-          {!me
-            ? role === 'player'
-              ? ru.turn.outsiderTitle
-              : role === 'admin'
-                ? ru.turn.adminOutsideTitle
-                : ru.turn.spectatorTitle
-            : finished
-              ? ru.turn.finishedTitle
-              : closing
-                ? ru.turn.closingTitle
-                : draft
-                  ? ru.turn.draftTitle
-                  : ru.turn.title}
-        </h2>
-        {!me && (
-          <p className="text-ink-soft">
-            {role === 'player'
-              ? ru.turn.outsider
-              : role === 'admin'
-                ? ru.turn.adminOutside
-                : ru.turn.spectator}
-          </p>
-        )}
-        {me && draft && <p className="text-ink-soft">{ru.turn.draftText}</p>}
-        {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
-        {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
-        {/* D-260: a finisher's season goes on; the card says where he stands and what his next runs give */}
-        {me?.finish && !finished && (!beforeMoment || beforeMoment.me?.finish) ? (
-          <MyFinish
-            finish={me.finish}
-            first={rows.find((r) => r.player.me)?.isFirst === true}
-            place={rows.find((r) => r.player.me)?.place ?? null}
-            rollsOpen={turnsOpen}
-            proofPending={finishRun?.proof?.status === 'pending'}
-          />
-        ) : null}
-        {/* A refusal is said at the top of the card, where the eye is after the action */}
-        {message && <Notice tone="danger">{message}</Notice>}
-        {/* D-134: at the limit of runs waiting for the admin's check the roll is closed: the step's statement */}
-        {rollSlot && uncheckedBlocked ? (
-          <Notice tone="warning">
-            {ru.turn.uncheckedBlocked(me.unchecked?.count ?? 0, me.unchecked?.limit ?? 0)}
-          </Notice>
-        ) : null}
-        {phoneMoment ? (
-          <div
-            ref={focusPhoneMoment}
-            aria-label={ru.turn.title}
-            role="region"
-            className={phoneMomentClass}
+        <header className="grid min-w-0 gap-2">
+          <h1
+            ref={heading}
+            tabIndex={-1}
+            className="font-display text-xl font-heavy text-balance outline-none"
           >
-            {phoneMoment}
+            {season.name}
+          </h1>
+          <div className="flex flex-wrap gap-2">
+            {season.deadline ? (
+              <span data-testid="season-deadline">
+                <Chip icon={<CalendarClock size={16} aria-hidden />}>
+                  {ru.season.deadline(moscowTime(season.deadline))}
+                </Chip>
+              </span>
+            ) : null}
+            {me?.coins != null ? (
+              <span data-testid="my-coins">
+                <Chip icon={<Coins size={16} aria-hidden />}>{ru.season.coins(me.coins)}</Chip>
+              </span>
+            ) : null}
+            {closing || finished ? (
+              <span data-testid="season-status">
+                <Chip icon={<Flag size={16} aria-hidden />}>
+                  {finished ? ru.season.finished : ru.season.closing}
+                </Chip>
+              </span>
+            ) : null}
+          </div>
+        </header>
+        {season.globalEvents?.length ? (
+          <GlobalEventBanner events={season.globalEvents} compact />
+        ) : null}
+        {loadFailed ? (
+          <div className="min-w-0">
+            <Notice tone="danger">{ru.app.loadError}</Notice>
           </div>
         ) : null}
-        {spinningStatus ? (
-          <div className="grid gap-2 justify-items-start">
-            <p data-testid="moment-status" role="status" className="text-ink-soft">
-              {spinningStatus}
+
+        <section
+          aria-labelledby="turn-title"
+          data-testid="turn"
+          className="grid min-w-0 grid-cols-1 gap-4 rounded-lg bg-card p-4"
+        >
+          <h2 id="turn-title" className="font-display text-lg font-heavy">
+            {!me
+              ? role === 'player'
+                ? ru.turn.outsiderTitle
+                : role === 'admin'
+                  ? ru.turn.adminOutsideTitle
+                  : ru.turn.spectatorTitle
+              : finished
+                ? ru.turn.finishedTitle
+                : closing
+                  ? ru.turn.closingTitle
+                  : draft
+                    ? ru.turn.draftTitle
+                    : ru.turn.title}
+          </h2>
+          {!me && (
+            <p className="text-ink-soft">
+              {role === 'player'
+                ? ru.turn.outsider
+                : role === 'admin'
+                  ? ru.turn.adminOutside
+                  : ru.turn.spectator}
             </p>
-            {splitRoll && spin ? (
-              <Button
-                data-testid="skip-roll"
-                variant="quiet"
-                disabled={pending}
-                onClick={() => void revealGame(false)}
-              >
-                {wheelWords.skipRoll}
-              </Button>
-            ) : (
-              <Button variant="quiet" onClick={() => wheel.current?.skip()}>
-                {ru.moments.skip}
-              </Button>
-            )}
-          </div>
-        ) : null}
-        {desk && throwing ? (
-          <p data-testid="throwing" role="status" className="text-ink-soft">
-            {movingRun === throwing.id
-              ? ru.moments.dice.moving(0)
-              : ru.turn.throwing(throwing.game.title)}
-          </p>
-        ) : null}
-        {drawPending && !throwing && !moving ? (
-          <p role="status" className="text-ink-soft">
-            {ru.moments.dice.drawing}
-          </p>
-        ) : null}
-        {manualFirst && !throwing ? afterRun : null}
-        {waiting && (
-          <div className="grid gap-2" aria-busy="true">
-            <Skeleton className="h-6 w-2/3" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        )}
-        {branchCard ? (
-          desk ? (
-            <p data-testid="branch-hint" className="font-bold">
-              {ru.map.branch.onMap}
-            </p>
-          ) : (
-            branchCard
-          )
-        ) : null}
-        {mainProof ? (
-          <Button
-            variant="main"
-            data-testid="send-proof"
-            aria-controls={`proof-${mainProof.id}`}
-            disabled={pending}
-            onClick={() => {
-              openProof(mainProof.id);
-            }}
-          >
-            {finishProof ? ru.proof.submit : ru.turn.sendProof}
-          </Button>
-        ) : null}
-        {rollSlot && !uncheckedBlocked && (
-          <div className="grid gap-2">
-            <p className="text-sm text-ink-soft">{wheelWords.genreStep}</p>
-            <Button
-              variant={finishProof || (drawPending && me.finish) ? 'quiet' : 'main'}
-              data-testid="roll"
-              loading={pending}
-              disabled={pending}
-              onClick={() => void act({ kind: 'roll' })}
+          )}
+          {me && draft && <p className="text-ink-soft">{ru.turn.draftText}</p>}
+          {me && finished && <p className="text-ink-soft">{ru.turn.finishedText}</p>}
+          {me && closing && <p className="text-ink-soft">{ru.turn.closingText}</p>}
+          {/* D-260: a finisher's season goes on; the card says where he stands and what his next runs give */}
+          {me?.finish && !finished && (!beforeMoment || beforeMoment.me?.finish) ? (
+            <MyFinish
+              finish={me.finish}
+              first={rows.find((r) => r.player.me)?.isFirst === true}
+              place={rows.find((r) => r.player.me)?.place ?? null}
+              rollsOpen={turnsOpen}
+              proofPending={finishRun?.proof?.status === 'pending'}
+            />
+          ) : null}
+          {/* A refusal is said at the top of the card, where the eye is after the action */}
+          {message && !completing && <Notice tone="danger">{message}</Notice>}
+          {/* D-134: at the limit of runs waiting for the admin's check the roll is closed: the step's statement */}
+          {rollSlot && uncheckedBlocked ? (
+            <Notice tone="warning">
+              {ru.turn.uncheckedBlocked(me.unchecked?.count ?? 0, me.unchecked?.limit ?? 0)}
+            </Notice>
+          ) : null}
+          {phoneMoment ? (
+            <div
+              ref={focusPhoneMoment}
+              aria-label={ru.turn.title}
+              role="region"
+              className={phoneMomentClass}
             >
-              {ru.turn.roll}
-            </Button>
-            {me.unchecked && me.unchecked.count > 0 ? (
-              <p className="text-sm text-ink-soft" data-testid="unchecked">
-                {ru.turn.uncheckedWaiting(me.unchecked.count, me.unchecked.limit)}
+              {phoneMoment}
+            </div>
+          ) : null}
+          {spinningStatus ? (
+            <div className="grid gap-2 justify-items-start">
+              <p data-testid="moment-status" role="status" className="text-ink-soft">
+                {spinningStatus}
               </p>
-            ) : null}
-          </div>
-        )}
-        {splitRoll && heldGenre && !spin ? (
-          <RollGenre
-            category={splitRoll.category}
-            games={gameWheel?.sectors.length ?? 0}
-            choice={choice !== null}
-            opening={openingGame || pending}
-            onOpen={() => void revealGame(true)}
-            onSkip={() => void revealGame(false)}
-          />
-        ) : null}
-        {desk ? null : stage}
-        {effectChoice && !throwing && !moving ? (
-          <div className={cx('grid min-w-0 gap-3', phoneDraw && phoneMomentClass)}>
-            <EventChoice
-              choice={effectChoice}
-              busy={pending}
-              disabled={!answerAllowed}
-              drawn={me?.lastEvent ?? null}
-              fresh={freshDraw}
-              onShown={noteDrawShown}
-              onSettled={newDraw ? setSettledDraw : undefined}
-              unavailableReason={
-                answerAllowed
-                  ? ''
-                  : finished
-                    ? ru.events.choice.closed
-                    : draft
-                      ? ru.events.choice.draft
-                      : ru.events.choice.paused
-              }
-              onChoose={(optionId) =>
-                void act({ kind: 'choose', choiceId: effectChoice.id, optionId })
-              }
-            />
-            {closePhoneDraw}
-          </div>
-        ) : null}
-        {choice && showRollResult && (
-          <ChoiceCard
-            choice={choice}
-            className={rollRevealClass}
-            eventsEnabled={me?.eventsEnabled === true}
-            roll={me?.roll ?? null}
-            price={me?.nextReroll ?? null}
-            coins={me?.coins ?? null}
-            pending={pending}
-            onChoose={(optionId, difficulty) =>
-              void act({ kind: 'choose', choiceId: choice.id, optionId, difficulty })
-            }
-            onAlreadyPlayed={(gameId) => void act({ kind: 'alreadyPlayed', gameId })}
-            onReroll={() => void act({ kind: 'reroll', expected: me?.nextReroll?.payment ?? null })}
-          />
-        )}
-        {offer && showRollResult && (
-          <OfferCard
-            offer={offer}
-            className={rollRevealClass}
-            eventsEnabled={me?.eventsEnabled === true}
-            roll={me?.roll ?? null}
-            price={me?.nextReroll ?? null}
-            coins={me?.coins ?? null}
-            pending={pending}
-            onStart={(difficulty) => void act({ kind: 'start', gameId: offer.id, difficulty })}
-            onAlreadyPlayed={() => void act({ kind: 'alreadyPlayed', gameId: offer.id })}
-            onReroll={() => void act({ kind: 'reroll', expected: me?.nextReroll?.payment ?? null })}
-          />
-        )}
-        {/* The result is said once, when the wheel stops, and outlives the wheel */}
-        <p className="sr-only" aria-live="polite" data-testid="roll-announce">
-          {announced}
-        </p>
-        {/* A card drawn while the page is open is said once, when it is drawn on screen */}
-        <p className="sr-only" aria-live="polite" data-testid="draw-announce">
-          {newDraw && !drawPending && !moving && !throwing && me?.lastEvent
-            ? ru.events.announce(me.lastEvent.kind, me.lastEvent.name)
-            : ''}
-        </p>
-        {me?.phase === 'playing' && me.activeRun && (
-          <div data-testid="active-run" className="grid gap-4">
-            <p className="sr-only">{ru.turn.playing(me.activeRun.game.title)}</p>
-            <RunCard
-              game={{
-                title: me.activeRun.game.title,
-                hours: me.activeRun.game.hours ?? null,
-                tags: [],
-                cover: me.activeRun.game.cover?.thumbnailUrl,
+              {splitRoll && spin ? (
+                <Button
+                  data-testid="skip-roll"
+                  variant="quiet"
+                  disabled={pending}
+                  onClick={() => void revealGame(false)}
+                >
+                  {wheelWords.skipRoll}
+                </Button>
+              ) : (
+                <Button variant="quiet" onClick={() => wheel.current?.skip()}>
+                  {ru.moments.skip}
+                </Button>
+              )}
+            </div>
+          ) : null}
+          {desk && throwing ? (
+            <p data-testid="throwing" role="status" className="text-ink-soft">
+              {movingRun === throwing.id
+                ? ru.moments.dice.moving(0)
+                : ru.turn.throwing(throwing.game.title)}
+            </p>
+          ) : null}
+          {drawPending && !throwing && !moving ? (
+            <p role="status" className="text-ink-soft">
+              {ru.moments.dice.drawing}
+            </p>
+          ) : null}
+          {manualFirst && !throwing ? afterRun : null}
+          {waiting && (
+            <div className="grid gap-2" aria-busy="true">
+              <Skeleton className="h-6 w-2/3" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          )}
+          {branchCard ? (
+            desk ? (
+              <p data-testid="branch-hint" className="font-bold">
+                {ru.map.branch.onMap}
+              </p>
+            ) : (
+              branchCard
+            )
+          ) : null}
+          {mainProof ? (
+            <Button
+              variant="main"
+              data-testid="send-proof"
+              aria-controls={`proof-${mainProof.id}`}
+              disabled={pending}
+              onClick={() => {
+                openProof(mainProof.id);
               }}
-              left={myRow ? myRow.cellsToFinish : routeLength}
-              level={3}
-              total={routeLength}
-              actions={null}
+            >
+              {finishProof ? ru.proof.submit : ru.turn.sendProof}
+            </Button>
+          ) : null}
+          {rollSlot && !uncheckedBlocked && (
+            <div className="grid gap-2">
+              <p className="text-sm text-ink-soft">{wheelWords.genreStep}</p>
+              <Button
+                variant={finishProof || (drawPending && me.finish) ? 'quiet' : 'main'}
+                data-testid="roll"
+                loading={pending}
+                disabled={pending}
+                onClick={() => void act({ kind: 'roll' })}
+              >
+                {ru.turn.roll}
+              </Button>
+              {me.unchecked && me.unchecked.count > 0 ? (
+                <p className="text-sm text-ink-soft" data-testid="unchecked">
+                  {ru.turn.uncheckedWaiting(me.unchecked.count, me.unchecked.limit)}
+                </p>
+              ) : null}
+            </div>
+          )}
+          {splitRoll && heldGenre && !spin ? (
+            <RollGenre
+              category={splitRoll.category}
+              games={gameWheel?.sectors.length ?? 0}
+              choice={choice !== null}
+              opening={openingGame || pending}
+              onOpen={() => void revealGame(true)}
+              onSkip={() => void revealGame(false)}
             />
-            {me.isCoopPartner ? (
-              <p className="text-ink-soft">{ru.turn.coopPartnerWaiting}</p>
-            ) : null}
-            {me.eventsEnabled === true ? (
-              <RunConditions conditions={me.activeRun.conditions ?? null} />
-            ) : null}
-            {me.activeDuels?.length ? (
-              <ul data-testid="run-duels" className="grid gap-2 text-sm">
-                {me.activeDuels.map((duel) => {
-                  const opponentId =
-                    duel.challengerId === me.playerId ? duel.opponentId : duel.challengerId;
-                  const opponent = season.players.find((player) => player.id === opponentId);
-                  return opponent ? (
-                    <li key={duel.id} className="flex items-start gap-2 rounded-md bg-muted p-3">
-                      <Swords size={18} aria-hidden className="shrink-0" />
-                      <span>{ru.turn.race(opponent.name, moscowTime(duel.expiresAt))}</span>
-                    </li>
-                  ) : null;
-                })}
-              </ul>
-            ) : null}
-          </div>
-        )}
-        {turnsOpen &&
-          !effectChoice &&
-          me?.phase === 'playing' &&
-          me.activeRun &&
-          !me.isCoopPartner && (
-            <div className="grid min-w-0 gap-4">
-              <CompleteForm
-                needsHours={me.activeRun.game.hours == null}
-                challengesEnabled={me.challengesEnabled}
-                dice={me.difficultyDice ?? null}
-                declared={me.activeRun.declaredDifficulty ?? null}
-                pending={pending}
-                onComplete={(completion) => void act({ kind: 'complete', completion })}
+          ) : null}
+          {desk ? null : stage}
+          {effectChoice && !throwing && !moving ? (
+            <div className={cx('grid min-w-0 gap-3', drawStageClass)}>
+              <EventChoice
+                choice={effectChoice}
+                busy={pending}
+                disabled={!answerAllowed}
+                drawn={me?.lastEvent ?? null}
+                fresh={freshDraw}
+                onShown={noteDrawShown}
+                onSettled={newDraw ? setSettledDraw : undefined}
+                unavailableReason={
+                  answerAllowed
+                    ? ''
+                    : finished
+                      ? ru.events.choice.closed
+                      : draft
+                        ? ru.events.choice.draft
+                        : ru.events.choice.paused
+                }
+                onChoose={(optionId) =>
+                  void act({ kind: 'choose', choiceId: effectChoice.id, optionId })
+                }
               />
+              {closeDraw}
+            </div>
+          ) : null}
+          {choice && showRollResult && (
+            <ChoiceCard
+              choice={choice}
+              className={rollRevealClass}
+              eventsEnabled={me?.eventsEnabled === true}
+              roll={me?.roll ?? null}
+              price={me?.nextReroll ?? null}
+              coins={me?.coins ?? null}
+              pending={pending}
+              onChoose={(optionId, difficulty) =>
+                void act({ kind: 'choose', choiceId: choice.id, optionId, difficulty })
+              }
+              onAlreadyPlayed={(gameId) => void act({ kind: 'alreadyPlayed', gameId })}
+              onReroll={() =>
+                void act({ kind: 'reroll', expected: me?.nextReroll?.payment ?? null })
+              }
+            />
+          )}
+          {offer && showRollResult && (
+            <OfferCard
+              offer={offer}
+              className={rollRevealClass}
+              eventsEnabled={me?.eventsEnabled === true}
+              roll={me?.roll ?? null}
+              price={me?.nextReroll ?? null}
+              coins={me?.coins ?? null}
+              pending={pending}
+              onStart={(difficulty) => void act({ kind: 'start', gameId: offer.id, difficulty })}
+              onAlreadyPlayed={() => void act({ kind: 'alreadyPlayed', gameId: offer.id })}
+              onReroll={() =>
+                void act({ kind: 'reroll', expected: me?.nextReroll?.payment ?? null })
+              }
+            />
+          )}
+          {/* The result is said once, when the wheel stops, and outlives the wheel */}
+          <p className="sr-only" aria-live="polite" data-testid="roll-announce">
+            {announced}
+          </p>
+          {/* A card drawn while the page is open is said once, when it is drawn on screen */}
+          <p className="sr-only" aria-live="polite" data-testid="draw-announce">
+            {newDraw && !drawPending && !moving && !throwing && me?.lastEvent
+              ? ru.events.announce(me.lastEvent.kind, me.lastEvent.name)
+              : ''}
+          </p>
+          {me?.phase === 'playing' && me.activeRun && (
+            <div data-testid="active-run" className="grid gap-4">
+              <p className="sr-only">{ru.turn.playing(me.activeRun.game.title)}</p>
+              <RunCard
+                game={{
+                  title: me.activeRun.game.title,
+                  hours: me.activeRun.game.hours ?? null,
+                  tags: [],
+                  cover: me.activeRun.game.cover?.thumbnailUrl,
+                }}
+                left={myRow ? myRow.cellsToFinish : routeLength}
+                level={3}
+                total={routeLength}
+                actions={null}
+                compact
+              />
+              {me.isCoopPartner ? (
+                <p className="text-ink-soft">{ru.turn.coopPartnerWaiting}</p>
+              ) : null}
+              {me.eventsEnabled === true ? (
+                <RunConditions conditions={me.activeRun.conditions ?? null} />
+              ) : null}
+              {me.activeDuels?.length ? (
+                <ul data-testid="run-duels" className="grid gap-2 text-sm">
+                  {me.activeDuels.map((duel) => {
+                    const opponentId =
+                      duel.challengerId === me.playerId ? duel.opponentId : duel.challengerId;
+                    const opponent = season.players.find((player) => player.id === opponentId);
+                    return opponent ? (
+                      <li key={duel.id} className="flex items-start gap-2 rounded-md bg-muted p-3">
+                        <Swords size={18} aria-hidden className="shrink-0" />
+                        <span>{ru.turn.race(opponent.name, moscowTime(duel.expiresAt))}</span>
+                      </li>
+                    ) : null;
+                  })}
+                </ul>
+              ) : null}
+            </div>
+          )}
+          {me && completableRun && (
+            <div key={completableRun.id} className="grid min-w-0 gap-4">
+              <Button
+                ref={completionOpener}
+                data-testid="complete-open"
+                variant="main"
+                disabled={pending}
+                onClick={() => {
+                  setMessage(null);
+                  setCompletionDraftRun(completableRun.id);
+                }}
+              >
+                {ru.turn.completeOpen}
+              </Button>
+              <CompletionRulesLink className="justify-self-start" />
+              <FormDialog
+                open={completing}
+                onOpenChange={(open) => {
+                  if (!open && !pending) setCompletionDraftRun(null);
+                }}
+                title={ru.turn.completeTitle}
+                returnFocus={completionOpener}
+                testId="complete-dialog"
+              >
+                {message ? <Notice tone="danger">{message}</Notice> : null}
+                <CompleteForm
+                  needsHours={completableRun.game.hours == null}
+                  challengesEnabled={me.challengesEnabled}
+                  dice={me.difficultyDice ?? null}
+                  declared={completableRun.declaredDifficulty ?? null}
+                  showHeading={false}
+                  pending={pending}
+                  onComplete={(completion) => {
+                    void act({ kind: 'complete', completion }).then((ok) => {
+                      if (ok) setCompletionDraftRun(null);
+                    });
+                  }}
+                />
+              </FormDialog>
               <RunActions
-                game={me.activeRun.game.title}
+                game={completableRun.game.title}
                 dropHintMinutes={me.dropHintMinutes}
                 dropPenalty={me.dropPenalty}
                 techRerollOpen={me.techRerollOpen}
@@ -1547,7 +1597,7 @@ export function SeasonScreen({
                 frozen={me.finish?.frozen === true}
                 pending={pending}
                 onDrop={() => {
-                  if (me.activeRun) void act({ kind: 'drop', runId: me.activeRun.id });
+                  void act({ kind: 'drop', runId: completableRun.id });
                 }}
                 onTechReroll={(reason, comment) =>
                   void act({ kind: 'techReroll', reason, comment })
@@ -1555,67 +1605,72 @@ export function SeasonScreen({
               />
             </div>
           )}
-        {me?.eventsEnabled === true ? (
-          <WaitingEvents
-            events={me.waitingEvents ?? null}
-            conditions={me.waitingConditions ?? null}
-          />
+          {me?.eventsEnabled === true ? (
+            <WaitingEvents
+              events={me.waitingEvents ?? null}
+              conditions={me.waitingConditions ?? null}
+              compact
+            />
+          ) : null}
+          {irlEffects.length > 0 ? (
+            <section
+              aria-labelledby="irl-proofs-title"
+              data-testid="irl-effects"
+              className={cx('min-w-0 gap-3', throwing || moving ? 'hidden' : 'grid')}
+              hidden={Boolean(throwing || moving)}
+            >
+              <h3 id="irl-proofs-title" className="font-display font-heavy">
+                {ru.irlProof.tasks}
+              </h3>
+              <ul className="grid min-w-0 gap-4">
+                {irlEffects.map((effect) => (
+                  <li
+                    key={effect.id}
+                    data-testid={`manual-effect-${effect.id}`}
+                    className="grid min-w-0 gap-2"
+                  >
+                    <IrlProofSection
+                      effect={effect}
+                      maxFiles={me?.irlProofMaxFiles ?? 0}
+                      pending={pending}
+                      enabled={answerAllowed}
+                      unavailableReason={
+                        answerAllowed
+                          ? ''
+                          : finished
+                            ? ru.irlProof.closed
+                            : draft
+                              ? ru.irlProof.draft
+                              : ru.irlProof.paused
+                      }
+                      onSubmit={(files, link) =>
+                        void act({ kind: 'irlProof', effectId: effect.id, files, link })
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {!manualFirst && !throwing ? afterRun : null}
+          {showInteractions ? (
+            <Link
+              to={paths.interactions(season.id)}
+              className={standaloneLink}
+              data-testid="season-interactions"
+            >
+              {ru.turn.interactions}
+            </Link>
+          ) : null}
+        </section>
+        {finished && season.nominationsEnabled === true ? (
+          <NominationResults seasonId={season.id} onSignedOut={onSignedOut} />
         ) : null}
-        {irlEffects.length > 0 ? (
-          <section
-            aria-labelledby="irl-proofs-title"
-            data-testid="irl-effects"
-            className={cx('min-w-0 gap-3', throwing || moving ? 'hidden' : 'grid')}
-            hidden={Boolean(throwing || moving)}
-          >
-            <h3 id="irl-proofs-title" className="font-display font-heavy">
-              {ru.irlProof.tasks}
-            </h3>
-            <ul className="grid min-w-0 gap-4">
-              {irlEffects.map((effect) => (
-                <li
-                  key={effect.id}
-                  data-testid={`manual-effect-${effect.id}`}
-                  className="grid min-w-0 gap-2"
-                >
-                  <IrlProofSection
-                    effect={effect}
-                    maxFiles={me?.irlProofMaxFiles ?? 0}
-                    pending={pending}
-                    enabled={answerAllowed}
-                    unavailableReason={
-                      answerAllowed
-                        ? ''
-                        : finished
-                          ? ru.irlProof.closed
-                          : draft
-                            ? ru.irlProof.draft
-                            : ru.irlProof.paused
-                    }
-                    onSubmit={(files, link) =>
-                      void act({ kind: 'irlProof', effectId: effect.id, files, link })
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-        {!manualFirst && !throwing ? afterRun : null}
-        {showInteractions ? (
-          <Link
-            to={paths.interactions(season.id)}
-            className={standaloneLink}
-            data-testid="season-interactions"
-          >
-            {ru.turn.interactions}
-          </Link>
-        ) : null}
-      </section>
+      </div>
 
       <section
         aria-labelledby="map-title"
-        className="grid min-w-0 gap-2 desk:sticky desk:top-20 desk:col-start-2 desk:row-span-6 desk:row-start-1"
+        className="grid min-w-0 gap-2 desk:min-h-0 desk:grid-rows-[minmax(0,1fr)_auto]"
       >
         <h2 id="map-title" className="sr-only">
           {ru.map.title}
@@ -1627,7 +1682,10 @@ export function SeasonScreen({
             players={shownPlayers}
             focus={shownMine && shownMine.cell >= 0 ? shownMine.cell : undefined}
             options={options?.map((o) => o.cell)}
-            className="h-105 rounded-lg border-3 border-ink desk:h-190"
+            className={cx(
+              'rounded-lg border-3 border-ink desk:h-full',
+              phoneMoment ? 'h-105' : 'h-55',
+            )}
           />
           {desk && branchCard && !onMap ? (
             <div className="absolute inset-x-3 bottom-3 z-10 rounded-lg border-3 border-ink bg-card p-4 shadow-lift">
@@ -1643,6 +1701,58 @@ export function SeasonScreen({
             >
               {onMap}
             </div>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-4">
+          {!desk ? (
+            <BottomSheet
+              title={ru.map.title}
+              full
+              trigger={
+                <Button variant="quiet" data-testid="map-open">
+                  {ru.season.mapOpen}
+                </Button>
+              }
+            >
+              <MapView
+                board={board}
+                players={shownPlayers}
+                focus={shownMine && shownMine.cell >= 0 ? shownMine.cell : undefined}
+                options={options?.map((option) => option.cell)}
+                className="h-full min-h-0 rounded-lg border-3 border-ink"
+              />
+            </BottomSheet>
+          ) : null}
+          {graphMode ? (
+            <>
+              <Button
+                ref={legendOpener}
+                variant="link"
+                onClick={() => {
+                  setLegendOpen(true);
+                }}
+              >
+                {ru.map.legend.title}
+              </Button>
+              <FormDialog
+                open={legendOpen}
+                onOpenChange={setLegendOpen}
+                title={ru.map.legend.title}
+                returnFocus={legendOpener}
+                wide
+              >
+                <MapLegend
+                  zones={season.zones}
+                  kinds={new Set(season.cells.map((cell) => cell.type))}
+                  myZone={
+                    season.cells.find(
+                      (cell) =>
+                        cell.id === season.players.find((p) => p.id === me?.playerId)?.cellId,
+                    )?.zone
+                  }
+                />
+              </FormDialog>
+            </>
           ) : null}
         </div>
         {/* The map in words: every cell and who stands there (also what the tests and screen readers read) */}
@@ -1672,68 +1782,60 @@ export function SeasonScreen({
         </ol>
       </section>
 
-      <Panel title={ru.leaderboard.title} className="hidden desk:col-start-1 desk:grid desk:w-96">
-        <p className="text-sm text-ink-soft">{ru.board.rule}</p>
-        <Leaderboard rows={shownRows} />
-      </Panel>
-      {finished && season.nominationsEnabled === true ? (
-        <NominationResults seasonId={season.id} onSignedOut={onSignedOut} />
-      ) : null}
-      {season.globalEvents?.length ? (
-        <div className="min-w-0 desk:col-start-1 desk:w-96">
-          <GlobalEventBanner events={season.globalEvents} />
-        </div>
-      ) : null}
-      {/* Items on (D-441): my inventory under the map on a phone, under the leaderboard on a desktop (S4D-1: nothing goes
-          between the turn and who leads), then the shop and the bets when they are on (D-447) — bets may play without
-          items; a mechanic off is not shown at all */}
-      {me && (season.economy?.items || season.economy?.shop || season.economy?.bets) ? (
-        <EconomySection
+      <div
+        data-testid="season-right"
+        className="grid min-w-0 content-start gap-4 desk:min-h-0 desk:overflow-y-auto desk:overscroll-contain desk:px-1"
+      >
+        <Panel title={ru.leaderboard.title} className="hidden desk:grid">
+          <Leaderboard rows={topRows} />
+          <Button
+            ref={leadersOpener}
+            variant="link"
+            className="justify-self-start"
+            onClick={() => {
+              setLeadersOpen(true);
+            }}
+          >
+            {ru.leaderboard.full}
+          </Button>
+          <FormDialog
+            open={leadersOpen}
+            onOpenChange={setLeadersOpen}
+            title={ru.leaderboard.title}
+            returnFocus={leadersOpener}
+            wide
+          >
+            <p className="text-sm text-ink-soft">{ru.board.rule}</p>
+            <div ref={showMe}>
+              <Leaderboard rows={shownRows} marked={false} />
+            </div>
+          </FormDialog>
+        </Panel>
+        {desk ? (
+          <FeedPreview
+            seasonId={seasonId}
+            version={visibleThrough}
+            visibleThrough={visibleThrough}
+            hiddenRollSequence={splitRoll && !showRollResult ? splitRoll.sequence : undefined}
+          />
+        ) : null}
+        {me && (season.economy?.items || season.economy?.shop || season.economy?.bets) ? (
+          <EconomySection
+            seasonId={seasonId}
+            version={season.lastSequence}
+            onSignedOut={onSignedOut}
+            items={season.economy.items}
+            shop={season.economy.shop}
+            bets={season.economy.bets}
+            compact
+          />
+        ) : null}
+        <PlayerSuggestions
           seasonId={seasonId}
-          version={season.lastSequence}
+          role={role}
+          participating={me !== null}
+          seasonStatus={season.status}
           onSignedOut={onSignedOut}
-          items={season.economy.items}
-          shop={season.economy.shop}
-          bets={season.economy.bets}
-          className="desk:col-start-1 desk:w-96"
-        />
-      ) : null}
-      <PlayerSuggestions
-        seasonId={seasonId}
-        role={role}
-        participating={me !== null}
-        seasonStatus={season.status}
-        onSignedOut={onSignedOut}
-      />
-      {/* The latest of the feed beside the map on a desktop; a phone opens the feed from the header */}
-      {desk ? (
-        <FeedPreview
-          seasonId={seasonId}
-          version={visibleThrough}
-          visibleThrough={visibleThrough}
-          hiddenRollSequence={splitRoll && !showRollResult ? splitRoll.sequence : undefined}
-          className="desk:col-start-1 desk:w-96"
-        />
-      ) : null}
-
-      {/* The map's legend after the leaderboard and the feed (K2-7): on a desktop it pushed «who leads» below the fold */}
-      {graphMode ? (
-        <MapLegend
-          zones={season.zones}
-          kinds={new Set(season.cells.map((c) => c.type))}
-          myZone={
-            season.cells.find(
-              (c) => c.id === season.players.find((p) => p.id === me?.playerId)?.cellId,
-            )?.zone
-          }
-          className="min-w-0 desk:col-start-1 desk:w-96"
-        />
-      ) : null}
-      <div className="legacy-screens min-w-0 desk:col-start-1 desk:w-96">
-        <AvatarSection
-          onChanged={() => {
-            void fetchSeason(seasonId).then(apply);
-          }}
         />
       </div>
       {/* On a phone the leaderboard waits in a sheet at the bottom of the screen */}

@@ -1,9 +1,12 @@
+import { MessageCircle } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type Ref } from 'react';
 import { newCommandId } from '../api/commands';
 import { moscowTime } from '../app/time';
 import { useSeasonVersion } from '../app/useSeasonVersion';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
+import { base } from '../ui/buttonStyles';
+import { cx } from '../ui/cx';
 import { SummaryButton } from '../ui/Disclosure';
 import { ConfirmDanger } from '../ui/Dialogs';
 import { TextArea } from '../ui/Field';
@@ -56,10 +59,12 @@ export function CommentThread({
   target: thread,
   label,
   onSignedOut,
+  count,
 }: {
   target: CommentTarget;
   label: string;
   onSignedOut: () => void;
+  count?: number;
 }) {
   const { seasonId } = thread;
   const targetId = thread.kind === 'feed' ? thread.targetCommandId : thread.runId;
@@ -305,31 +310,62 @@ export function CommentThread({
     />
   ) : null;
   const editorHasRow = window?.comments.some((entry) => entry.canEdit && entry.id === editing?.id);
+  const compact = target.kind === 'feed';
+  const visibleCount = window?.nextBefore === null ? window.comments.length : count;
+  const triggerId = `${id}-label`;
+  const trigger = {
+    ref: toggle,
+    id: triggerId,
+    'aria-controls': id,
+    'aria-label': label,
+    onClick: () => {
+      opening.current = !open;
+      setOpen(!open);
+      if (open) {
+        reader.current?.controller.abort();
+        reader.current = null;
+        olderQueued.current = false;
+        setLoadingOlder(false);
+        setReadIssue(null);
+        show(null);
+      }
+    },
+  };
   return (
-    <div className="grid min-w-0">
-      <SummaryButton
-        ref={toggle}
-        id={`${id}-label`}
-        open={open}
-        aria-controls={id}
-        aria-label={label}
-        className="justify-self-start text-sm font-bold"
-        onClick={() => {
-          opening.current = !open;
-          setOpen(!open);
-          if (open) {
-            reader.current?.controller.abort();
-            reader.current = null;
-            olderQueued.current = false;
-            setLoadingOlder(false);
-            setReadIssue(null);
-            show(null);
-          }
-        }}
+    <div className={compact ? 'contents' : 'grid min-w-0'}>
+      {compact ? (
+        <button
+          {...trigger}
+          type="button"
+          aria-expanded={open}
+          aria-describedby={visibleCount === undefined ? undefined : `${id}-count`}
+          className={cx(
+            base,
+            'row-start-1 min-h-11 min-w-11 gap-1 rounded-md px-1 text-sm text-ink-soft tabular-nums is-hover:bg-page',
+          )}
+        >
+          <MessageCircle size={16} aria-hidden />
+          {visibleCount === undefined ? null : (
+            <>
+              <span aria-hidden>{visibleCount}</span>
+              <span id={`${id}-count`} className="sr-only">
+                {t.count(visibleCount)}
+              </span>
+            </>
+          )}
+        </button>
+      ) : (
+        <SummaryButton {...trigger} open={open} className="justify-self-start text-sm font-bold">
+          {t.title}
+        </SummaryButton>
+      )}
+      <div
+        id={id}
+        role="region"
+        aria-labelledby={triggerId}
+        hidden={!open}
+        className={compact ? 'col-span-full' : undefined}
       >
-        {t.title}
-      </SummaryButton>
-      <div id={id} role="region" aria-labelledby={`${id}-label`} hidden={!open}>
         {open ? (
           <div className="grid min-w-0 gap-3 rounded-md border-2 border-muted p-3">
             {!window && !readIssue ? (

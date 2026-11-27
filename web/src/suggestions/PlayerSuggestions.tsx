@@ -254,7 +254,7 @@ function SuggestionBox({
   return (
     <section
       aria-labelledby={heading}
-      className="grid min-w-0 gap-3 rounded-lg bg-card p-4 desk:col-start-1 desk:w-96 desk:p-6"
+      className="grid min-w-0 gap-3 rounded-lg bg-card p-4 desk:p-6"
       data-testid="player-suggestions"
     >
       <h2 id={heading} className="font-display text-lg font-heavy">
@@ -385,7 +385,7 @@ function SuggestionBox({
               type="submit"
               loading={pending}
               disabled={!canSubmit}
-              className="justify-self-start"
+              className="justify-self-start desk:max-w-full desk:whitespace-normal"
             >
               {t.submit}
             </Button>

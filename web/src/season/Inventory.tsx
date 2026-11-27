@@ -1,11 +1,12 @@
 import { Backpack, Check, Clock, Swords, UserRound } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { api, rejectionCode, type Schemas } from '../api/client';
 import { newCommandId } from '../api/commands';
 import { moscowTime } from '../app/time';
 import { ru } from '../i18n/ru';
 import { Button } from '../ui/Button';
 import { FormDialog } from '../ui/Dialogs';
+import { SummaryButton } from '../ui/Disclosure';
 import { Select } from '../ui/Field';
 import { Badge, Chip } from '../ui/Marks';
 import { Skeleton } from '../ui/Progress';
@@ -13,11 +14,13 @@ import { EmptyState, ErrorState, Notice } from '../ui/States';
 import { Sticker } from '../ui/Sticker';
 import { Panel } from '../ui/Surface';
 import { cx } from '../ui/cx';
+import { useDesk } from '../ui/useDesk';
 import { BetsPanel } from './Bets';
 import { ShopPanel } from './Shop';
 import {
   clockOffset,
   refusalText,
+  useNow,
   type Economy,
   type Loaded,
   type PanelState,
@@ -26,6 +29,10 @@ import {
 
 export type { Economy, Loaded, PanelState, UseResult } from './economy';
 export type InventoryItem = Schemas['InventoryItemView'];
+
+function itemCount(items: readonly InventoryItem[]) {
+  return items.filter((item) => item.kind === 'item').length;
+}
 
 /** What the player answers in the sheet: the target (when the item asks for one) and the steps' answers in order */
 export type ItemUse = { targetPlayerId: string | null; choices: string[] };
@@ -62,6 +69,7 @@ export function EconomySection({
   items = true,
   shop = false,
   bets = false,
+  compact = false,
   className,
 }: {
   seasonId: string;
@@ -71,6 +79,8 @@ export function EconomySection({
   items?: boolean;
   shop?: boolean;
   bets?: boolean;
+  /** Disclosures on a phone and segments on a desktop, with one persistent set of panels. */
+  compact?: boolean;
   className?: string;
 }) {
   const [loaded, setLoaded] = useState<Loaded>({ kind: 'loading' });
@@ -115,9 +125,30 @@ export function EconomySection({
     setRetry((n) => n + 1);
   };
 
-  return (
-    <>
-      {items ? (
+  const economy = state.kind === 'ready' ? state.economy : null;
+  const inventoryItems = economy?.items ?? [];
+  const shopData = shop ? economy?.shop : null;
+  const betData = bets ? economy?.bets : null;
+  const deviceNow = useNow(compact && shopData?.expiresAt != null);
+  const offset = state.kind === 'ready' ? (state.clockOffset ?? 0) : 0;
+  const shopNow = compact ? new Date(deviceNow.getTime() + offset) : undefined;
+  const openLots =
+    shopData?.expiresAt && shopNow && Date.parse(shopData.expiresAt) > shopNow.getTime()
+      ? shopData.lots.filter((lot) => !lot.sold).length
+      : 0;
+  const panelClassName = compact ? undefined : className;
+  const panels: EconomyPanel[] = [];
+
+  if (items) {
+    panels.push({
+      kind: 'inventory',
+      label: ru.inventory.title,
+      summary: economy
+        ? inventoryItems.length === 0
+          ? ru.inventory.emptySummary(economy.inventoryLimit)
+          : ru.inventory.count(itemCount(inventoryItems), economy.inventoryLimit)
+        : null,
+      content: (
         <InventoryPanel
           state={state}
           onRetry={onRetry}
@@ -133,10 +164,23 @@ export function EconomySection({
               }),
             )
           }
-          className={className}
+          className={panelClassName}
         />
-      ) : null}
-      {shop ? (
+      ),
+    });
+  }
+  if (shop && (!compact || economy === null || shopData != null)) {
+    panels.push({
+      kind: 'shop',
+      label: ru.shop.title,
+      summary: shopData
+        ? openLots > 0
+          ? ru.shop.liveSummary(openLots)
+          : shopData.payment === 'freeRoll'
+            ? ru.shop.rollFree
+            : ru.shop.rollSummary(shopData.price)
+        : null,
+      content: (
         <ShopPanel
           state={state}
           onRetry={onRetry}
@@ -160,10 +204,18 @@ export function EconomySection({
               ru.shop.refusals,
             )
           }
-          className={className}
+          {...(shopNow ? { now: shopNow } : {})}
+          className={panelClassName}
         />
-      ) : null}
-      {bets ? (
+      ),
+    });
+  }
+  if (bets && (!compact || economy === null || betData != null)) {
+    panels.push({
+      kind: 'bets',
+      label: ru.bets.title,
+      summary: betData ? ru.bets.open(betData.openBets, betData.maxOpenBets) : null,
+      content: (
         <BetsPanel
           state={state}
           onRetry={onRetry}
@@ -177,10 +229,105 @@ export function EconomySection({
               ru.bets.refusals,
             )
           }
-          className={className}
+          className={panelClassName}
         />
+      ),
+    });
+  }
+
+  return compact ? (
+    <CompactEconomy panels={panels} className={className} />
+  ) : (
+    panels.map(({ kind, content }) => <Fragment key={kind}>{content}</Fragment>)
+  );
+}
+
+type EconomyKind = 'inventory' | 'shop' | 'bets';
+
+type EconomyPanel = {
+  kind: EconomyKind;
+  label: string;
+  summary: string | null;
+  content: ReactNode;
+};
+
+function CompactEconomy({
+  panels,
+  className,
+}: {
+  panels: readonly EconomyPanel[];
+  className: string | undefined;
+}) {
+  const desk = useDesk();
+  const id = useId();
+  const [selected, setSelected] = useState<EconomyKind | null>(null);
+  const [opened, setOpened] = useState<ReadonlySet<EconomyKind>>(() => new Set());
+  const active = panels.find((panel) => panel.kind === selected)?.kind ?? panels[0]?.kind;
+
+  function toggle(kind: EconomyKind) {
+    setOpened((current) => {
+      const next = new Set(current);
+      if (!next.delete(kind)) next.add(kind);
+      return next;
+    });
+  }
+
+  if (panels.length === 0) return null;
+  return (
+    <div className={cx('grid min-w-0 content-start gap-2', className)}>
+      {desk && panels.length > 1 ? (
+        <div
+          role="group"
+          aria-label={ru.inventory.sections}
+          className="flex min-w-0 flex-wrap gap-1 rounded-lg bg-card p-1"
+        >
+          {panels.map(({ kind, label }) => (
+            <button
+              key={kind}
+              type="button"
+              className="min-h-11 flex-1 cursor-pointer rounded-md px-2 text-sm font-bold is-hover:bg-page is-focus:focus-ring aria-pressed:bg-ink aria-pressed:text-card aria-pressed:is-hover:bg-ink"
+              data-testid={`open-${kind}`}
+              aria-controls={`${id}-${kind}`}
+              aria-pressed={active === kind}
+              onClick={() => {
+                setSelected(kind);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       ) : null}
-    </>
+      {panels.map(({ kind, label, summary, content }) => {
+        const open = desk ? active === kind : opened.has(kind);
+        const contentId = `${id}-${kind}`;
+        return (
+          <div key={kind} className={desk ? undefined : 'rounded-lg bg-card'}>
+            {desk ? null : (
+              <SummaryButton
+                className="w-full px-3"
+                open={open}
+                aria-controls={contentId}
+                data-testid={`open-${kind}`}
+                onClick={() => {
+                  toggle(kind);
+                }}
+              >
+                <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-left">
+                  <span className="font-bold">{label}</span>
+                  {summary ? (
+                    <span className="text-sm text-ink-soft tabular-nums">{summary}</span>
+                  ) : null}
+                </span>
+              </SummaryButton>
+            )}
+            <div id={contentId} hidden={!open}>
+              {content}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -201,7 +348,7 @@ export function InventoryPanel({
   const opener = useRef<HTMLButtonElement | null>(null);
   const economy = state.kind === 'ready' ? state.economy : null;
   const items = economy?.items ?? [];
-  const held = items.filter((i) => i.kind === 'item').length;
+  const held = itemCount(items);
 
   return (
     <Panel

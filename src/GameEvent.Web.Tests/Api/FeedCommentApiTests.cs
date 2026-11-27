@@ -37,6 +37,7 @@ public sealed class FeedCommentApiTests : IAsyncLifetime
         var before = await OkAsync(await spectator.GetAsync(feed, Ct));
         Assert.Equal(target, Assert.Single(before.GetProperty("entries").EnumerateArray()).GetProperty("commandId").GetGuid());
         Assert.Contains(target, before.GetProperty("commentTargets").EnumerateArray().Select(entry => entry.GetGuid()));
+        Assert.False(before.GetProperty("commentCounts").TryGetProperty(target.ToString(), out _));
         Assert.Empty(await CommentsAsync(spectator, url));
 
         var playerComment = Guid.NewGuid();
@@ -56,6 +57,7 @@ public sealed class FeedCommentApiTests : IAsyncLifetime
         Assert.Equal(new CommentView(spectatorComment, "zritel", SpectatorText, true), Assert.Single(forSpectator, c => c.Id == spectatorComment));
 
         var after = await OkAsync(await spectator.GetAsync(feed, Ct));
+        Assert.Equal(2, after.GetProperty("commentCounts").GetProperty(target.ToString()).GetInt32());
         Assert.Equal(before.GetProperty("nextBefore").GetInt64(), after.GetProperty("nextBefore").GetInt64());
         Assert.Equal(
             Assert.Single(before.GetProperty("entries").EnumerateArray()).GetProperty("sequence").GetInt64(),
@@ -142,6 +144,8 @@ public sealed class FeedCommentApiTests : IAsyncLifetime
 
         await ExpectAsync(HideAsync(admin, target, hidden), HttpStatusCode.NoContent);
         Assert.Equal(removed, Assert.Single(await CommentsAsync(spectator, url)).Id);
+        var afterHide = await OkAsync(await spectator.GetAsync(Url("feed"), Ct));
+        Assert.Equal(1, afterHide.GetProperty("commentCounts").GetProperty(target.ToString()).GetInt32());
         await ExpectAsync(RemoveAsync(spectator, url, removed), HttpStatusCode.NoContent);
 
         using var editHidden = await EditAsync(player, url, hidden, HiddenText);
@@ -155,6 +159,7 @@ public sealed class FeedCommentApiTests : IAsyncLifetime
             Assert.DoesNotContain(HiddenText, thread.ToString(), StringComparison.Ordinal);
             Assert.DoesNotContain(RemovedText, thread.ToString(), StringComparison.Ordinal);
             var publicFeed = await OkAsync(await reader.GetAsync(Url("feed"), Ct));
+            Assert.False(publicFeed.GetProperty("commentCounts").TryGetProperty(target.ToString(), out _));
             Assert.DoesNotContain(HiddenText, publicFeed.ToString(), StringComparison.Ordinal);
             Assert.DoesNotContain(RemovedText, publicFeed.ToString(), StringComparison.Ordinal);
         }
@@ -281,6 +286,7 @@ public sealed class FeedCommentApiTests : IAsyncLifetime
         var feed = await OkAsync(await spectator.GetAsync(Url("feed"), Ct));
         Assert.Contains(feed.GetProperty("entries").EnumerateArray(), e => e.GetProperty("commandId").GetGuid() == target);
         Assert.False(feed.TryGetProperty("commentTargets", out _));
+        Assert.False(feed.TryGetProperty("commentCounts", out _));
 
         var url = Thread(target);
         using var cannotRead = await spectator.GetAsync(url, Ct);

@@ -1,8 +1,9 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '../App';
 import { SIGNED_OUT_EVENT, type Schemas } from '../api/client';
 import type { SeasonUpdate } from '../api/realtime';
+import { ru } from '../i18n/ru';
 import { fakeServer, json, type Handler } from '../test/fakeServer';
 import { navigate, paths, routeOf } from './router';
 
@@ -35,7 +36,16 @@ vi.mock('../season/SeasonScreen', () => ({
   SeasonScreen: ({ seasonId, onNavigationLoaded }: HomeProps) => (
     <main data-testid="navigation-home" data-season-id={seasonId}>
       <h1>Главная макета</h1>
-      <button onClick={() => onNavigationLoaded?.({ id: seasonId, pollsEnabled: true })}>
+      <button
+        onClick={() =>
+          onNavigationLoaded?.({
+            id: seasonId,
+            pollsEnabled: true,
+            galleryEnabled: true,
+            interactionFeatures: { coop: false, duels: true, partnerBoard: false },
+          })
+        }
+      >
         Главная загружена: включено
       </button>
       <button onClick={() => onNavigationLoaded?.({ id: seasonId, pollsEnabled: false })}>
@@ -107,15 +117,16 @@ function at(path: string) {
   globalThis.history.replaceState(null, '', path);
 }
 
-function links() {
-  return screen.queryAllByRole('link', { name: /^Голосования$/ });
+function expectMenuHidden() {
+  expect(screen.queryByTestId('nav-more')).not.toBeInTheDocument();
 }
 
-function expectLinksTo(id: string) {
-  const found = links();
-  expect(found.length).toBeGreaterThan(0);
-  for (const link of found)
-    expect(link.getAttribute('href')?.toLowerCase()).toBe(`/seasons/${id.toLowerCase()}/polls`);
+async function expectLinkTo(id: string) {
+  const person = userEvent.setup();
+  await person.click(await screen.findByTestId('nav-more'));
+  const link = await screen.findByRole('menuitem', { name: ru.nav.polls });
+  expect(link.getAttribute('href')?.toLowerCase()).toBe(paths.polls(id.toLowerCase()));
+  await person.keyboard('{Escape}');
 }
 
 function activeSubscription(id: string) {
@@ -150,6 +161,55 @@ afterEach(() => {
 });
 
 describe('poll navigation uses actual flags of the selected season', () => {
+  it('keeps the five primary links and the seasonal menu on one navigation row across pages', async () => {
+    const answer = deferredResponse();
+    const server = site(() => answer.promise);
+    const person = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('navigation-home');
+    const navigation = within(screen.getByRole('navigation', { name: ru.nav.label }));
+    const expectPrimary = () => {
+      expect(navigation.getAllByRole('link').map((link) => link.textContent)).toEqual([
+        ru.nav.season,
+        ru.nav.feed,
+        ru.nav.pool,
+        ru.nav.rules,
+        ru.nav.hallOfFame,
+      ]);
+    };
+    expectPrimary();
+    expect(navigation.queryByRole('button', { name: ru.nav.more })).not.toBeInTheDocument();
+
+    await person.click(screen.getByRole('button', { name: 'Главная загружена: включено' }));
+    expectPrimary();
+    const more = navigation.getByRole('button', { name: ru.nav.more });
+    more.focus();
+    await person.keyboard('{ArrowDown}');
+    expect(await screen.findByRole('menuitem', { name: ru.nav.gallery })).toHaveFocus();
+    expect(screen.getByRole('menuitem', { name: ru.nav.polls })).toHaveAttribute(
+      'href',
+      paths.polls(seasonA),
+    );
+    expect(screen.getByRole('menuitem', { name: ru.turn.interactions })).toHaveAttribute(
+      'href',
+      paths.interactions(seasonA),
+    );
+    await person.keyboard('{Escape}');
+    expect(more).toHaveFocus();
+
+    await person.click(navigation.getByRole('link', { name: ru.nav.feed }));
+    await screen.findByTestId('navigation-feed');
+    expectPrimary();
+    expect(navigation.getByRole('button', { name: ru.nav.more })).toBe(more);
+    expect(server.sent('GET', '/navigation')).toHaveLength(1);
+
+    await act(async () => {
+      answer.resolve(json(200, nav(seasonA, false)));
+      await answer.promise;
+    });
+    await waitFor(() => expect(more).not.toBeInTheDocument());
+  });
+
   it('parses poll aliases and explicit ids, rejects malformed paths and preserves legacy routes', () => {
     expect(paths.polls()).toBe('/polls');
     expect(paths.polls(seasonB)).toBe(`/seasons/${seasonB}/polls`);
@@ -179,11 +239,11 @@ describe('poll navigation uses actual flags of the selected season', () => {
     const person = userEvent.setup();
     render(<App />);
     await screen.findByTestId('navigation-home');
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
 
     await person.click(screen.getByRole('button', { name: 'Главная загружена: включено' }));
 
-    expectLinksTo(seasonA);
+    await expectLinkTo(seasonA);
     expect(server.sent('GET', '/navigation')).toHaveLength(0);
     expect(observed.subscriptions).toHaveLength(0);
     expect(observed.pollsRendered).toHaveLength(0);
@@ -191,12 +251,12 @@ describe('poll navigation uses actual flags of the selected season', () => {
 
     await person.click(screen.getByRole('button', { name: 'Главная загружена: выключено' }));
 
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
     expect(server.sent('GET', '/navigation')).toHaveLength(0);
     expect(observed.subscriptions).toHaveLength(0);
   });
 
-  it('waits for the current home view instead of restoring the flag from a previous visit', async () => {
+  it('keeps the latest rules flags when returning to the home view', async () => {
     at('/');
     const answer = deferredResponse();
     const server = site(() => answer.promise);
@@ -204,7 +264,7 @@ describe('poll navigation uses actual flags of the selected season', () => {
     render(<App />);
     await screen.findByTestId('navigation-home');
     await person.click(screen.getByRole('button', { name: 'Главная загружена: включено' }));
-    expectLinksTo(seasonA);
+    await expectLinkTo(seasonA);
 
     act(() => {
       navigate('/feed');
@@ -217,13 +277,13 @@ describe('poll navigation uses actual flags of the selected season', () => {
       answer.resolve(json(200, nav(seasonA, false)));
       await answer.promise;
     });
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
 
     act(() => {
       navigate('/');
     });
     await screen.findByTestId('navigation-home');
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
     expect(server.sent('GET', '/navigation')).toHaveLength(1);
   });
 
@@ -233,7 +293,7 @@ describe('poll navigation uses actual flags of the selected season', () => {
     const server = site(() => answer.promise);
     render(<App />);
     await screen.findByTestId('navigation-feed');
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
     await waitFor(() => {
       expect(server.sent('GET', '/navigation')).toHaveLength(1);
     });
@@ -246,7 +306,7 @@ describe('poll navigation uses actual flags of the selected season', () => {
       await answer.promise;
     });
 
-    expectLinksTo(seasonB);
+    await expectLinkTo(seasonB);
     expect(
       screen.getByTestId('navigation-feed').getAttribute('data-season-id')?.toLowerCase(),
     ).toBe(seasonB);
@@ -264,9 +324,7 @@ describe('poll navigation uses actual flags of the selected season', () => {
       'data-season-id',
       seasonA,
     );
-    await waitFor(() => {
-      expectLinksTo(seasonA);
-    });
+    await expectLinkTo(seasonA);
     expect(server.sent('GET', '/navigation')).toHaveLength(1);
     expect(server.sent('GET', '/rules')).toHaveLength(0);
   });
@@ -281,22 +339,18 @@ describe('poll navigation uses actual flags of the selected season', () => {
       expect(server.sent('GET', '/navigation')).toHaveLength(1);
     });
     const subscription = activeSubscription(seasonA);
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
 
     await publish(subscription, 'game-rolled');
     expect(server.sent('GET', '/navigation')).toHaveLength(1);
     enabled = true;
     await publish(subscription, 'ruleset-changed');
-    await waitFor(() => {
-      expectLinksTo(seasonA);
-    });
+    await expectLinkTo(seasonA);
     expect(server.sent('GET', '/navigation')).toHaveLength(2);
 
     enabled = false;
     await publish(subscription, 'command-undone');
-    await waitFor(() => {
-      expect(links()).toHaveLength(0);
-    });
+    await waitFor(expectMenuHidden);
     expect(server.sent('GET', '/navigation')).toHaveLength(3);
   });
 
@@ -307,9 +361,7 @@ describe('poll navigation uses actual flags of the selected season', () => {
     const server = site(({ path }) => ({ body: nav(requestSeason(path), enabled) }));
     render(<App />);
     await screen.findByTestId('navigation-feed');
-    await waitFor(() => {
-      expectLinksTo(seasonA);
-    });
+    await expectLinkTo(seasonA);
     expect(server.sent('GET', '/navigation')).toHaveLength(1);
     const subscription = activeSubscription(seasonA);
 
@@ -319,9 +371,7 @@ describe('poll navigation uses actual flags of the selected season', () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => {
-      expect(links()).toHaveLength(0);
-    });
+    await waitFor(expectMenuHidden);
     expect(server.sent('GET', '/navigation')).toHaveLength(2);
   });
 
@@ -348,14 +398,14 @@ describe('poll navigation uses actual flags of the selected season', () => {
       expect(server.sent('GET', '/navigation')).toHaveLength(2);
     });
     expect(oldSubscription.stopped).toBe(true);
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
 
     await act(async () => {
       old.resolve(json(200, nav(seasonA, true)));
       await old.promise;
     });
 
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
     expect(screen.getByTestId('navigation-feed')).toHaveAttribute('data-season-id', seasonB);
     activeSubscription(seasonB);
   });
@@ -372,9 +422,7 @@ describe('poll navigation uses actual flags of the selected season', () => {
     );
     render(<App />);
     await screen.findByTestId('navigation-feed');
-    await waitFor(() => {
-      expectLinksTo(seasonA);
-    });
+    await expectLinkTo(seasonA);
 
     act(() => {
       navigate(`/seasons/${seasonB}/feed`);
@@ -383,13 +431,11 @@ describe('poll navigation uses actual flags of the selected season', () => {
       expect(server.sent('GET', '/navigation')).toHaveLength(2);
     });
     expect(screen.getByTestId('navigation-feed')).toHaveAttribute('data-season-id', seasonB);
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
 
     broken = false;
     await publish(activeSubscription(seasonB), 'ruleset-changed');
-    await waitFor(() => {
-      expectLinksTo(seasonB);
-    });
+    await expectLinkTo(seasonB);
     expect(server.sent('GET', '/navigation')).toHaveLength(3);
     expect(screen.getByTestId('navigation-feed')).toBeVisible();
   });
@@ -401,7 +447,7 @@ describe('poll navigation uses actual flags of the selected season', () => {
 
     await screen.findByTestId('login-submit');
 
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
     expect(screen.queryByTestId('navigation-feed')).not.toBeInTheDocument();
     expect(observed.subscriptions.every((subscription) => subscription.stopped)).toBe(true);
   });
@@ -427,7 +473,7 @@ describe('poll navigation uses actual flags of the selected season', () => {
       await pending.promise;
     });
 
-    expect(links()).toHaveLength(0);
+    expectMenuHidden();
     expect(screen.getByTestId('login-submit')).toBeVisible();
     expect(screen.queryByTestId('navigation-feed')).not.toBeInTheDocument();
   });

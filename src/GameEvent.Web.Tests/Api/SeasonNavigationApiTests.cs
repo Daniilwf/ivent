@@ -54,6 +54,26 @@ public sealed class SeasonNavigationApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Seasonal_navigation_matches_the_home_interaction_flags_and_omits_them_when_all_are_off()
+    {
+        var spectator = await _site.SignedInAsync("zritel");
+        var seasonId = SiteFactory.SeasonId;
+        var disabled = await ApiCalls.OkAsync(await spectator.GetAsync(Navigation(seasonId), Ct));
+        Assert.False(disabled.TryGetProperty("interactionFeatures", out _));
+
+        await RulesAsync(_site, Flags(f => f with { Coop = true, PartnerBoard = true }));
+        var navigation = await ApiCalls.OkAsync(await spectator.GetAsync(Navigation(seasonId), Ct));
+        var flags = navigation.GetProperty("interactionFeatures");
+        Assert.True(flags.GetProperty("coop").GetBoolean());
+        Assert.True(flags.GetProperty("partnerBoard").GetBoolean());
+        Assert.False(flags.GetProperty("duels").GetBoolean());
+
+        var season = await ApiCalls.OkAsync(await spectator.GetAsync(Season(seasonId), Ct));
+        Assert.Equal(season.GetProperty("interactionFeatures").GetRawText(), flags.GetRawText());
+        await AssertIntactAsync(_site);
+    }
+
+    [Fact]
     public async Task Current_rule_changes_and_their_undo_change_both_navigation_and_home_flags()
     {
         var admin = await _site.SignedInAsync("admin");

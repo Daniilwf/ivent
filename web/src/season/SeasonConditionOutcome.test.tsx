@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { fakeServer, seasonId } from '../test/fakeServer';
 import { SeasonScreen } from './SeasonScreen';
@@ -106,7 +107,7 @@ function season(run: Schemas['CompletedRunView']): Schemas['SeasonView'] {
   };
 }
 
-function open(run: Schemas['CompletedRunView']) {
+async function openResult(run: Schemas['CompletedRunView']) {
   fakeServer({
     'GET /api/auth/me': {
       id: 'user',
@@ -125,7 +126,12 @@ function open(run: Schemas['CompletedRunView']) {
     },
     [`GET /api/seasons/${seasonId}`]: season(run),
   });
-  return render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+  const view = render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+  const details = await screen.findByTestId('proof-details');
+  expect(details).not.toHaveAttribute('open');
+  await userEvent.click(screen.getByTestId('last-dice'));
+  expect(details).toHaveAttribute('open');
+  return view;
 }
 
 describe('the actual reward after checking event conditions', () => {
@@ -134,7 +140,7 @@ describe('the actual reward after checking event conditions', () => {
   });
 
   it('explains an unmet completed run without any dice once beside the aggregate check', async () => {
-    open(completedRun());
+    await openResult(completedRun());
 
     const note = await screen.findByText(noDiceResult);
 
@@ -152,7 +158,7 @@ describe('the actual reward after checking event conditions', () => {
       { dice: [{ sides: 4, value: 2 }], challengeDice: [] },
       { dice: [], challengeDice: [{ sides: 4, value: 2 }] },
     ]) {
-      const view = open(completedRun({ ...dice, total: 2 }));
+      const view = await openResult(completedRun({ ...dice, total: 2 }));
 
       expect(await screen.findByRole('heading', { name: 'Условия прохождения' })).toBeVisible();
       expect(screen.getByText('Нарушено', { exact: true })).toBeVisible();
@@ -163,7 +169,7 @@ describe('the actual reward after checking event conditions', () => {
   });
 
   it('does not claim completion coins were awarded for a rejected run without dice', async () => {
-    open(completedRun({ status: 'rejected' }));
+    await openResult(completedRun({ status: 'rejected' }));
 
     expect(await screen.findByRole('heading', { name: 'Условия прохождения' })).toBeVisible();
     expect(screen.queryByText(noDiceResult)).not.toBeInTheDocument();
@@ -174,7 +180,7 @@ describe('the actual reward after checking event conditions', () => {
       [{ met: false, waived: true }, 'Не применимо'],
       [{ met: true, waived: false }, 'Выполнено'],
     ] as const) {
-      const view = open(completedRun({ conditionCheck }));
+      const view = await openResult(completedRun({ conditionCheck }));
 
       expect(await screen.findByRole('heading', { name: 'Условия прохождения' })).toBeVisible();
       expect(screen.getByText(label, { exact: true })).toBeVisible();

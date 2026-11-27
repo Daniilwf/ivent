@@ -43,7 +43,15 @@ test('spectator: sees everything public and cannot make a single game action', a
   await expect(page.getByTestId('cells')).toContainText('Вася');
   await expect(page.getByTestId('cells')).toContainText('Петя');
   await expect(leaderRow(page, vasya.playerId)).toContainText(`1. Вася: ${points(run.total)}`);
-  for (const action of ['roll', 'start', 'complete-form', 'drop', 'tech-reroll', 'proof-form'])
+  for (const action of [
+    'roll',
+    'start',
+    'complete-open',
+    'complete-form',
+    'drop',
+    'tech-reroll',
+    'proof-form',
+  ])
     await expect(page.getByTestId(action), action).toHaveCount(0);
 
   // The feed: Vasya's completion, and from it his profile with the review and the game's page

@@ -71,6 +71,7 @@ describe('ProfileScreen', () => {
     expect(screen.getByTestId('profile-loading')).toHaveAttribute('aria-busy', 'true');
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Капитан_Пельмень');
     expect(screen.queryByText(ru.board.you)).toBeNull();
+    expect(screen.queryByRole('heading', { name: ru.avatar.title })).not.toBeInTheDocument();
     // The sticker has the colour of the token in the latest season (the first listed), as on its map.
     // The inline declaration is read: jsdom substitutes var() in computed styles (D-251)
     expect(screen.getByTestId('profile').querySelector('span')?.style.background).toBe(

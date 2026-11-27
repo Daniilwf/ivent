@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Schemas } from '../support/api.ts';
+import { openEconomy } from '../support/economy.ts';
 import { apiOf, confirmButton, live, openAdmin, setUpSeason, signIn } from '../support/world.ts';
 
 // Stage 4 (4.13): the whole way of an item from the admin to another player's screen, three browsers. The admin turns
@@ -77,7 +78,7 @@ test('a lot bought in the shop and used on another player, seen live by him', as
   }
 
   // Вася: the shop appears with the mechanics, the roll gives the one lot, «Купить за 15»
-  const shop = vasyaPage.getByTestId('shop');
+  const shop = await openEconomy(vasyaPage, 'shop');
   await expect(shop).toBeVisible(live);
   await shop.getByTestId('shop-roll').click();
   await expect(shop.getByTestId('shop-lots')).toBeVisible();
@@ -85,6 +86,7 @@ test('a lot bought in the shop and used on another player, seen live by him', as
   await expect(shop.getByRole('status')).toHaveText('Куплено: «Птичкерс». Уже в инвентаре.');
 
   // ... and uses it on Петя, the only target
+  await openEconomy(vasyaPage, 'inventory');
   const item = vasyaPage.getByTestId('item-bird-thief');
   await expect(item).toBeVisible();
   await item.getByTestId('use-bird-thief').click();
@@ -102,6 +104,7 @@ test('a lot bought in the shop and used on another player, seen live by him', as
     (await petyaApi.get<Schemas['EconomyView']>(`/api/seasons/${world.seasonId}/economy`)).coins;
   expect(stolen).toBeGreaterThanOrEqual(1);
   expect(stolen).toBeLessThanOrEqual(4);
+  await openEconomy(petyaPage, 'inventory');
   await expect(petyaPage.getByTestId('coins')).toHaveText(
     new RegExp(`^${String(10 - stolen)} `),
     live,
