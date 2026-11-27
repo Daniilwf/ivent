@@ -9,7 +9,7 @@ export function Rating({ value }: { value: number }) {
       <Badge
         tone="gold"
         label={ru.feed.ratingLabel(value)}
-        icon={<Star size={14} aria-hidden className="fill-ink" />}
+        icon={<Star size={14} aria-hidden className="fill-on-bright" />}
       >
         <span aria-hidden>{ru.feed.rating(value)}</span>
       </Badge>

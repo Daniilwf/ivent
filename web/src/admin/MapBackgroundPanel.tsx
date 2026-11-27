@@ -79,7 +79,7 @@ export function MapBackgroundPanel({
           <img
             src={preview ?? `/api/files/${background.fileId}/thumbnail`}
             alt={t.preview}
-            className="max-h-40 w-auto rounded-md border-2 border-ink bg-page"
+            className="map-picture max-h-40 w-auto rounded-md border-2 border-ink bg-page"
             data-testid="map-background-preview"
           />
           <figcaption className="text-sm text-ink-soft" data-testid="map-background-size">

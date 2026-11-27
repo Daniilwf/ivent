@@ -820,6 +820,9 @@ export const ru = {
     menuWaiting: (name: string, waiting: number) =>
       `Меню: ${name}. Ждут проверки пруфов: ${waiting}`,
     changePassword: 'Сменить пароль',
+    // D-940: the theme, a setting of this device
+    theme: 'Тема',
+    themes: { light: 'Светлая', dark: 'Тёмная', system: 'Как в системе' },
     noSeasonTitle: 'Сезон ещё не начался',
     noSeasonText: 'Когда админ заведёт сезон, здесь появятся карта, лидерборд и твой ход.',
     loadErrorTitle: 'Сайт не загрузился',

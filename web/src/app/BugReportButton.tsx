@@ -127,7 +127,7 @@ export function BugReportButton() {
         }}
       >
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-20 bg-ink/40" />
+          <Dialog.Overlay className="fixed inset-0 z-20 bg-scrim" />
           <Dialog.Content
             onCloseAutoFocus={(event) => {
               // The dialog opens from state, not from a trigger: focus goes back to the button by hand

@@ -173,7 +173,7 @@ export function ProfileDetails({
                   key={`${achievement.scope ?? 'season'}:${achievement.seasonId}:${achievement.objectId}`}
                   className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 py-3"
                 >
-                  <span className="grid size-8 place-items-center rounded-full bg-gold text-ink">
+                  <span className="grid size-8 place-items-center rounded-full bg-gold text-on-bright">
                     <Award size={20} aria-hidden />
                   </span>
                   <div className="grid gap-1 wrap-anywhere">

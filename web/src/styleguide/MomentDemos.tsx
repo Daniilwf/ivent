@@ -162,7 +162,7 @@ export function MoveDemo() {
           </span>
         ) : null}
         {phase === 'done' ? (
-          <MomentCard className="absolute inset-x-3 bottom-3 bg-gold">
+          <MomentCard className="absolute inset-x-3 bottom-3 bg-gold text-on-bright">
             <strong>{t.move.landed(landed)}</strong>
           </MomentCard>
         ) : null}

@@ -4,6 +4,32 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="" />
+    <style>
+      /* The canvas before the app stylesheet loads. Match the two page colours in tokens.css. */
+      @layer theme-startup {
+        :root {
+          --initial-dark-page: #1a1c22;
+          --initial-page-color: #eef2f7;
+          background-color: var(--initial-page-color);
+          color-scheme: light;
+        }
+
+        :root[data-theme='dark'] {
+          --initial-page-color: var(--initial-dark-page);
+          color-scheme: dark;
+        }
+
+        @media (prefers-color-scheme: dark) {
+          :root:not([data-theme]) {
+            --initial-page-color: var(--initial-dark-page);
+            color-scheme: dark;
+          }
+        }
+      }
+    </style>
+    <script src="/theme-init.js"></script>
     <title>Игровой ивент</title>
   </head>
   <body>

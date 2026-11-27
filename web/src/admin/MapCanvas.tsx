@@ -15,6 +15,7 @@ import '@xyflow/react/dist/base.css';
 import { Flag, GitFork, Maximize, Minus, Orbit, Play, Plus, Trophy, Users } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { graphBoard } from '../board/graphBoard';
+import { useTheme } from '../design/theme';
 import { ru } from '../i18n/ru';
 import { IconButton } from '../ui/Button';
 import { cx } from '../ui/cx';
@@ -157,6 +158,7 @@ export function MapCanvas({
   onMove: (id: string, at: { x: number; y: number }) => void;
   onConnect: (from: string, to: string) => void;
 }) {
+  const { theme } = useTheme();
   const zoneName = useMemo(() => new Map(draft.zones.map((z) => [z.id, z.name])), [draft.zones]);
   const { cellNumber } = useMemo(() => graphBoard(draft), [draft]);
   const fromDraft: CellNode[] = draft.cells.map((c, i) => ({
@@ -239,6 +241,7 @@ export function MapCanvas({
       role="group"
     >
       <ReactFlow
+        colorMode={theme}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
@@ -283,7 +286,7 @@ export function MapCanvas({
               alt=""
               draggable={false}
               data-testid="canvas-background"
-              className="pointer-events-none absolute top-0 left-0 -z-1 max-w-none select-none"
+              className="map-picture pointer-events-none absolute top-0 left-0 -z-1 max-w-none select-none"
               style={{
                 width: draft.background.width * spread,
                 height: draft.background.height * spread,

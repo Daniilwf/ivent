@@ -57,6 +57,8 @@ function scenery(board: Board): Prop[] {
 }
 
 const ink = 'var(--color-ink)';
+/** Marks on event and checkpoint cells, and on an unoccupied bonus cell (D-940). */
+const onBright = 'var(--color-on-bright)';
 
 function PropShape({ prop }: { prop: Prop }) {
   const { x, y, size: k } = prop;
@@ -150,7 +152,7 @@ function BackgroundPicture({ picture }: { picture: BoardBackground }) {
       preserveAspectRatio="none"
       data-map-background=""
       className={cx(
-        'transition-opacity duration-(--duration-slow) motion-reduce:transition-none',
+        'map-picture transition-opacity duration-(--duration-slow) motion-reduce:transition-none',
         ready === picture.url ? 'opacity-100' : 'opacity-0',
       )}
     />
@@ -909,7 +911,7 @@ export function MapView({
                   y={c.y - 10}
                   width={20}
                   height={20}
-                  color={ink}
+                  color={onBright}
                   strokeWidth={2.5}
                   aria-hidden
                 />
@@ -940,7 +942,7 @@ export function MapView({
                   className="pointer-events-none font-display text-sm font-heavy"
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fill={mine ? 'var(--color-on-color)' : ink}
+                  fill={mine ? 'var(--color-on-color)' : onBright}
                 >
                   {t.bonus(c.amount ?? 0)}
                 </text>
@@ -950,7 +952,7 @@ export function MapView({
                   y={c.y - 10}
                   width={20}
                   height={20}
-                  color={ink}
+                  color={onBright}
                   strokeWidth={2.5}
                   aria-hidden
                 />
@@ -961,7 +963,13 @@ export function MapView({
                   className={label}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fill={mine ? 'var(--color-on-color)' : ink}
+                  fill={
+                    mine
+                      ? c.kind === 'fork'
+                        ? 'var(--color-on-current-fork)'
+                        : 'var(--color-on-color)'
+                      : ink
+                  }
                 >
                   {c.id}
                 </text>

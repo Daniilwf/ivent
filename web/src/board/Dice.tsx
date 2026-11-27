@@ -64,7 +64,7 @@ function Face({
       <span
         className={cx(
           'absolute inset-0 grid place-items-center rounded-md border-3 border-ink font-display text-2xl font-heavy backface-hidden',
-          challenge ? 'bg-gold' : 'bg-card',
+          challenge ? 'bg-gold text-on-bright' : 'bg-card',
           place,
         )}
       >
@@ -84,7 +84,7 @@ function Face({
           key={i}
           className={cx(
             'size-2 place-self-center rounded-full',
-            pips[value]?.includes(i) && 'bg-ink',
+            pips[value]?.includes(i) && (challenge ? 'bg-on-bright' : 'bg-ink'),
           )}
         />
       ))}

@@ -393,4 +393,5 @@
 | Отчёт о баге | сообщение с кнопки «Сообщить о баге»: страница, описание, контекст, скриншот, статус | `BugReport`, команда `ReportBug`, событие `BugReported`, `BugReportButton` |
 | Статус отчёта о баге | новый, в работе (перенесён в `docs/BUGS.md`), закрыт | `BugReportStatus` (`New`, `InWork`, `Closed`), `SetBugReportStatus`, `BugReportStatusChanged` |
 | Контекст отчёта | что страница собрала сама: последние действия (нажатия, запросы с ответами), ошибки браузера, браузер и размер окна; введённое в поля не собирается | `BugReportContext`, `BugContextEntry`, `web/src/app/bugContext.ts` |
+| Тема оформления | как выглядит сайт на этом устройстве: «Светлая», «Тёмная» или «Как в системе» (по умолчанию); хранится в браузере, не в игре (D-940) | `ThemeChoice` (`light`, `dark`, `system`), `web/src/design/theme.ts`, атрибут `data-theme`, подписи — `ru.shell.themes` |
 | Проверка здоровья | ответ `/health`: общий статус и статусы базы, диска и очереди | `HealthView`, `DatabaseHealthCheck`, `DiskHealthCheck`, `QueueHealthCheck` |

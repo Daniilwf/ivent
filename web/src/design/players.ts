@@ -20,8 +20,8 @@ export const tokenColors = [
   '#8a8a8a',
 ] as const;
 
-const ink = '#1e2030';
-const white = '#ffffff';
+// The light letter colours select one semantic token per fill. The dark theme can deepen the dark letter.
+export const tokenLetters = { dark: '#1e2030', light: '#ffffff' } as const;
 
 function luminance(hex: string) {
   const [r, g, b] = [1, 3, 5].map((i) => {
@@ -41,7 +41,9 @@ export function playerToken(index: number) {
   const n = ((index % tokenColors.length) + tokenColors.length) % tokenColors.length;
   const color = tokenColors[n] as string;
   const onColor =
-    contrast(color, white) >= contrast(color, ink) ? 'var(--color-on-color)' : 'var(--color-ink)';
+    contrast(color, tokenLetters.light) >= contrast(color, tokenLetters.dark)
+      ? 'var(--color-on-token-light)'
+      : 'var(--color-on-token-dark)';
   return { fill: `var(--color-token-${n + 1})`, ink: onColor, hex: color };
 }
 
