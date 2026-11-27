@@ -177,6 +177,37 @@
   outline-offset: 3px;
 }
 
+@utility shell-min-height {
+  min-height: calc(100dvh - var(--shell-banner-height, 0px));
+}
+
+@utility season-frame {
+  height: calc(
+    100dvh - var(--shell-header-height, var(--spacing) * 16) - var(--shell-banner-height, 0px)
+  );
+  grid-template-columns:
+    min(25vw, var(--spacing) * 90) minmax(0, 1fr)
+    min(24vw, var(--spacing) * 85);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+@utility season-draw-panel {
+  --season-draw-panel-height: calc(
+    100dvh - var(--shell-header-height, var(--spacing) * 16) - var(--shell-banner-height, 0px) -
+      var(--spacing) * 24
+  );
+  --season-draw-panel-width: min(40vw, var(--spacing) * 120);
+  --season-drawing-face-height: calc(var(--season-draw-panel-height) - var(--spacing) * 24);
+  max-height: var(--season-draw-panel-height);
+  width: var(--season-draw-panel-width);
+
+  /* The face is inert during the draw; a long description must leave room for the skip button. */
+  & [data-drawing='true'] {
+    max-height: var(--season-drawing-face-height);
+    overflow: hidden;
+  }
+}
+
 /* Keep the sidebar below the measured header and reserve a bottom gutter for its own scrolling. */
 @utility sticky-below-header {
   --sticky-top: calc(var(--shell-header-height, var(--spacing) * 16) + var(--spacing) * 4);

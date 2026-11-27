@@ -210,14 +210,15 @@ test('waiting events and conditions follow the roll and show one completion resu
     await rollAndStart(owner, world.seasonId);
     await owner.post(`${path}/drop`);
     const turn = page.getByTestId('turn');
+    await turn.getByText('Ждут своего часа', { exact: true }).click();
     await expect(turn.getByRole('heading', { name: 'Накопленные ивенты' })).toBeVisible(live);
     await expect(turn.getByRole('heading', { name: 'Условия следующей игры' })).toBeVisible();
     await expect(turn.getByText('Не ниже: Сложная', { exact: true })).toBeVisible();
     await expect(turn.getByText('Ждёт броска', { exact: true })).toBeVisible();
     await expect(turn.getByText('Ждёт ролла игры', { exact: true })).toHaveCount(0);
-    const sourceText = turn
-      .locator('details')
-      .filter({ hasText: 'Текст ивента: «Даже не вспотел»' });
+    const sourceText = turn.locator(
+      'details:has(> summary:has-text("Текст ивента: «Даже не вспотел»"))',
+    );
     await expect(sourceText).not.toHaveAttribute('open');
     await sourceText.locator('summary').focus();
     await sourceText.locator('summary').press('Space');

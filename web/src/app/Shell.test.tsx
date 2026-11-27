@@ -45,6 +45,52 @@ function serve(routes: Record<string, (request: Request) => Response>) {
 describe('the shell', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('opens avatar editing in a spectator’s own profile and refreshes the profile and shell after removal', async () => {
+    const id = 'aaaaaaaa-0000-0000-0000-000000000001';
+    const avatar = {
+      id: 'f',
+      url: '/api/files/f',
+      thumbnailUrl: '/api/files/f/thumbnail',
+    };
+    let removed = false;
+    const account = { ...user, id, role: 'spectator', avatar };
+    serve({
+      '/api/auth/me': () => json(200, account),
+      '/api/auth/me/avatar': () => {
+        removed = true;
+        return json(200, { duplicate: false, avatar: null });
+      },
+      [`/api/users/${id}`]: () =>
+        json(200, {
+          id,
+          name: account.name,
+          avatar: removed ? null : avatar,
+          completed: 0,
+          seasons: [],
+          reviews: [],
+          achievements: [],
+        }),
+    });
+    const person = userEvent.setup();
+    render(<App />);
+    await screen.findByTestId('no-season');
+    expect(screen.queryByRole('heading', { name: ru.avatar.title })).not.toBeInTheDocument();
+    const menu = screen.getByTestId('user-menu');
+    expect(menu.querySelector('img')).toHaveAttribute('src', avatar.thumbnailUrl);
+
+    await person.click(menu);
+    await person.click(await screen.findByRole('menuitem', { name: ru.nav.profile }));
+    const profile = await screen.findByTestId('profile');
+    expect(profile.querySelector('img')).toHaveAttribute('src', avatar.url);
+    await person.click(await screen.findByRole('button', { name: ru.avatar.remove }));
+
+    await waitFor(() => {
+      expect(profile.querySelector('img')).toBeNull();
+      expect(menu.querySelector('img')).toBeNull();
+    });
   });
 
   it('opens the release journal from my menu without an update banner and focuses its heading', async () => {

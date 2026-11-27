@@ -80,7 +80,9 @@ test('an anonymous poll shows each player their own vote and reveals the result 
 
   const first = await signIn(browser, lena);
   await expect(first.getByRole('heading', { level: 1, name: world.seasonName })).toBeVisible();
-  const link = first.getByTestId('nav-polls').first();
+  const more = first.getByRole('button', { name: 'Ещё', exact: true });
+  await activate(more, phone);
+  const link = first.getByRole('menuitem', { name: 'Голосования', exact: true });
   const explicit = `/seasons/${world.seasonId}/polls`;
   await expect(link).toHaveAttribute('href', explicit);
   expect(await pollScreenLoads(first)).toBe(0);
@@ -90,6 +92,9 @@ test('an anonymous poll shows each player their own vote and reveals the result 
   await activate(link, phone);
   await expect(first).toHaveURL(new RegExp(`${explicit}$`));
   await expect(first.getByRole('heading', { level: 1, name: 'Голосования' })).toBeVisible();
+  await activate(more, phone);
+  await expect(link).toHaveAttribute('aria-current', 'page');
+  await first.keyboard.press('Escape');
   await expect.poll(() => pollScreenLoads(first)).toBeGreaterThan(0);
   const firstCard = first.getByRole('article', { name: question });
   await expect(firstCard.getByRole('heading', { level: 3, name: question })).toBeVisible();
@@ -138,7 +143,7 @@ test('an anonymous poll shows each player their own vote and reveals the result 
 
   await setFeatures(world, { polls: false });
   await expect(first.getByRole('heading', { name: 'Голосования выключены' })).toBeVisible(live);
-  await expect(first.getByTestId('nav-polls')).toHaveCount(0, live);
+  await expect(more).toHaveCount(0, live);
   await expect(firstCard).toHaveCount(0);
 });
 
@@ -372,6 +377,11 @@ test('the season banner shows a global goal and follows real completions and ear
       durationHours: 168,
       goal: { metric: 'runs', target: 2 },
     });
+    const summary = banner.locator('summary');
+    await expect(summary).toContainText(name, live);
+    await expect(summary).toContainText('0 из 2 прохождений');
+    await expect(banner.getByText(description)).toBeHidden();
+    await summary.click();
     await expect(banner.getByText(description)).toBeVisible(live);
     const progress = banner.getByRole('progressbar', { name: `Общая цель: ${name}` });
     await expect(progress).toHaveAttribute('aria-valuetext', '0 из 2 прохождений');

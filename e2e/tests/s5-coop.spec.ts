@@ -140,7 +140,7 @@ test('two players complete one coop run, receive their shares and lose both shar
       activeRun: { id: run.id },
       isCoopPartner: true,
     });
-    for (const action of ['roll', 'complete-submit', 'drop', 'tech-reroll']) {
+    for (const action of ['roll', 'complete-open', 'complete-submit', 'drop', 'tech-reroll']) {
       await expect(partnerPage.getByTestId(action)).toHaveCount(0);
     }
 

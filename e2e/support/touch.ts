@@ -1,9 +1,9 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 // Fingers on the map of a phone (Chromium only: the touches go through the DevTools protocol, D-275).
 
 /** The map's visible box in map units (its viewBox): a smaller width is closer, the centre moves with a drag */
-export async function mapView(page: Page) {
+export async function mapView(page: Page | Locator) {
   const box = (await page.locator('svg[role="application"]').first().getAttribute('viewBox')) ?? '';
   const [x = 0, y = 0, w = 0, h = 0] = box.split(' ').map(Number);
   return { width: w, centre: x + w / 2, middle: y + h / 2 };

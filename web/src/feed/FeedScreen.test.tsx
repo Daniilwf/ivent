@@ -89,6 +89,7 @@ const page = (entries: Entry[], nextBefore: number | null = null): Page => ({
 const fire = (count: number, selected = false) => ({ emoji: '🔥', count, selected });
 const groupName = 'Реакции на запись';
 const fireName = 'Реакция 🔥';
+const chooserName = 'Добавить реакцию';
 
 function notify(sequence: number, type: string, commentTarget?: { kind: string; id: string }) {
   act(() => {
@@ -301,9 +302,28 @@ describe('FeedScreen', () => {
     const row = screen.getByTestId(`feed-item-${command}`);
     const group = within(row).getByRole('group', { name: groupName });
     expect(screen.getAllByRole('group', { name: groupName })).toHaveLength(1);
-    expect(
-      within(group).getByRole('button', { name: fireName, pressed: false }),
-    ).toHaveAccessibleDescription('1 реакция');
+    expect(within(group).getByRole('button', { name: chooserName })).toHaveAccessibleDescription(
+      '1 реакция',
+    );
+  });
+
+  it('keeps a timestamp and omits social controls on a system row', async () => {
+    const id = '1c000000-0000-0000-0000-000000000082';
+    const at = '2026-09-26T10:00:00Z';
+    const server = fakeServer({
+      [`GET ${feedPath}`]: {
+        ...page([{ ...started(9, id, at), type: 'season-deadline-set', data: { deadline: at } }]),
+        reactions: { [id]: [fire(2)] },
+        commentTargets: [id],
+        commentCounts: { [id]: 1 },
+      },
+    });
+    render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const row = await screen.findByTestId(`feed-item-${id}`);
+    expect(row.querySelector('time')).toHaveAttribute('datetime', at);
+    expect(within(row).queryByRole('button')).toBeNull();
+    expect(server.sent('GET', `${feedPath}/${id}/comments`)).toHaveLength(0);
   });
 
   it('opens the selected feed comment thread and sends a plain-text comment to that row', async () => {
@@ -406,6 +426,57 @@ describe('FeedScreen', () => {
     await flushLiveChange(11, 'comment-posted');
     expect(server.sent('GET', firstPath)).toHaveLength(3);
     expect(server.sent('GET', secondPath)).toHaveLength(2);
+  });
+
+  it('refreshes a collapsed comment count without loading the discussion', async () => {
+    const target = '1c000000-0000-0000-0000-000000000086';
+    let count = 1;
+    const server = fakeServer({
+      [`GET ${feedPath}`]: () =>
+        json(200, {
+          ...page([started(9, target, '2026-09-26T10:00:00Z')]),
+          commentTargets: [target],
+          commentCounts: { [target]: count },
+        }),
+    });
+    render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    const button = await screen.findByRole('button', { name: /^Комментарии к записи/ });
+    expect(button).toHaveAccessibleDescription('1 комментарий');
+    count = 2;
+    await flushLiveChange(10, 'comment-posted', { kind: 'feedEntry', id: target });
+    expect(button).toHaveAccessibleDescription('2 комментария');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(server.sent('GET', `${feedPath}/${target}/comments`)).toHaveLength(0);
+  });
+
+  it('refreshes a collapsed comment count on a previously loaded page', async () => {
+    const target = '1c000000-0000-0000-0000-000000000087';
+    const at = '2026-09-26T10:00:00Z';
+    let count = 2;
+    const server = fakeServer({
+      [`GET ${feedPath}`]: ({ query }) =>
+        json(
+          200,
+          query.has('before')
+            ? {
+                ...page([started(4, target, at)]),
+                commentTargets: [target],
+                commentCounts: { [target]: count },
+              }
+            : { ...page([started(9, 'new', at)], 9), commentTargets: [] },
+        ),
+    });
+    render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await userEvent.click(await screen.findByTestId('feed-more'));
+    const button = await screen.findByRole('button', { name: /^Комментарии к записи/ });
+    expect(button).toHaveAccessibleDescription('2 комментария');
+
+    count = 1;
+    await flushLiveChange(10, 'comment-hidden', { kind: 'feedEntry', id: target });
+    expect(button).toHaveAccessibleDescription('1 комментарий');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(server.sent('GET', `${feedPath}/${target}/comments`)).toHaveLength(0);
   });
 
   it('does not expose comments when the feed omits comment targets', async () => {
@@ -650,6 +721,7 @@ describe('FeedScreen', () => {
 
     await user.click(await screen.findByTestId('feed-more'));
     const row = await screen.findByTestId(`feed-item-${older}`);
+    await user.click(within(row).getByRole('button', { name: chooserName }));
     const button = within(row).getByRole('button', { name: fireName, pressed: false });
     const scrollTo = vi.spyOn(window, 'scrollTo');
     scrollTo.mockClear();
@@ -683,7 +755,7 @@ describe('FeedScreen', () => {
     }
   });
 
-  it('keeps only active reactions inline and returns keyboard focus to the collapsed chooser', async () => {
+  it('shows compact counts beside the time and keeps keyboard access to every emoji', async () => {
     const target = '1c000000-0000-0000-0000-000000000020';
     const targetReactions = `${feedPath}/${target}/reactions`;
     const selected = new Set(['🔥']);
@@ -701,6 +773,7 @@ describe('FeedScreen', () => {
           ...page([started(9, target, '2026-09-26T10:00:00Z')]),
           reactions: reactions(),
           commentTargets: [target],
+          commentCounts: { [target]: 1 },
         }),
       [`GET ${feedPath}/reactions`]: () => json(200, reactions()),
       [`PUT ${targetReactions}`]: ({ body }) => {
@@ -713,17 +786,20 @@ describe('FeedScreen', () => {
     const user = userEvent.setup();
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    const row = within(await screen.findByTestId(`feed-item-${target}`));
+    const entry = await screen.findByTestId(`feed-item-${target}`);
+    const row = within(entry);
     const group = within(row.getByRole('group', { name: groupName }));
-    const add = group.getByRole('button', { name: 'Добавить реакцию' });
+    const add = group.getByRole('button', { name: chooserName });
     const comments = row.getByRole('button', { name: /^Комментарии к записи/ });
     const heart = 'Реакция ❤️';
-    expect(group.getByRole('button', { name: fireName, pressed: true })).toBeVisible();
-    expect(group.getByRole('button', { name: 'Реакция 😂' })).toHaveAccessibleDescription(
-      '2 реакции',
-    );
-    expect(group.queryByRole('button', { name: heart })).toBeNull();
-    expect(group.getAllByRole('button')).toHaveLength(3);
+    expect(add).toHaveAccessibleDescription('3 реакции');
+    expect(add).toHaveTextContent('3');
+    expect(comments).toHaveTextContent('1');
+    expect(comments).toHaveAttribute('aria-expanded', 'false');
+    const metadata = entry.querySelector('time')?.parentElement;
+    expect(metadata).toContainElement(comments);
+    expect(metadata).toContainElement(add);
+    expect(group.getAllByRole('button')).toEqual([add]);
 
     add.focus();
     await user.tab();
@@ -733,7 +809,11 @@ describe('FeedScreen', () => {
     await user.keyboard('{Enter}');
     expect(add).toHaveAttribute('aria-expanded', 'true');
     await user.tab();
-    expect(group.getByRole('button', { name: heart })).toHaveFocus();
+    const fireButton = group.getByRole('button', { name: fireName, pressed: true });
+    expect(fireButton).toHaveFocus();
+    expect(group.getByRole('button', { name: 'Реакция 😂' })).toHaveAccessibleDescription(
+      '2 реакции',
+    );
     await user.keyboard('{Escape}');
     expect(add).toHaveAttribute('aria-expanded', 'false');
     expect(add).toHaveFocus();
@@ -741,26 +821,26 @@ describe('FeedScreen', () => {
 
     await user.keyboard('{Enter}');
     await user.tab();
+    await user.tab();
     await user.keyboard('{Enter}');
-    expect(await group.findByRole('button', { name: heart, pressed: true })).toBeVisible();
-    expect(add).toHaveFocus();
-    expect(add).toHaveAttribute('aria-expanded', 'false');
+    const heartButton = await group.findByRole('button', { name: heart, pressed: true });
+    expect(heartButton).toHaveFocus();
+    expect(add).toHaveAccessibleDescription('4 реакции');
 
-    const fireButton = group.getByRole('button', { name: fireName, pressed: true });
     await waitFor(() => {
-      expect(fireButton).not.toHaveAttribute('aria-disabled', 'true');
+      expect(heartButton).not.toHaveAttribute('aria-disabled', 'true');
     });
-    fireButton.focus();
+    await user.tab({ shift: true });
     await user.keyboard(' ');
-    await waitFor(() => {
-      expect(group.queryByRole('button', { name: fireName })).toBeNull();
+    expect(await group.findByRole('button', { name: fireName, pressed: false })).toHaveFocus();
+    expect(add).toHaveAccessibleDescription('3 реакции');
+    await user.keyboard('{Escape}');
       expect(add).toHaveFocus();
-    });
     await user.tab();
     expect(comments).toHaveFocus();
   });
 
-  it('focuses the newly added reaction when the last hidden choice becomes visible', async () => {
+  it('keeps the focused reaction and its chooser when there is a single configured emoji', async () => {
     const target = '1c000000-0000-0000-0000-000000000021';
     let selected = false;
     const reactions = () => ({ [target]: [fire(selected ? 1 : 0, selected)] });
@@ -780,14 +860,15 @@ describe('FeedScreen', () => {
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     const group = within(await screen.findByRole('group', { name: groupName }));
-    await user.click(group.getByRole('button', { name: 'Добавить реакцию' }));
+    const chooser = group.getByRole('button', { name: chooserName });
+    await user.click(chooser);
     await user.tab();
     await user.keyboard('{Enter}');
     const fireButton = await group.findByRole('button', { name: fireName, pressed: true });
-    expect(group.queryByRole('button', { name: 'Добавить реакцию' })).toBeNull();
-    await waitFor(() => {
       expect(fireButton).toHaveFocus();
-    });
+    expect(chooser).toHaveAccessibleDescription('1 реакция');
+    await user.keyboard('{Escape}');
+    expect(chooser).toHaveFocus();
   });
 
   it('only offers eligible reactions and removes the controls after undo or disabling the feature', async () => {
@@ -854,18 +935,18 @@ describe('FeedScreen', () => {
 
     await user.click(await screen.findByTestId('feed-more'));
     const row = await screen.findByTestId(`feed-item-${older}`);
-    const button = within(row).getByRole('button', { name: fireName, pressed: false });
+    const button = within(row).getByRole('button', { name: chooserName });
     expect(button).toHaveAccessibleDescription('1 реакция');
     button.focus();
 
     count = 2;
     notify(10, 'feed-reaction-set');
     await waitFor(() => {
-      expect(
-        within(row).getByRole('button', { name: fireName, pressed: false }),
-      ).toHaveAccessibleDescription('2 реакции');
+      expect(within(row).getByRole('button', { name: chooserName })).toHaveAccessibleDescription(
+        '2 реакции',
+      );
     });
-    expect(within(row).getByRole('button', { name: fireName })).toHaveFocus();
+    expect(button).toHaveFocus();
     expect(server.calls.some(({ method }) => method === 'PUT')).toBe(false);
   });
 
@@ -887,7 +968,7 @@ describe('FeedScreen', () => {
     });
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
     await userEvent.click(await screen.findByTestId('feed-more'));
-    const button = await screen.findByRole('button', { name: fireName });
+    const button = await screen.findByRole('button', { name: chooserName });
     expect(button).toHaveAccessibleDescription('1 реакция');
 
     const advance = async (ms: number) => {
@@ -955,6 +1036,8 @@ describe('FeedScreen', () => {
     const user = userEvent.setup();
     render(<FeedScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
     await user.click(await screen.findByTestId('feed-more'));
+    const chooser = await screen.findByRole('button', { name: chooserName });
+    await user.click(chooser);
     const button = await screen.findByRole('button', { name: fireName, pressed: false });
 
     notify(10, 'feed-reaction-set');

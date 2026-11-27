@@ -700,6 +700,7 @@ export const ru = {
       `Пройдено: ${title}. Кубы летят на карте — потом фишка сделает ход.`,
     complete: 'Завершить прохождение',
     completeTitle: 'Игра пройдена? Отметь прохождение',
+    completeOpen: 'Игра пройдена',
     difficulty: 'Сложность',
     difficultyHint: 'На какой сложности проходил. Админ сверит её с пруфом',
     difficultyDeclared: (difficulty: string) => `Начинал на «${difficulty}» — выше не засчитается`,
@@ -1343,6 +1344,8 @@ export const ru = {
   },
   inventory: {
     title: 'Инвентарь',
+    sections: 'Разделы экономики',
+    emptySummary: (limit: number) => `Пусто, 0 из ${limit}`,
     coins: (n: number) => coins(n),
     count: (n: number, limit: number) => `Предметов ${n} из ${limit}`,
     emptyTitle: 'В инвентаре пусто',
@@ -1393,6 +1396,8 @@ export const ru = {
   // 4.11c (D-447): my shop on the season screen — the roll, the lots with their timer, the purchase
   shop: {
     title: 'Магазин',
+    rollSummary: (price: number) => `Ролл за ${coins(price, 'accusative')}`,
+    liveSummary: (n: number) => `${n} ${plural(n, 'лот', 'лота', 'лотов')} в продаже`,
     lead: 'Ролл даёт личные лоты на несколько минут. Не купил — лоты исчезнут.',
     coupons: (n: number) => `${plural(n, 'Купон', 'Купона', 'Купонов')}: ${n}`,
     roll: (price: number) => `Ролл магазина за ${coins(price, 'accusative')}`,
@@ -1482,6 +1487,7 @@ export const ru = {
     history: (name: string) => `Последний ивент: «${name}»`,
     waitingTitle: 'Накопленные ивенты',
     waitingConditionsTitle: 'Условия следующей игры',
+    waitingSummary: 'Ждут своего часа',
     waitingForRoll: 'Ждёт ролла игры',
     waitingForThrow: 'Ждёт броска',
     waitingForStep: 'Ждёт будущего шага',
@@ -1544,6 +1550,11 @@ export const ru = {
     waived: 'Не применимо',
   },
   effects: {
+    taskTitle: 'Дело перед ходом',
+    taskHint: 'Разыграй ивент и отметь результат.',
+    played: 'Разыграно',
+    unsuitable: 'Не подходит…',
+    unsuitableTitle: 'Ивент не подходит',
     title: 'Нужно разыграть',
     drawEvent: (kind: EventKind, source: keyof typeof effectSources) =>
       `${eventKindNames[kind]} ${effectSources[source]}`,
@@ -1623,6 +1634,7 @@ export const ru = {
   },
   season: {
     deadline: (text: string) => `Дедлайн: ${text}`,
+    mapOpen: 'Открыть карту',
     closing: 'Дедлайн прошёл: броски закрыты, пруфы принимаются.',
     finished: 'Сезон завершён. Итоги ниже.',
     // K1S-3: my balance, what a paid reroll spends
@@ -1630,6 +1642,7 @@ export const ru = {
   },
   leaderboard: {
     title: 'Лидерборд',
+    full: 'Вся таблица',
     row: (place: number, name: string, points: number, cellsToFinish: number | null) =>
       `${place}. ${name}: ${points.toLocaleString('ru-RU')} ${plural(points, 'очко', 'очка', 'очков')}` +
       (cellsToFinish === null
@@ -1643,6 +1656,7 @@ export const ru = {
   // H5: the season's feed, a player's profile and a game's page
   comments: {
     title: 'Комментарии',
+    count: (n: number) => `${n} ${plural(n, 'комментарий', 'комментария', 'комментариев')}`,
     feedLabel: (entry: string) => `Комментарии к записи «${entry}»`,
     reviewLabel: (author: string) => `Комментарии к отзыву игрока ${author}`,
     write: 'Написать комментарий',
@@ -1958,6 +1972,7 @@ export const ru = {
   // The sections of the site in the header (H5–H7) and my own pages in my menu
   nav: {
     label: 'Разделы сайта',
+    more: 'Ещё',
     season: 'Сезон',
     feed: 'Лента',
     gallery: 'Галерея',

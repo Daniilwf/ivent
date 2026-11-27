@@ -144,7 +144,8 @@ public sealed record SeasonNavigationView(
     Guid Id,
     bool PollsEnabled,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AdminFeaturesView? AdminFeatures = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? GalleryEnabled = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? GalleryEnabled = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] InteractionFeaturesView? InteractionFeatures = null);
 
 /// <summary>Which stage 5 sections exist for administrators in the selected season.</summary>
 public sealed record AdminFeaturesView(bool GlobalEvents, bool WeeklyChallenge, bool Events, bool Suggestions);
@@ -701,8 +702,14 @@ public static class SeasonEndpoints
         var adminFeatures = includeAdmin == true && user.IsInRole(nameof(Infrastructure.Accounts.Role.Admin))
             ? new AdminFeaturesView(features.GlobalEvents, features.WeeklyChallenge, features.Events, features.Suggestions)
             : null;
-        return TypedResults.Ok(new SeasonNavigationView(seasonId, features.Polls, adminFeatures, features.Gallery ? true : null));
+        var interactions = InteractionFeatures(rules);
+        return TypedResults.Ok(new SeasonNavigationView(
+            seasonId, features.Polls, adminFeatures, features.Gallery ? true : null,
+            interactions.Coop || interactions.Duels || interactions.PartnerBoard ? interactions : null));
     }
+
+    private static InteractionFeaturesView InteractionFeatures(Ruleset rules) =>
+        new(rules.Features.Coop, rules.Features.Duels, rules.Features.Coop && rules.Features.PartnerBoard);
 
     private static Task<Results<Ok<SeasonView>, NotFound>> GetSeasonAsync(
         Guid seasonId, ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards, SeasonStateReader seasonStates, IClock clock, CancellationToken ct) =>
@@ -723,8 +730,7 @@ public static class SeasonEndpoints
         var players = (await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToListAsync(ct)).InTokenOrder();
         var seasonRecord = await db.Seasons.AsNoTracking().SingleAsync(s => s.Id == seasonId, ct);
         var rules = JsonSerializer.Deserialize<Ruleset>(seasonRecord.RulesetJson, EngineJson.Options)!;
-        var interactionFeatures = new InteractionFeaturesView(
-            rules.Features.Coop, rules.Features.Duels, rules.Features.Coop && rules.Features.PartnerBoard);
+        var interactionFeatures = InteractionFeatures(rules);
         var completedRuns = await db.Runs.AsNoTracking()
             .Where(r => r.SeasonId == seasonId && r.Status == RunStatus.Completed)
             .GroupBy(r => r.PlayerId)

@@ -65,6 +65,7 @@ export function RunCard({
   onDrop,
   busy = false,
   level = 2,
+  compact = false,
 }: {
   game: GameCard;
   /** Cells left to the finish (null: no way to it) and the whole way's length */
@@ -78,16 +79,20 @@ export function RunCard({
   busy?: boolean;
   /** The heading's level: 3 inside a section that has its own heading */
   level?: 2 | 3;
+  compact?: boolean;
 }) {
   const Heading = `h${level}` as const;
   return (
     <section
-      className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 rounded-lg bg-card p-4"
+      className={cx(
+        'grid gap-x-4 gap-y-3 rounded-lg bg-card',
+        compact ? 'grid-cols-[auto_minmax(0,1fr)] items-start' : 'grid-cols-[auto_1fr] p-4',
+      )}
       aria-label={t.nowPlaying}
     >
-      <Cover game={game} />
+      <Cover game={game} width={compact ? 48 : 88} />
       <div className="grid content-start gap-1">
-        <p className="text-sm text-ink-soft">{t.nowPlaying}</p>
+        {compact ? null : <p className="text-sm text-ink-soft">{t.nowPlaying}</p>}
         <Heading className="font-display text-lg font-heavy wrap-anywhere" title={game.title}>
           {game.title}
         </Heading>

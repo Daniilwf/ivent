@@ -25,6 +25,11 @@ vi.mock('../api/realtime', () => ({
 const seasonId = '5ea50000-0000-0000-0000-000000000001';
 const me = '10000000-0000-0000-0000-000000000001';
 
+async function openCompletion() {
+  await userEvent.click(await screen.findByTestId('complete-open'));
+  return screen.findByTestId('complete-form');
+}
+
 // Cells to the finish on the fixture map start → c1 → finish (the server computes them, D-100)
 const cellsToFinish: Record<string, number> = { start: 2, c1: 1, finish: 0 };
 
@@ -1085,7 +1090,7 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     const list = await screen.findByTestId('manual-effects');
-    expect(list).toHaveTextContent(ru.effects.title);
+    expect(list).toHaveAccessibleName(ru.effects.taskTitle);
     for (const effect of effects) {
       expect(screen.getByTestId(`manual-effect-${effect.id}`)).toHaveTextContent(
         ru.effects.drawEvent('bad', 'paidReroll'),
@@ -1108,7 +1113,7 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
 
     const turn = await screen.findByTestId('turn');
     const todo = within(turn).getByTestId('after');
-    expect(within(todo).getByRole('heading', { name: ru.turn.todo(1) })).toBeInTheDocument();
+    expect(within(todo).getByRole('heading', { name: ru.effects.taskTitle })).toBeInTheDocument();
     expect(within(todo).getByTestId('manual-effects')).toBeInTheDocument();
     // Before a new roll, the to-do comes first
     const roll = within(turn).getByTestId('roll');
@@ -1129,7 +1134,7 @@ describe('SeasonScreen reroll price and manual effects (D-93)', () => {
 
     const turn = await screen.findByTestId('turn');
     const todo = within(turn).getByTestId('after');
-    expect(within(todo).getByRole('heading', { name: ru.turn.todo(1) })).toBeInTheDocument();
+    expect(within(todo).getByRole('heading', { name: ru.effects.taskTitle })).toBeInTheDocument();
     // The answer to the roll is the one main action: it stands first, the tails of the last run below it
     const reroll = within(turn).getByTestId('reroll');
     expect(todo.compareDocumentPosition(reroll) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
@@ -1248,7 +1253,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
     expect(await screen.findByTestId('drop')).toHaveTextContent(ru.turn.drop);
     expect(screen.getByTestId('tech-reroll')).toHaveTextContent(ru.turn.techReroll);
     // Completing stays available next to them
-    expect(screen.getByTestId('complete-form')).toBeInTheDocument();
+    expect(screen.getByTestId('complete-open')).toBeInTheDocument();
   });
 
   it('offers no drop or tech reroll for an offered game', async () => {
@@ -1459,7 +1464,7 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
     );
     expect(screen.queryByTestId('tech-reroll')).not.toBeInTheDocument();
     expect(screen.getByTestId('drop')).toBeInTheDocument();
-    expect(screen.getByTestId('complete-form')).toBeInTheDocument();
+    expect(screen.getByTestId('complete-open')).toBeInTheDocument();
   });
 
   it('shows the tech reroll and no note while the window is open', async () => {
@@ -1531,13 +1536,24 @@ describe('SeasonScreen drop and tech reroll (RR2, RR4, RR5, D-94)', () => {
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
     expect(await screen.findByTestId('drop')).toHaveAttribute('data-variant', 'dangerLink');
-    expect(screen.getByTestId('complete-submit')).toHaveAttribute('data-variant', 'main');
+    const opener = screen.getByTestId('complete-open');
+    expect(opener).toHaveAttribute('data-variant', 'main');
+    expect(screen.queryByTestId('complete-form')).not.toBeInTheDocument();
     // One main action on the screen
     expect(
       within(screen.getByTestId('turn'))
         .getAllByRole('button')
         .filter((b) => b.getAttribute('data-variant') === 'main'),
     ).toHaveLength(1);
+    await userEvent.click(opener);
+    const completion = await screen.findByRole('dialog');
+    expect(within(completion).getByTestId('complete-submit')).toHaveAttribute(
+      'data-variant',
+      'main',
+    );
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
   });
 
   it('requires a comment for the reason «other» before sending', async () => {
@@ -1998,7 +2014,8 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     const commands = recordCommands(playingWithoutHours());
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    await userEvent.type(await screen.findByTestId('complete-hours'), '6');
+    await openCompletion();
+    await userEvent.type(screen.getByTestId('complete-hours'), '6');
     await userEvent.type(screen.getByTestId('complete-hours-source'), 'HLTB');
     await userEvent.click(screen.getByLabelText(ru.turn.challengeDone));
     await userEvent.selectOptions(screen.getByTestId('complete-review-rating'), '7');
@@ -2022,7 +2039,7 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     serve((r) => (isSeasonGet(r) ? json(200, playingWithoutHours(false)) : json(404, {})));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    await screen.findByTestId('complete-submit');
+    await openCompletion();
     expect(screen.queryByLabelText(ru.turn.challengeDone)).not.toBeInTheDocument();
   });
 
@@ -2030,7 +2047,35 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     serve((r) => (isSeasonGet(r) ? json(200, playingWithoutHours(true)) : json(404, {})));
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
+    await openCompletion();
     expect(await screen.findByLabelText(ru.turn.challengeDone)).not.toBeChecked();
+  });
+
+  it('closes the completion draft when another tab changes the active run', async () => {
+    let current = playingWithoutHours(true);
+    const turn = current.me;
+    const run = turn?.activeRun;
+    if (!turn || !run) throw new Error('The fixture needs an active run');
+    serve((request) => (isSeasonGet(request) ? json(200, current) : json(404, {})));
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+    await openCompletion();
+    await userEvent.type(screen.getByTestId('complete-hours'), '6');
+
+    current = {
+      ...current,
+      lastSequence: current.lastSequence + 1,
+      me: {
+        ...turn,
+        activeRun: { ...run, id: 'another-run', game: { ...run.game, title: 'Celeste' } },
+      },
+    };
+    act(() => {
+      hubChange?.();
+    });
+    await vi.waitFor(() => expect(screen.getByTestId('active-run')).toHaveTextContent('Celeste'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await openCompletion();
+    expect(screen.getByTestId('complete-hours')).toHaveValue('');
   });
 
   it.each([
@@ -2042,7 +2087,8 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
       const commands = recordCommands(playingWithoutHours(challengesEnabled));
       render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-      await userEvent.type(await screen.findByTestId('complete-hours'), '6');
+      await openCompletion();
+      await userEvent.type(screen.getByTestId('complete-hours'), '6');
       await userEvent.type(screen.getByTestId('complete-hours-source'), 'HLTB');
       await userEvent.click(screen.getByTestId('complete-submit'));
 
@@ -2064,7 +2110,8 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
       );
       render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-      await userEvent.type(await screen.findByTestId('complete-hours'), '6');
+      await openCompletion();
+      await userEvent.type(screen.getByTestId('complete-hours'), '6');
       await userEvent.type(screen.getByTestId('complete-hours-source'), 'HLTB');
       await userEvent.click(screen.getByTestId('complete-submit'));
 
@@ -2087,7 +2134,8 @@ describe('SeasonScreen completion reward (C7a, D-96)', () => {
     );
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    await userEvent.type(await screen.findByTestId('complete-hours'), '6');
+    await openCompletion();
+    await userEvent.type(screen.getByTestId('complete-hours'), '6');
     await userEvent.type(screen.getByTestId('complete-hours-source'), 'HLTB');
     await userEvent.click(screen.getByTestId('complete-submit'));
 
@@ -2608,7 +2656,8 @@ describe('SeasonScreen completion moment (H4)', () => {
   }
 
   async function complete() {
-    await userEvent.click(await screen.findByTestId('complete-submit'));
+    await openCompletion();
+    await userEvent.click(screen.getByTestId('complete-submit'));
   }
 
   it('shows the last completion the page opened with at once, without the dice', async () => {
@@ -2651,7 +2700,7 @@ describe('SeasonScreen completion moment (H4)', () => {
     expect(screen.getByTestId('roll-announce')).toHaveTextContent(announce);
     expect(screen.getByTestId('roll')).toBeInTheDocument();
     await vi.waitFor(() => {
-      expect(screen.getByTestId('last-dice')).toHaveFocus();
+      expect(screen.getByTestId('last-dice').closest('summary')).toHaveFocus();
     });
     expect(screen.getByTestId('last-dice')).toHaveTextContent(
       ru.turn.lastDice('Silent Hill', [1, 2], 3),
@@ -2702,7 +2751,7 @@ describe('SeasonScreen completion moment (H4)', () => {
     const after = screen.getByTestId('after');
     expect(run.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(
-      screen.getByTestId('complete-submit').compareDocumentPosition(after) &
+      screen.getByTestId('complete-open').compareDocumentPosition(after) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(within(after).getByRole('heading', { level: 3 })).toHaveTextContent(
@@ -2931,6 +2980,7 @@ describe('SeasonScreen completion moment (H4)', () => {
     );
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
+    await openCompletion();
     expect(await screen.findByTestId('complete-hours')).toBeInTheDocument();
     expect(screen.getByTestId('complete-hours-source')).toBeInTheDocument();
   });

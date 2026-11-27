@@ -274,6 +274,7 @@ export async function completeHere(page: Page, difficulty = 'Нормальна�
 
 /** Fills the completion form without sending it */
 export async function fillCompletionHere(page: Page, difficulty = 'Нормальная') {
+  await page.getByTestId('complete-open').click();
   await expect(page.getByTestId('complete-form')).toBeVisible();
   // A game without pool hours needs an estimate with its source (D-96)
   const hours = page.getByTestId('complete-hours');

@@ -118,7 +118,7 @@ internal static class CommentEndpoints
 
         var rows = db.Set<CommentRecord>().AsNoTracking().Where(row =>
             row.SeasonId == seasonId && row.TargetKind == thread.Target.Kind && row.TargetId == thread.Target.Id);
-        var visible = rows.Where(row => row.Status == CommentStatus.Visible);
+        var visible = rows.Visible();
         if (before is { } cursor)
         {
             var anchor = await rows.Where(row => row.CommentId == cursor)

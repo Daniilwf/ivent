@@ -13363,6 +13363,9 @@ export interface components {
                 [key: string]: components["schemas"]["ReactionView"][];
             };
             commentTargets?: null | string[];
+            commentCounts?: null | {
+                [key: string]: number;
+            };
         };
         /** @description A picture by link (D-117): https from Tenor, Giphy or Klipy; the server downloads it and stores it as an upload. */
         FileFromUrlRequest: {
@@ -14930,6 +14933,7 @@ export interface components {
             pollsEnabled: boolean;
             adminFeatures?: null | components["schemas"]["AdminFeaturesView"];
             galleryEnabled?: null | boolean;
+            interactionFeatures?: null | components["schemas"]["InteractionFeaturesView"];
         };
         SeasonRollView: {
             /** Format: uuid */

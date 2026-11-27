@@ -1,18 +1,9 @@
-import { Check, LoaderCircle } from 'lucide-react';
-import {
-  useCallback,
-  useId,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-  type Ref,
-} from 'react';
+import { Check, Heart, LoaderCircle } from 'lucide-react';
+import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { base } from '../ui/buttonStyles';
 import { cx } from '../ui/cx';
-import { SummaryButton } from '../ui/Disclosure';
 import { Notice } from '../ui/States';
 
 type Reaction = Schemas['ReactionView'];
@@ -65,42 +56,10 @@ export function ReactionButtons({
 }) {
   const descriptionId = useId();
   const writing = useRef(false);
-  const group = useRef<HTMLDivElement>(null);
-  const add = useRef<HTMLButtonElement>(null);
-  const lastChoice = useRef<string | null>(null);
+  const chooser = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
   const [issue, setIssue] = useState<ReactionIssue | null>(null);
-
-  // A focused button can disappear when the last reaction of its kind is removed or the final choice is added.
-  const keepFocus = useCallback((button: HTMLButtonElement | null) => {
-    if (!button) return;
-    return () => {
-      const doc = button.ownerDocument;
-      if (doc.activeElement !== button) return;
-      queueMicrotask(() => {
-        if (button.isConnected || doc.activeElement !== doc.body) return;
-        const inline = Array.from(
-          group.current?.querySelectorAll<HTMLButtonElement>('button[data-reaction-inline]') ?? [],
-        );
-        const chosen = inline.find(
-          (option) => option.dataset.reactionInline === lastChoice.current,
-        );
-        (add.current ?? chosen ?? inline[0])?.focus({ preventScroll: true });
-      });
-    };
-  }, []);
-
-  const keepAdd = useCallback(
-    (button: HTMLButtonElement | null) => {
-      add.current = button;
-      const cleanUp = keepFocus(button);
-      return () => {
-        add.current = null;
-        cleanUp?.();
-      };
-    },
-    [keepFocus],
-  );
 
   async function toggle({ emoji, selected }: Reaction) {
     if (writing.current) return;
@@ -115,25 +74,18 @@ export function ReactionButtons({
     }
   }
 
-  const buttons = reactions.map((reaction, index) => ({ reaction, index }));
-  const showInline = ({ reaction }: (typeof buttons)[number]) =>
-    !compact || reaction.selected || reaction.count > 0;
-  const remaining = buttons.filter((button) => !showInline(button));
-
-  function renderButton({ reaction, index }: (typeof buttons)[number], close?: () => void) {
+  function renderButton(reaction: Reaction, index: number) {
     const busy = pending === reaction.emoji;
     const countId = `${descriptionId}-${index}`;
     return (
       <button
         key={reaction.emoji}
-        ref={compact ? keepFocus : undefined}
         type="button"
         aria-label={t.reaction(reaction.emoji)}
         aria-describedby={countId}
         aria-pressed={reaction.selected}
         aria-busy={busy || undefined}
         aria-disabled={pending !== null || undefined}
-        data-reaction-inline={compact && !close ? reaction.emoji : undefined}
         className={cx(
           base,
           'min-h-11 min-w-11 gap-1 rounded-full border-2 px-2 text-sm text-ink tabular-nums aria-disabled:cursor-wait aria-disabled:opacity-70 is-active:translate-y-px',
@@ -141,14 +93,7 @@ export function ReactionButtons({
             ? 'border-action bg-info-soft is-hover:bg-info-soft'
             : 'border-ink bg-card is-hover:bg-page',
         )}
-        onClick={() => {
-          if (writing.current) return;
-          if (close) {
-            lastChoice.current = reaction.emoji;
-            close();
-          }
-          void toggle(reaction);
-        }}
+        onClick={() => void toggle(reaction)}
       >
         <span aria-hidden className="max-w-20 min-w-5 truncate text-base">
           {reaction.emoji}
@@ -170,72 +115,65 @@ export function ReactionButtons({
     );
   }
 
-  return (
-    <div className="grid min-w-0 gap-2">
-      <div ref={group} role="group" aria-label={groupLabel} className="flex flex-wrap gap-1">
-        {buttons.filter(showInline).map((button) => renderButton(button))}
-        {remaining.length > 0 ? (
-          <ReactionPicker
-            trigger={keepAdd}
-            focusTrigger={() => add.current?.focus({ preventScroll: true })}
-            disabled={pending !== null}
-            busy={remaining.some(({ reaction }) => reaction.emoji === pending)}
-          >
-            {(close) => remaining.map((button) => renderButton(button, close))}
-          </ReactionPicker>
-        ) : null}
-      </div>
-      {issue ? <Notice tone="danger">{t[issue]}</Notice> : null}
-      {stale && !issue ? <Notice tone="warning">{t.stale}</Notice> : null}
-    </div>
-  );
-}
+  const status = issue ? (
+    <Notice tone="danger">{t[issue]}</Notice>
+  ) : stale ? (
+    <Notice tone="warning">{t.stale}</Notice>
+  ) : null;
 
-function ReactionPicker({
-  trigger,
-  focusTrigger,
-  disabled,
-  busy,
-  children,
-}: {
-  trigger: Ref<HTMLButtonElement>;
-  focusTrigger: () => void;
-  disabled: boolean;
-  busy: boolean;
-  children: (close: () => void) => ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const panel = useId();
-
-  function close() {
-    setOpen(false);
-    focusTrigger();
-  }
-
-  function onKeyDown(event: KeyboardEvent) {
-    if (!open || event.key !== 'Escape') return;
-    event.stopPropagation();
-    close();
-  }
-
-  return (
-    <div className="contents" onKeyDown={onKeyDown}>
-      <SummaryButton
-        ref={trigger}
-        open={open}
-        aria-controls={panel}
-        aria-disabled={disabled || undefined}
-        busy={busy}
-        className="px-2 text-sm font-medium text-ink-soft is-hover:bg-page aria-disabled:cursor-wait aria-disabled:opacity-70"
-        onClick={() => {
-          if (!disabled) setOpen(!open);
+  if (compact) {
+    const total = reactions.reduce((sum, reaction) => sum + reaction.count, 0);
+    const selected = reactions.some((reaction) => reaction.selected);
+    const totalId = `${descriptionId}-total`;
+    const panelId = `${descriptionId}-panel`;
+    return (
+      <div
+        role="group"
+        aria-label={groupLabel}
+        className="contents"
+        onKeyDown={(event: KeyboardEvent) => {
+          if (!open || event.key !== 'Escape') return;
+          event.stopPropagation();
+          setOpen(false);
+          chooser.current?.focus({ preventScroll: true });
         }}
       >
-        {t.add}
-      </SummaryButton>
-      <div id={panel} hidden={!open} className="basis-full">
-        {open ? <div className="flex flex-wrap gap-1">{children(close)}</div> : null}
+        <button
+          ref={chooser}
+          type="button"
+          aria-label={t.add}
+          aria-describedby={totalId}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className={cx(
+            base,
+            'row-start-1 min-h-11 min-w-11 gap-1 rounded-md px-1 text-sm tabular-nums is-hover:bg-page',
+            selected ? 'text-action' : 'text-ink-soft',
+          )}
+          onClick={() => {
+            setOpen(!open);
+          }}
+        >
+          <Heart size={16} aria-hidden className={cx(selected && 'fill-current')} />
+          <span aria-hidden>{total}</span>
+          <span id={totalId} className="sr-only">
+            {t.count(total)}
+          </span>
+        </button>
+        <div id={panelId} hidden={!open} className="col-span-full pb-2">
+          {open ? <div className="flex flex-wrap gap-1">{reactions.map(renderButton)}</div> : null}
+        </div>
+        {status ? <div className="col-span-full pb-2">{status}</div> : null}
       </div>
+    );
+  }
+
+  return (
+    <div className="grid min-w-0 gap-2">
+      <div role="group" aria-label={groupLabel} className="flex flex-wrap gap-1">
+        {reactions.map(renderButton)}
+      </div>
+      {status}
     </div>
   );
 }

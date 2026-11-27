@@ -1,12 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { SeasonScreen } from './SeasonScreen';
 import { json } from '../test/fakeServer';
 
-// Resolving manual effects on the season screen (C11a, E1, D-102): «Применено» sends at once, with the comment if one is
-// typed; «Не применимо» needs a comment first; the engine's refusal is shown in Russian.
+// Resolving manual effects on the season screen (C11a, E1, D-102): «Разыграно» sends at once.
+// «Не подходит…» asks for a comment. The engine's refusal is shown in Russian.
 
 vi.mock('../api/realtime', () => ({
   watchSeason: () => () => {},
@@ -114,6 +114,7 @@ describe('Manual effects', () => {
 
     expect(await screen.findByTestId(`manual-effect-${effectId}`)).toBeInTheDocument();
     expect(screen.queryByTestId(`manual-effect-applied-${effectId}`)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Не подходит…' })).not.toBeInTheDocument();
     expect(
       screen.queryByTestId(`manual-effect-not-applicable-${effectId}`),
     ).not.toBeInTheDocument();
@@ -132,32 +133,35 @@ describe('Manual effects', () => {
     expect((sent[0] as { commandId: string }).commandId).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it('sends the typed comment with «применено»', async () => {
+  it('applies directly after the player abandons an unsuitable reason', async () => {
     const sent = serve();
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    await userEvent.type(
-      await screen.findByTestId(`manual-effect-comment-${effectId}`),
-      '  разыграли  ',
-    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Не подходит…' }));
+    await userEvent.type(screen.getByTestId(`manual-effect-comment-${effectId}`), 'Колода пуста');
+    await userEvent.keyboard('{Escape}');
+    expect(sent).toHaveLength(0);
     await userEvent.click(screen.getByTestId(`manual-effect-applied-${effectId}`));
 
     await vi.waitFor(() => {
       expect(sent).toHaveLength(1);
     });
-    expect(sent[0]).toMatchObject({ outcome: 'applied', comment: 'разыграли' });
+    expect(sent[0]).toMatchObject({ outcome: 'applied', comment: null });
   });
 
-  it('offers «не применимо» only with a comment', async () => {
+  it('submits «не применимо» from the dialog with a trimmed comment', async () => {
     const sent = serve();
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    const notApplicable = await screen.findByTestId(`manual-effect-not-applicable-${effectId}`);
+    await userEvent.click(await screen.findByRole('button', { name: 'Не подходит…' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Ивент не подходит' }));
+    const notApplicable = dialog.getByTestId(`manual-effect-not-applicable-${effectId}`);
     expect(notApplicable).toBeDisabled();
-    await userEvent.type(screen.getByTestId(`manual-effect-comment-${effectId}`), '   ');
+    const comment = dialog.getByTestId(`manual-effect-comment-${effectId}`);
+    await userEvent.type(comment, '   ');
     expect(notApplicable).toBeDisabled();
 
-    await userEvent.type(screen.getByTestId(`manual-effect-comment-${effectId}`), 'Колода пуста');
+    await userEvent.type(comment, 'Колода пуста  ');
     expect(notApplicable).toBeEnabled();
     await userEvent.click(notApplicable);
 
@@ -176,13 +180,17 @@ describe('Manual effects', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(ru.rejection['effect.notPending']);
   });
 
-  it('labels the comment field and both buttons', async () => {
+  it('labels the task buttons and the comment field in the dialog', async () => {
     serve();
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    expect(await screen.findByLabelText(ru.effects.comment)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: ru.effects.applied })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: ru.effects.notApplicable })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Разыграно' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(ru.effects.comment)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Не подходит…' }));
+
+    const dialog = within(screen.getByRole('dialog', { name: 'Ивент не подходит' }));
+    expect(dialog.getByLabelText(ru.effects.comment)).toBeInTheDocument();
+    expect(dialog.getByRole('button', { name: ru.effects.notApplicable })).toBeInTheDocument();
   });
 
   it.each(['finished', 'archived'] as const)(
@@ -196,6 +204,7 @@ describe('Manual effects', () => {
       );
       expect(screen.queryByTestId(`manual-effect-applied-${effectId}`)).toBeNull();
       expect(screen.queryByTestId(`manual-effect-not-applicable-${effectId}`)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Не подходит…' })).toBeNull();
     },
   );
 
@@ -210,8 +219,10 @@ describe('Manual effects', () => {
     serve();
     render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
 
-    const button = await screen.findByTestId(`manual-effect-not-applicable-${effectId}`);
-    expect(button).toHaveAccessibleDescription(ru.effects.commentNeeded);
+    await userEvent.click(await screen.findByRole('button', { name: 'Не подходит…' }));
+    expect(screen.getByRole('textbox', { name: ru.effects.comment })).toHaveAccessibleDescription(
+      ru.effects.commentNeeded,
+    );
     expect(screen.getByText(ru.effects.commentNeeded)).toBeVisible();
   });
 });

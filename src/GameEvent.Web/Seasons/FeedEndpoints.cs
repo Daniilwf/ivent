@@ -61,7 +61,8 @@ public sealed record FeedView(
     IReadOnlyList<FeedRunView> Runs,
     IReadOnlyList<FeedObjectView>? Objects = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<Guid, ReactionView[]>? Reactions = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<Guid>? CommentTargets = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<Guid>? CommentTargets = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<Guid, int>? CommentCounts = null);
 
 /// <summary>
 /// An object of the season's content the page's events name (<c>objectId</c>: item uses and gifts, drawn events): its
@@ -240,16 +241,18 @@ public static class FeedEndpoints
             ? await FeedReactionEndpoints.ReadAsync(db, targets, seasonId, commandIds, rules.Social.Reactions, viewer, ct)
             : null;
         IReadOnlyList<Guid>? commentTargets = null;
+        IReadOnlyDictionary<Guid, int>? commentCounts = null;
         if (rules.Features.Comments)
         {
             var allowed = reactions is null
                 ? await targets.FindAsync(db, seasonId, commandIds, ct)
                 : reactions.Keys.ToHashSet();
             commentTargets = [.. commandIds.Where(allowed.Contains)];
+            commentCounts = await CommentQueries.ReadFeedCountsAsync(db, seasonId, commentTargets, ct);
         }
 
         return TypedResults.Ok(new FeedView(
-            entries, nextBefore, players, games, runs, await ObjectsAsync(db, contentCards, seasonId, entries, ct), reactions, commentTargets));
+            entries, nextBefore, players, games, runs, await ObjectsAsync(db, contentCards, seasonId, entries, ct), reactions, commentTargets, commentCounts));
     }
 
     private sealed record RollDisclosure(HashSet<Guid> Shown, Dictionary<(Guid Player, Guid Game), long> HiddenOffers);

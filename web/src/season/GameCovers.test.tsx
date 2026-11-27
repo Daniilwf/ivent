@@ -161,7 +161,7 @@ describe('Game covers on the season screen (D-222)', () => {
     expect(pictures(await screen.findByTestId('active-run'))).toEqual([cover(2).thumbnailUrl]);
   });
 
-  it('shows my last completed game with its cover beside its dice', async () => {
+  it('keeps the dice visible and shows the last completed game cover in its proof details', async () => {
     open(
       season({
         lastCompleted: {
@@ -179,7 +179,13 @@ describe('Game covers on the season screen (D-222)', () => {
     );
 
     const dice = await screen.findByTestId('last-dice');
-    expect(pictures(dice.parentElement as HTMLElement)).toEqual([cover(1).thumbnailUrl]);
+    const detail = screen.getByTestId('proof-details');
+    expect(dice).toBeVisible();
+    expect(detail).not.toHaveAttribute('open');
+    await userEvent.click(dice);
+    expect(detail).toHaveAttribute('open');
+    expect(pictures(detail)).toEqual([cover(1).thumbnailUrl]);
+    expect(detail.querySelector('img')).toBeVisible();
   });
 
   it('puts no placeholder beside the dice line of a game without a cover', async () => {
@@ -199,9 +205,11 @@ describe('Game covers on the season screen (D-222)', () => {
       }),
     );
 
-    const row = (await screen.findByTestId('last-dice')).parentElement as HTMLElement;
-    expect(pictures(row)).toEqual([]);
-    expect(within(row).queryByRole('img', { name: ru.board.noCover })).toBeNull();
+    await userEvent.click(await screen.findByTestId('last-dice'));
+    const detail = screen.getByTestId('proof-details');
+    expect(detail).toHaveAttribute('open');
+    expect(pictures(detail)).toEqual([]);
+    expect(within(detail).queryByRole('img', { name: ru.board.noCover })).toBeNull();
   });
 
   it('shows the cover of the game the wheel lands on', async () => {

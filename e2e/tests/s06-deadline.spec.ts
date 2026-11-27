@@ -35,6 +35,7 @@ test('deadline: rolls closed, proofs accepted, results only after every proof is
   const petyaApi = await apiOf(petya);
   await rollAndStart(petyaApi, world.seasonId);
   const petyaPage = await signIn(browser, petya);
+  await petyaPage.getByTestId('complete-open').click();
   await expect(petyaPage.getByTestId('complete-form')).toBeVisible();
 
   // The deadline in an hour, then an hour and a minute later
@@ -52,6 +53,7 @@ test('deadline: rolls closed, proofs accepted, results only after every proof is
   // Petya's game was not completed in time: nothing to complete it with any more
   await expect(petyaPage.getByTestId('season-status')).toContainText(closing, live);
   await expect(petyaPage.getByTestId('complete-form')).toHaveCount(0);
+  await expect(petyaPage.getByTestId('complete-open')).toHaveCount(0);
   await expect(petyaPage.getByTestId('roll')).toHaveCount(0);
 
   // A forged roll or completion is refused by the server

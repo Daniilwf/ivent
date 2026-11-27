@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  ChevronDown,
   Images,
   KeyRound,
   Library,
@@ -10,6 +11,7 @@ import {
   ShieldCheck,
   Trophy,
   UserRound,
+  UsersRound,
   Vote,
 } from 'lucide-react';
 import { useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
@@ -35,45 +37,58 @@ const sections: { kind: Route['kind'] & keyof typeof ru.nav; to: string; icon: R
   { kind: 'hallOfFame', to: paths.hallOfFame(), icon: <Trophy size={18} aria-hidden /> },
 ];
 
-/**
- * The site's sections go under the name on a phone, between the name and my menu on a desktop.
- * Compact labels leave room for the five common sections on a phone. Extra sections wrap.
- */
+const navControl =
+  'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-2 text-sm font-medium whitespace-nowrap transition duration-(--duration-fast) desk:px-3 desk:text-base';
+
+/** Primary links share a row with the seasonal menu. On a phone the primary links can scroll. */
 function SiteNav({
   admin,
   pollsSeasonId,
   gallerySeasonId,
+  interactionsSeasonId,
 }: {
   admin: boolean;
   pollsSeasonId: string | null;
   gallerySeasonId: string | null;
+  interactionsSeasonId: string | null;
 }) {
   const found = routeOf(usePath());
   // Anyone but the admin at the admin's address sees the game: its section is the current one
   const route: Route = found.kind === 'admin' && !admin ? { kind: 'season' } : found;
-  const shown = [...sections];
+  const seasonal: { kind: Route['kind']; label: string; to: string; icon: ReactNode }[] = [];
   if (gallerySeasonId) {
-    shown.splice(2, 0, {
+    seasonal.push({
       kind: 'gallery',
+      label: ru.nav.gallery,
       to: paths.gallery(gallerySeasonId),
       icon: <Images size={18} aria-hidden />,
     });
   }
   if (pollsSeasonId) {
-    shown.push({
+    seasonal.push({
       kind: 'polls',
+      label: ru.nav.polls,
       to: paths.polls(pollsSeasonId),
       icon: <Vote size={18} aria-hidden />,
     });
   }
+  if (interactionsSeasonId) {
+    seasonal.push({
+      kind: 'interactions',
+      label: ru.turn.interactions,
+      to: paths.interactions(interactionsSeasonId),
+      icon: <UsersRound size={18} aria-hidden />,
+    });
+  }
+
   return (
     <nav
       aria-label={ru.nav.label}
       data-testid="site-nav"
-      className="order-last -mx-1 w-full min-w-0 p-1 desk:order-none desk:mx-0 desk:mr-auto desk:w-auto"
+      className="order-last -mx-1 flex w-full min-w-0 items-center gap-1 desk:order-none desk:mx-0 desk:w-auto desk:flex-1"
     >
-      <ul className="flex flex-wrap gap-1">
-        {shown.map((section) => {
+      <ul className="scrollbar-none -m-1 flex min-w-0 gap-1 overflow-x-auto p-2">
+        {sections.map((section) => {
           const current = route.kind === section.kind;
           return (
             <li key={section.kind} className="shrink-0">
@@ -81,8 +96,12 @@ function SiteNav({
                 to={section.to}
                 aria-current={current ? 'page' : undefined}
                 data-testid={`nav-${section.kind}`}
+                onFocus={({ currentTarget }) => {
+                  currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                }}
                 className={cx(
-                  'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-2 text-sm font-medium whitespace-nowrap transition duration-(--duration-fast) desk:px-3 desk:text-base',
+                  navControl,
+                  'scroll-mx-2',
                   // The current section: filled, not by colour alone
                   current ? 'bg-ink text-on-color' : 'text-ink is-hover:bg-muted',
                 )}
@@ -94,6 +113,37 @@ function SiteNav({
           );
         })}
       </ul>
+      {seasonal.length ? (
+        <Menu
+          trigger={
+            <button
+              type="button"
+              data-testid="nav-more"
+              className={cx(
+                navControl,
+                'shrink-0 cursor-pointer is-focus:focus-ring',
+                seasonal.some((section) => section.kind === route.kind)
+                  ? 'bg-ink text-on-color'
+                  : 'text-ink is-hover:bg-muted data-[state=open]:bg-muted',
+              )}
+            >
+              {ru.nav.more}
+              <ChevronDown size={16} aria-hidden />
+            </button>
+          }
+          items={seasonal.map((section) => ({
+            label: section.label,
+            icon: section.icon,
+            testId: `nav-${section.kind}`,
+            link: (
+              <Link
+                to={section.to}
+                aria-current={route.kind === section.kind ? 'page' : undefined}
+              />
+            ),
+          }))}
+        />
+      ) : null}
     </nav>
   );
 }
@@ -107,6 +157,7 @@ export function Shell({
   seasonId = null,
   pollsSeasonId = null,
   gallerySeasonId = null,
+  interactionsSeasonId = null,
   onChangePassword,
   onLogout,
   offline,
@@ -118,6 +169,7 @@ export function Shell({
   seasonId?: string | null;
   pollsSeasonId?: string | null;
   gallerySeasonId?: string | null;
+  interactionsSeasonId?: string | null;
   onChangePassword: () => void;
   onLogout: () => void;
   /** The styleguide shows the lost connection without losing it */
@@ -140,9 +192,9 @@ export function Shell({
   useLayoutEffect(() => {
     const layout = frame.current;
     const bar = header.current;
-    if (!admin || !onAdminPage || !layout || !bar) return;
+    if (!layout || !bar) return;
 
-    // The optional season links can wrap into a second row after the initial render.
+    // The season and admin use the actual header height to fit their sticky layout to the viewport.
     const measure = () => {
       const height = bar.getBoundingClientRect().height;
       if (height > 0) layout.style.setProperty('--shell-header-height', `${height}px`);
@@ -154,9 +206,9 @@ export function Shell({
       observer?.disconnect();
       layout.style.removeProperty('--shell-header-height');
     };
-  }, [admin, onAdminPage]);
+  }, []);
   return (
-    <div ref={frame} className="min-h-dvh">
+    <div ref={frame} className="shell-min-height">
       <header
         ref={header}
         className="sticky top-0 z-10 border-b-2 border-muted bg-page/95 backdrop-blur-sm"
@@ -168,7 +220,12 @@ export function Shell({
           >
             {ru.app.title}
           </Link>
-          <SiteNav admin={admin} pollsSeasonId={pollsSeasonId} gallerySeasonId={gallerySeasonId} />
+          <SiteNav
+            admin={admin}
+            pollsSeasonId={pollsSeasonId}
+            gallerySeasonId={gallerySeasonId}
+            interactionsSeasonId={interactionsSeasonId}
+          />
           {online ? null : <ConnectionLost compact />}
           <BugReportButton />
           <Menu

@@ -37,6 +37,7 @@ export function CompleteForm({
   challengesEnabled = false,
   dice = null,
   declared = null,
+  showHeading = true,
   pending,
   onComplete,
 }: {
@@ -46,6 +47,7 @@ export function CompleteForm({
   declared?: Schemas['Difficulty'] | null;
   needsHours: boolean;
   challengesEnabled?: boolean;
+  showHeading?: boolean;
   pending: boolean;
   onComplete: (completion: Completion) => void;
 }) {
@@ -119,13 +121,16 @@ export function CompleteForm({
       onSubmit={submit}
       noValidate
       data-testid="complete-form"
-      aria-labelledby="complete-title"
+      aria-labelledby={showHeading ? 'complete-title' : undefined}
+      aria-label={showHeading ? undefined : ru.turn.completeTitle}
       className="grid min-w-0 gap-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <h3 id="complete-title" className="font-display font-heavy">
-          {ru.turn.completeTitle}
-        </h3>
+        {showHeading ? (
+          <h3 id="complete-title" className="font-display font-heavy">
+            {ru.turn.completeTitle}
+          </h3>
+        ) : null}
         <CompletionRulesLink />
       </div>
       <ChoiceGroup

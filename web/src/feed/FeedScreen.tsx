@@ -33,7 +33,8 @@ type Feed = {
   nextBefore: number | null;
   pages: number;
   reactions: FeedReactions | null;
-  commentTargets: ReadonlyMap<string, boolean> | null;
+  /** Visible counts, with null for a checked row that has no thread. */
+  commentTargets: ReadonlyMap<string, number | null> | null;
 };
 type State =
   { kind: 'loading' } | { kind: 'failed' } | { kind: 'notFound' } | ({ kind: 'ready' } & Feed);
@@ -52,13 +53,14 @@ function rollRevealId({ data }: Entry) {
 }
 
 function mergeCommentTargets(
-  previous: ReadonlyMap<string, boolean> | null,
+  previous: Feed['commentTargets'],
   pageIds: readonly string[],
   allowed: readonly string[],
-): ReadonlyMap<string, boolean> {
+  counts: Schemas['FeedView']['commentCounts'],
+): ReadonlyMap<string, number | null> {
   const next = new Map(previous);
   const eligible = new Set(allowed);
-  for (const id of pageIds) next.set(id, eligible.has(id));
+  for (const id of pageIds) next.set(id, eligible.has(id) ? (counts?.[id] ?? 0) : null);
   return next;
 }
 
@@ -119,6 +121,7 @@ export function FeedScreen({
   const current = useRef<State>({ kind: 'loading' });
   const lifetime = useRef<AbortController | null>(null);
   const newestPage = useRef<AbortController | null>(null);
+  const changedComments = useRef<{ through: number } | null>(null);
   const revision = useRef(0);
   const headRevision = useRef(0);
   useEffect(() => {
@@ -168,13 +171,13 @@ export function FeedScreen({
   const refreshCommentTargets = useCallback(
     async (before: number, oldest: number, signal: AbortSignal) => {
       let cursor: number | null = before;
-      // Enabling comments only covers the latest page at first. Read the older open pages as well.
+      // Read through the affected pages already shown, a page at a time.
       while (cursor !== null && cursor > oldest) {
         const result = await fetchFeedPage(seasonId, cursor, FEED_PAGE, signal);
-        if (signal.aborted) return;
+        if (signal.aborted) return false;
         if (result.kind === 'signedOut') {
           onSignedOut();
-          return;
+          return false;
         }
         const latest = current.current;
         if (
@@ -183,7 +186,7 @@ export function FeedScreen({
           latest.kind !== 'ready' ||
           latest.commentTargets === null
         )
-          return;
+          return false;
         const page = result.value;
         show({
           ...latest,
@@ -191,10 +194,12 @@ export function FeedScreen({
             latest.commentTargets,
             commandIdsOf(page.entries),
             result.value.commentTargets,
+            page.commentCounts,
           ),
         });
         cursor = page.nextBefore;
       }
+      return true;
     },
     [seasonId, onSignedOut, show],
   );
@@ -260,6 +265,7 @@ export function FeedScreen({
             before.kind === 'ready' ? before.commentTargets : null,
             pageIds,
             page.commentTargets,
+            page.commentCounts,
           );
     const previousReactions = before.kind === 'ready' ? before.reactions : null;
     const reactions =
@@ -318,12 +324,19 @@ export function FeedScreen({
       });
       void refreshHiddenRolls(hidden, request.signal);
     }
-    if (commentTargets && page.nextBefore !== null) {
+    const changed = changedComments.current;
+    if (!commentTargets || page.nextBefore === null) {
+      changedComments.current = null;
+    } else {
       const oldestUnchecked = entries.findLast(
         (entry) => !entry.undone && !commentTargets.has(entry.commandId),
       );
-      if (oldestUnchecked)
-        void refreshCommentTargets(page.nextBefore, oldestUnchecked.sequence, request.signal);
+      const through = Math.min(oldestUnchecked?.sequence ?? Infinity, changed?.through ?? Infinity);
+      if (through !== Infinity) {
+        void refreshCommentTargets(page.nextBefore, through, request.signal).then((complete) => {
+          if (complete && changedComments.current === changed) changedComments.current = null;
+        });
+      }
     }
     if (reactions !== null) {
       const pageCommands = new Set(pageIds);
@@ -338,7 +351,27 @@ export function FeedScreen({
   const version = useSeasonVersion(seasonId, {
     refreshOnJoin: true,
     throttleMs: liveRefreshIntervalMs,
-    relevant: (update) => update.types.some((type) => !isCommentEvent(type)),
+    relevant: ({ types, commentTarget }) => {
+      const feedChanged = types.some((type) => !isCommentEvent(type));
+      const latest = current.current;
+      if (
+        latest.kind !== 'ready' ||
+        !latest.commentTargets ||
+        commentTarget?.kind === 'review' ||
+        !types.some((type) => isCommentEvent(type) && type !== 'comment-edited')
+      )
+        return feedChanged;
+      const id = commentTarget?.id?.toLowerCase();
+      if (id && latest.commentTargets.get(id) == null) return feedChanged;
+      const changed = id
+        ? latest.entries.find((entry) => entry.commandId === id)
+        : latest.entries.at(-1);
+      if (!changed) return feedChanged;
+      changedComments.current = {
+        through: Math.min(changedComments.current?.through ?? Infinity, changed.sequence),
+      };
+      return true;
+    },
   });
   useEffect(() => {
     void load();
@@ -377,7 +410,12 @@ export function FeedScreen({
               : reconcileReactions(latest.reactions, pageIds, page.reactions, started),
           commentTargets:
             latest.commentTargets && page.commentTargets != null
-              ? mergeCommentTargets(latest.commentTargets, pageIds, page.commentTargets)
+              ? mergeCommentTargets(
+                  latest.commentTargets,
+                  pageIds,
+                  page.commentTargets,
+                  page.commentCounts,
+                )
               : latest.commentTargets,
         });
         if (latest.reactions && page.reactions == null) void refreshReactions(pageIds, signal);
@@ -513,7 +551,8 @@ export function FeedScreen({
               ) : null;
             }}
             renderComments={(item) => {
-              if (!state.commentTargets?.get(item.id)) return null;
+              const count = state.commentTargets?.get(item.id);
+              if (count == null) return null;
               const title = item.line
                 .map((part) =>
                   typeof part === 'string'
@@ -528,6 +567,7 @@ export function FeedScreen({
                   target={{ kind: 'feed', seasonId, targetCommandId: item.id }}
                   label={ru.comments.feedLabel(title)}
                   onSignedOut={onSignedOut}
+                  count={count}
                 />
               );
             }}

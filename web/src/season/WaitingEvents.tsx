@@ -8,14 +8,15 @@ import { RunConditionList } from './RunConditions';
 export type WaitingEventsProps = {
   events?: readonly Schemas['WaitingEventView'][] | null;
   conditions?: readonly Schemas['RunConditionView'][] | null;
+  compact?: boolean;
 };
 
-export function WaitingEvents({ events, conditions }: WaitingEventsProps) {
+export function WaitingEvents({ events, conditions, compact = false }: WaitingEventsProps) {
   const eventsTitleId = useId();
   const conditionsTitleId = useId();
   if (!events?.length && !conditions?.length) return null;
 
-  return (
+  const content = (
     <div className="grid gap-4">
       {events?.length ? (
         <section aria-labelledby={eventsTitleId} className="grid gap-2">
@@ -58,5 +59,26 @@ export function WaitingEvents({ events, conditions }: WaitingEventsProps) {
         </section>
       ) : null}
     </div>
+  );
+  if (!compact) return content;
+
+  const titles = new Set([
+    ...(events ?? []).map((event) => event.name),
+    ...(conditions ?? []).map((condition) => condition.name),
+  ]);
+  return (
+    <details data-testid="waiting-events" className="text-sm">
+      <Summary>
+        <span className="grid gap-1">
+          <span className="font-medium">{ru.events.waitingSummary}</span>
+          <span className="flex flex-wrap gap-1">
+            {[...titles].map((name) => (
+              <Tag key={name}>{name}</Tag>
+            ))}
+          </span>
+        </span>
+      </Summary>
+      <div className="pt-2">{content}</div>
+    </details>
   );
 }

@@ -81,6 +81,10 @@ function Avatar({ item }: { item: FeedItem }) {
   );
 }
 
+function hasSocialActions(item: FeedItem) {
+  return !item.undone && item.actor !== null && item.icon !== 'admin';
+}
+
 /** One line of the feed: one command of the log — who did what, a few facts and a quote */
 export function FeedLine({
   item,
@@ -93,6 +97,16 @@ export function FeedLine({
   reactions?: ReactNode;
   comments?: ReactNode;
 }) {
+  const showActions = hasSocialActions(item) && Boolean(reactions || comments);
+  const time = (
+    <time
+      dateTime={item.at}
+      title={moscowTime(item.at)}
+      className="row-start-1 shrink-0 text-sm text-ink-soft tabular-nums"
+    >
+      {moscowClock(item.at)}
+    </time>
+  );
   return (
     <li
       data-testid={`feed-item-${item.id}`}
@@ -116,13 +130,7 @@ export function FeedLine({
               typeof part === 'string' ? part : <Ref key={i} part={part} />,
             )}
           </p>
-          <time
-            dateTime={item.at}
-            title={moscowTime(item.at)}
-            className="shrink-0 text-sm text-ink-soft tabular-nums"
-          >
-            {moscowClock(item.at)}
-          </time>
+          {showActions ? null : time}
         </div>
         {item.undone ? (
           <p className="justify-self-start">
@@ -142,8 +150,13 @@ export function FeedLine({
           </ul>
         ) : null}
         {item.quote ? <Quote rating={item.quote.rating} text={item.quote.text} /> : null}
-        {reactions}
-        {comments}
+        {showActions ? (
+          <div className="grid grid-cols-[auto_auto_auto_minmax(0,1fr)] items-center gap-x-2">
+            {time}
+            {reactions}
+            {comments}
+          </div>
+        ) : null}
       </div>
       {/* The completed game's cover: a card on the table beside the line, the title is in the line itself */}
       {item.cover ? (
@@ -190,8 +203,8 @@ export function FeedList({
                 key={item.id}
                 item={item}
                 fresh={fresh?.has(item.id) ?? false}
-                reactions={item.undone ? null : renderReactions?.(item.id)}
-                comments={item.undone ? null : renderComments?.(item)}
+                reactions={hasSocialActions(item) ? renderReactions?.(item.id) : null}
+                comments={hasSocialActions(item) ? renderComments?.(item) : null}
               />
             ))}
           </ol>
