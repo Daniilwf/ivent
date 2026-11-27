@@ -44,7 +44,13 @@ public sealed class WheelRollApiTests : IAsyncLifetime
         var petya = await _site.SignedInAsync("petya");
         var completed = await PlayOneAsync(vasya);
         await PostOkAsync(vasya, $"{Season}/roll");
-        var held = (await MeAsync(vasya)).GetProperty("offer").GetProperty("title").GetString();
+        var heldView = await MeAsync(vasya);
+        var held = heldView.GetProperty("offer").GetProperty("title").GetString();
+        await PostOkAsync(vasya, $"{Season}/roll/reveal", new
+        {
+            commandId = Guid.NewGuid(),
+            revealId = heldView.GetProperty("roll").GetProperty("revealId").GetGuid(),
+        });
 
         await PostOkAsync(petya, $"{Season}/roll");
 
@@ -173,7 +179,167 @@ public sealed class WheelRollApiTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, (await MeAsync(petya)).GetProperty("roll").ValueKind);
     }
 
+    [Fact]
+    public async Task The_result_is_private_in_the_feed_and_pool_until_the_owner_shows_it()
+    {
+        var owner = await _site.SignedInAsync("vasya");
+        var other = await _site.SignedInAsync("petya");
+        var spectator = await _site.SignedInAsync("zritel");
+        var rollCommand = Guid.NewGuid();
+        await PostOkAsync(owner, $"{Season}/roll", new { commandId = rollCommand });
+
+        var me = await MeAsync(owner);
+        var game = me.GetProperty("offer").GetProperty("id").GetGuid();
+        var roll = me.GetProperty("roll");
+        var reveal = roll.GetProperty("revealId").GetGuid();
+        Assert.False(roll.GetProperty("revealed").GetBoolean());
+        Assert.Contains(roll.GetProperty("wheelGames").EnumerateArray(), item => item.GetProperty("id").GetGuid() == game);
+
+        foreach (var reader in new[] { owner, other, spectator })
+        {
+            var feed = await OkAsync(await reader.GetAsync($"{Season}/feed", Ct));
+            var entry = feed.GetProperty("entries").EnumerateArray().Single(e => e.GetProperty("commandId").GetGuid() == rollCommand);
+            Assert.Equal("game-roll-hidden", entry.GetProperty("type").GetString());
+            Assert.False(entry.GetProperty("data").TryGetProperty("gameId", out _));
+            Assert.DoesNotContain(feed.GetProperty("games").EnumerateArray(), item => item.GetProperty("id").GetGuid() == game);
+        }
+
+        var hiddenPool = await OkAsync(await spectator.GetAsync($"{Season}/games", Ct));
+        Assert.DoesNotContain(hiddenPool.EnumerateArray(), item => item.GetProperty("gameId").GetGuid() == game);
+
+        using var forbidden = await spectator.PostAsJsonAsync($"{Season}/roll/reveal", new { commandId = Guid.NewGuid(), revealId = reveal }, Ct);
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        using var stale = await other.PostAsJsonAsync($"{Season}/roll/reveal", new { commandId = Guid.NewGuid(), revealId = reveal }, Ct);
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        using var invalid = await owner.PostAsJsonAsync($"{Season}/roll/reveal", new { commandId = Guid.NewGuid(), revealId = Guid.Empty }, Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+        var command = new { commandId = Guid.NewGuid(), revealId = reveal };
+        await PostOkAsync(owner, $"{Season}/roll/reveal", command);
+        var repeated = await OkAsync(await owner.PostAsJsonAsync($"{Season}/roll/reveal", command, Ct));
+        Assert.True(repeated.GetProperty("duplicate").GetBoolean());
+
+        var shown = (await MeAsync(owner)).GetProperty("roll");
+        Assert.True(shown.GetProperty("revealed").GetBoolean());
+        Assert.Equal(roll.GetProperty("sequence").GetInt64(), shown.GetProperty("sequence").GetInt64());
+        var visible = await OkAsync(await spectator.GetAsync($"{Season}/feed", Ct));
+        var visibleEntry = visible.GetProperty("entries").EnumerateArray().Single(e => e.GetProperty("commandId").GetGuid() == rollCommand);
+        Assert.Equal("game-rolled", visibleEntry.GetProperty("type").GetString());
+        Assert.Equal(game, visibleEntry.GetProperty("data").GetProperty("gameId").GetGuid());
+        var visiblePool = await OkAsync(await spectator.GetAsync($"{Season}/games", Ct));
+        Assert.Contains(visiblePool.EnumerateArray(), item => item.GetProperty("gameId").GetGuid() == game);
+    }
+
+    [Fact]
+    public async Task An_unshown_reservation_does_not_leak_through_another_players_wheel()
+    {
+        var owner = await _site.SignedInAsync("vasya");
+        var other = await _site.SignedInAsync("petya");
+        await PostOkAsync(owner, $"{Season}/roll");
+        var reserved = (await MeAsync(owner)).GetProperty("offer").GetProperty("id").GetGuid();
+
+        await PostOkAsync(other, $"{Season}/roll");
+
+        var me = await MeAsync(other);
+        Assert.NotEqual(reserved, me.GetProperty("offer").GetProperty("id").GetGuid());
+        var roll = me.GetProperty("roll");
+        Assert.DoesNotContain(roll.GetProperty("wheelGames").EnumerateArray(), item => item.GetProperty("id").GetGuid() == reserved);
+        Assert.DoesNotContain(roll.GetProperty("misses").EnumerateArray(), item => item.GetProperty("gameId").GetGuid() == reserved);
+
+        await ApiCalls.ShowCurrentRollAsync(owner);
+
+        var reloaded = (await MeAsync(other)).GetProperty("roll");
+        Assert.Equal(roll.GetProperty("sequence").GetInt64(), reloaded.GetProperty("sequence").GetInt64());
+        Assert.Equal(roll.GetProperty("wheelGames").GetRawText(), reloaded.GetProperty("wheelGames").GetRawText());
+    }
+
+    [Fact]
+    public async Task An_admin_discard_keeps_an_unshown_result_private_until_its_disclosure_time()
+    {
+        var owner = await _site.SignedInAsync("vasya");
+        var spectator = await _site.SignedInAsync("zritel");
+        var admin = await _site.SignedInAsync("admin");
+        var rollCommand = Guid.NewGuid();
+        await PostOkAsync(owner, $"{Season}/roll", new { commandId = rollCommand });
+        var game = (await MeAsync(owner)).GetProperty("offer").GetProperty("id").GetGuid();
+        await DiscardOfferAsync(admin);
+
+        _site.Clock.Advance(TimeSpan.FromSeconds(119));
+        var hidden = await OkAsync(await spectator.GetAsync($"{Season}/feed", Ct));
+        var entries = hidden.GetProperty("entries").EnumerateArray().ToArray();
+        Assert.Equal("game-roll-hidden", entries.Single(entry => entry.GetProperty("commandId").GetGuid() == rollCommand).GetProperty("type").GetString());
+        var discard = entries.Single(entry => entry.GetProperty("type").GetString() == "offer-discarded");
+        Assert.False(discard.GetProperty("data").TryGetProperty("gameId", out _));
+        Assert.DoesNotContain(hidden.GetProperty("games").EnumerateArray(), item => item.GetProperty("id").GetGuid() == game);
+
+        _site.Clock.Advance(TimeSpan.FromSeconds(1));
+        var due = await OkAsync(await spectator.GetAsync($"{Season}/feed", Ct));
+        var disclosed = due.GetProperty("entries").EnumerateArray().Single(entry => entry.GetProperty("commandId").GetGuid() == rollCommand);
+        Assert.Equal("game-rolled", disclosed.GetProperty("type").GetString());
+        Assert.Equal(game, disclosed.GetProperty("data").GetProperty("gameId").GetGuid());
+    }
+
+    [Fact]
+    public async Task Discarding_a_hidden_offer_does_not_unmask_another_players_saved_miss()
+    {
+        var owner = await _site.SignedInAsync("vasya");
+        var other = await _site.SignedInAsync("petya");
+        var spectator = await _site.SignedInAsync("zritel");
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(owner, $"{Season}/roll");
+        var hiddenGame = (await MeAsync(owner)).GetProperty("offer").GetProperty("id").GetGuid();
+        var otherRoll = Guid.NewGuid();
+        await PostOkAsync(other, $"{Season}/roll", new { commandId = otherRoll });
+        await DiscardOfferAsync(admin);
+
+        var wheel = (await MeAsync(other)).GetProperty("roll");
+        Assert.Empty(wheel.GetProperty("misses").EnumerateArray());
+        Assert.Equal(1, wheel.GetProperty("missCount").GetInt32());
+
+        await ApiCalls.ShowCurrentRollAsync(other);
+        var feed = await OkAsync(await spectator.GetAsync($"{Season}/feed", Ct));
+        var shown = feed.GetProperty("entries").EnumerateArray().Single(entry => entry.GetProperty("commandId").GetGuid() == otherRoll);
+        Assert.Equal("game-rolled", shown.GetProperty("type").GetString());
+        Assert.Empty(shown.GetProperty("data").GetProperty("misses").EnumerateArray());
+        Assert.DoesNotContain(feed.GetProperty("games").EnumerateArray(), item => item.GetProperty("id").GetGuid() == hiddenGame);
+    }
+
+    [Fact]
+    public async Task A_repeated_game_at_the_same_clock_time_keeps_the_new_roll_identity_after_disclosure()
+    {
+        var owner = await _site.SignedInAsync("vasya");
+        var admin = await _site.SignedInAsync("admin");
+        await PostOkAsync(owner, $"{Season}/roll");
+        var first = await MeAsync(owner);
+        await DiscardOfferAsync(admin);
+        await PostOkAsync(owner, $"{Season}/roll");
+        var current = await MeAsync(owner);
+
+        Assert.Equal(first.GetProperty("offer").GetProperty("id").GetGuid(), current.GetProperty("offer").GetProperty("id").GetGuid());
+        var firstRoll = first.GetProperty("roll");
+        var secondRoll = current.GetProperty("roll");
+        Assert.Equal(firstRoll.GetProperty("rolledAt").GetDateTimeOffset(), secondRoll.GetProperty("rolledAt").GetDateTimeOffset());
+        Assert.NotEqual(firstRoll.GetProperty("revealId").GetGuid(), secondRoll.GetProperty("revealId").GetGuid());
+        Assert.True(secondRoll.GetProperty("sequence").GetInt64() > firstRoll.GetProperty("sequence").GetInt64());
+        Assert.False(secondRoll.GetProperty("revealed").GetBoolean());
+
+        await ApiCalls.ShowCurrentRollAsync(owner);
+
+        var shown = (await MeAsync(owner)).GetProperty("roll");
+        Assert.Equal(secondRoll.GetProperty("revealId").GetGuid(), shown.GetProperty("revealId").GetGuid());
+        Assert.Equal(secondRoll.GetProperty("sequence").GetInt64(), shown.GetProperty("sequence").GetInt64());
+        Assert.True(shown.GetProperty("revealed").GetBoolean());
+    }
+
     // ---- Helpers ----
+
+    private Task DiscardOfferAsync(HttpClient admin) =>
+        PostOkAsync(admin, $"/api/admin/seasons/{SiteFactory.SeasonId}/players/{_site.Players["vasya"]}/adjust", new
+        {
+            commandId = Guid.NewGuid(),
+            comment = "Снять предложение",
+            discardOffer = true,
+        });
 
     private static async Task ChangeRulesAsync(HttpClient admin, Action<JsonNode> change)
     {

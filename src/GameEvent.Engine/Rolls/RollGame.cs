@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Pool;
 using GameEvent.Engine.Runs;
@@ -27,13 +28,23 @@ public enum RollMissReason
 public sealed record RollMiss(Guid GameId, RollMissReason Reason, Guid ByPlayerId);
 
 /// <summary>The rolled game waiting for the player to start it, with rules fixed at roll time.</summary>
-public sealed record RollOffer(Guid GameId, RunSnapshot Snapshot, DateTimeOffset RolledAt);
+public sealed record RollOffer(Guid GameId, RunSnapshot Snapshot, DateTimeOffset RolledAt)
+{
+    /// <summary>Present until the player or timer reveals this roll.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RollReveal? Reveal { get; init; }
+
+    /// <summary>The roll's identity remains on the offer after disclosure.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? RevealId { get; init; }
+}
 
 /// <summary>
 /// A plain roll. <c>Sectors</c> — the categories that were on the wheel, in its order (ordinal by name): the page draws
 /// the wheel from the log, not from today's pool (D-136). v1 had no wheel; it reads as the picked category alone.
+/// v3 stores the game wheel and the pending disclosure. Earlier rolls remain visible immediately.
 /// </summary>
-[EventType("game-rolled", 2)]
+[EventType("game-rolled", 3)]
 public sealed record GameRolled(
     Guid PlayerId,
     string Category,
@@ -41,22 +52,26 @@ public sealed record GameRolled(
     Guid GameId,
     RunSnapshot Snapshot,
     DateTimeOffset RolledAt,
-    EquatableArray<string> Sectors) : IGameEvent;
+    EquatableArray<string> Sectors,
+    EquatableArray<Guid>? WheelGames = null,
+    RollReveal? Reveal = null) : IGameEvent;
 
 /// <summary>
 /// The wheel with <c>roll.choiceCount</c> &gt; 1 (D-06): up to that many available games of one category, drawn without
 /// replacement, reserved until the player picks one with <see cref="Turns.MakeChoice"/>. When the category has only
 /// one available game the roll is a plain <see cref="GameRolled"/>.
 /// </summary>
-/// <remarks><c>Sectors</c> as in <see cref="GameRolled"/> (D-136, v2).</remarks>
-[EventType("game-choice-rolled", 2)]
+/// <remarks>The persisted wheel and disclosure have the same format as <see cref="GameRolled"/>.</remarks>
+[EventType("game-choice-rolled", 3)]
 public sealed record GameChoiceRolled(
     Guid PlayerId,
     string Category,
     EquatableArray<RollMiss> Misses,
     Guid ChoiceId,
     EquatableArray<RollOffer> Offers,
-    EquatableArray<string> Sectors) : IGameEvent;
+    EquatableArray<string> Sectors,
+    EquatableArray<Guid>? WheelGames = null,
+    RollReveal? Reveal = null) : IGameEvent;
 
 internal static class Rolling
 {
@@ -280,12 +295,19 @@ internal static class Rolling
             offers.Add(new RollOffer(game.Id, RunConditions.Fix(snapshot, state, playerId), now));
         }
 
-        return offers.Count switch
+        if (offers.Count == 0)
         {
-            0 => throw new InvalidOperationException($"Category '{category.Name}' was on the wheel without an available game."),
-            1 => new GameRolled(playerId, category.Name, [.. misses], offers[0].GameId, offers[0].Snapshot, now, sectors),
-            _ => new GameChoiceRolled(playerId, category.Name, [.. misses], context.Ids.NewId(), [.. offers], sectors),
-        };
+            throw new InvalidOperationException($"Category '{category.Name}' was on the wheel without an available game.");
+        }
+
+        var rollId = context.Ids.NewId();
+        var reveal = RollReveals.Create(rollId, now);
+        // The saved display wheel must not disclose another player's result or change when they show it later.
+        var publicMisses = misses.Where(miss => !RollReveals.IsUnrevealedReservation(state, miss, now));
+        var gameSectors = RollReveals.GameSectors(rollId, offers, publicMisses, remaining.Where(g => status.Of(g) == GameAvailability.Available));
+        return offers.Count == 1
+            ? new GameRolled(playerId, category.Name, [.. misses], offers[0].GameId, offers[0].Snapshot, now, sectors, gameSectors, reveal)
+            : new GameChoiceRolled(playerId, category.Name, [.. misses], rollId, [.. offers], sectors, gameSectors, reveal);
     }
 
     // The candidates under the filters and the categories on the wheel: those with an available game among them
@@ -352,7 +374,7 @@ internal static class Rolling
                 state.Players[e.PlayerId] with
                 {
                     Phase = TurnPhase.Rolling,
-                    Offer = new RollOffer(e.GameId, e.Snapshot, e.RolledAt),
+                    Offer = new RollOffer(e.GameId, e.Snapshot, e.RolledAt) { Reveal = e.Reveal, RevealId = e.Reveal?.Id },
                 }),
         };
 

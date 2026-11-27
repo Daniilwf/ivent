@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { Schemas } from '../support/api.ts';
-import { fillCompletionHere, rollAndStartHere, setUpSeason, signInHere } from '../support/world.ts';
+import {
+  fillCompletionHere,
+  revealRollHere,
+  rollAndStartHere,
+  rollHere,
+  setUpSeason,
+  signInHere,
+} from '../support/world.ts';
 
 const confetti = '[data-testid="finish-confetti"]';
 const motionBudget = 3_000;
@@ -273,7 +280,7 @@ test.describe('branch finish', () => {
       expect(trace.starts).toHaveLength(1);
       expect(trace.starts[0]?.settled).toBe(true);
 
-      await page.getByTestId('roll').click();
+      await rollHere(page);
       await expect(canvas).toHaveCount(0);
       await expect(page.getByTestId('offer').or(page.getByTestId('choice'))).toBeVisible();
       await expect(page.getByTestId('my-finish')).toContainText(
@@ -381,6 +388,7 @@ for (const motion of ['no-preference', 'reduce'] as const) {
           if (asksQuestion) await expect(page.getByTestId('event-choice')).toContainText(eventName);
           if (route === 'next roll') {
             await expect(page.getByTestId('wheel')).toBeVisible();
+            await revealRollHere(page);
             await expect(page.getByTestId('offer').or(page.getByTestId('choice'))).toBeVisible();
             await expect(finish).toContainText('Первое место — твоё, пока предварительно');
             const trace = await finishTrace(page);

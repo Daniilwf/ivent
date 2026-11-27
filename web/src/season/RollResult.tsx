@@ -24,6 +24,46 @@ const difficulties = difficultyValues.map((d) => ({ value: d, label: ru.difficul
 
 /** The result's heading takes the focus when the wheel stops */
 export const rollResultTitle = 'roll-result-title';
+export const rollGameButton = 'roll-game-button';
+
+export function RollGenre({
+  category,
+  games,
+  choice,
+  opening,
+  onOpen,
+  onSkip,
+}: {
+  category: string;
+  games: number;
+  choice: boolean;
+  opening: boolean;
+  onOpen: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div className="grid gap-2" data-testid="roll-genre">
+      <p className="text-sm text-ink-soft">{w.gameStep}</p>
+      <h3 className="font-display text-lg font-heavy wrap-anywhere">{w.genre(category)}</h3>
+      {games > 0 && !choice ? (
+        <p className="text-sm text-ink-soft">{w.gameSectors(games)}</p>
+      ) : null}
+      <Button
+        id={rollGameButton}
+        data-testid="roll-game"
+        variant="main"
+        disabled={opening}
+        loading={opening}
+        onClick={onOpen}
+      >
+        {choice ? w.showOptions : w.rollGame}
+      </Button>
+      <Button data-testid="skip-roll" variant="link" disabled={opening} onClick={onSkip}>
+        {w.skipRoll}
+      </Button>
+    </div>
+  );
+}
 
 /**
  * What the wheel passed on the way, told as done: one folded line under the actions, the list inside —

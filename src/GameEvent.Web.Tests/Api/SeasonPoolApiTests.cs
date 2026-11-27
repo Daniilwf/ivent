@@ -67,6 +67,7 @@ public sealed class SeasonPoolApiTests : IAsyncLifetime
         var vasya = _site.Players["vasya"];
         await _site.SendAsync(new RollGame(vasya));
         var offered = await ActiveGameAsync("vasya");
+        await ApiCalls.ShowCurrentRollAsync(await _site.SignedInAsync("vasya"));
 
         Assert.Equal([Row(offered, RollMissReason.BeingPlayed, "vasya", [], null)], (await GamesAsync("petya")).Select(Row));
 
@@ -81,6 +82,7 @@ public sealed class SeasonPoolApiTests : IAsyncLifetime
         // K1A: glossary «Предложенная игра» — reserved for the player until «Начать», not played yet
         var vasya = _site.Players["vasya"];
         await _site.SendAsync(new RollGame(vasya));
+        await ApiCalls.ShowCurrentRollAsync(await _site.SignedInAsync("vasya"));
 
         Assert.True(Assert.Single(await GamesAsync("petya")).Offered);
         Assert.True(Assert.Single(await GamesAsync("vasya")).Offered);
@@ -139,6 +141,7 @@ public sealed class SeasonPoolApiTests : IAsyncLifetime
     public async Task Response_uses_camel_case_names_and_string_enums()
     {
         await _site.SendAsync(new RollGame(_site.Players["vasya"]));
+        await ApiCalls.ShowCurrentRollAsync(await _site.SignedInAsync("vasya"));
         var client = await _site.SignedInAsync("petya");
 
         using var json = JsonDocument.Parse(await client.GetStringAsync(GamesUrl(SiteFactory.SeasonId), Ct));

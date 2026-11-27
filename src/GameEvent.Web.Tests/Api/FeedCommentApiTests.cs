@@ -237,6 +237,7 @@ public sealed class FeedCommentApiTests : IAsyncLifetime
     {
         await EnableCommentsAsync();
         var roll = await RollAsync("vasya");
+        _site.Clock.Advance(TimeSpan.FromMinutes(2));
         var admin = await _site.SignedInAsync("admin");
         var spectator = await _site.SignedInAsync("zritel");
         var url = Thread(roll);

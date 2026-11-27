@@ -401,6 +401,10 @@ const headlines: [string, (d: Data, c: Context) => Headline][] = [
       line: L.started(c.playerRef(d), c.gameRef(d)),
     }),
   ],
+  [
+    'game-roll-hidden',
+    (d, c) => ({ icon: 'roll', actor: c.player(d), line: L.rollHidden(c.playerRef(d)) }),
+  ],
   // K1S-8: «Уже проходил» leads its command; the free roll after it is a fact
   [
     'game-excluded',

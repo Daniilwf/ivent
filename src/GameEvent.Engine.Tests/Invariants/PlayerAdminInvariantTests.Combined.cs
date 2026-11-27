@@ -500,7 +500,7 @@ public partial class PlayerAdminInvariantTests
             EffectChainCut => "effects",
             SeasonCreated or SeasonStatusChanged or SeasonDeadlineSet or SeasonResultRecorded or RulesetChanged
                 or SeasonPlayerAdded or PlayerAdjusted or PlayerInactivitySet or OfferDiscarded or ChoiceDiscarded
-                or GameRolled or GameChoiceRolled or GameRerolled or GameExcluded or ChoiceMade
+                or GameRolled or GameChoiceRolled or RollGameShown or GameRerolled or GameExcluded or ChoiceMade
                 or RunStarted or RunCompleted or CompletionRolled or RunReviewed or RunDropped or RunTechRerolled
                 or TechRerollConvertedToDrop or RunHoursCorrected or RunDifficultyChanged
                 or ProofSubmitted or ProofApproved or ProofRejected or ProofRejectPenalized

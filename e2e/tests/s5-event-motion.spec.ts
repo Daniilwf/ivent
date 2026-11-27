@@ -6,6 +6,7 @@ import {
   fillCompletionHere,
   live,
   rollAndStartHere,
+  rollHere,
   seasonOf,
   setUpSeason,
   signIn,
@@ -462,7 +463,7 @@ for (const skip of [false, true]) {
           // A following accepted own roll folds this event; opening its text must not replay the draw.
           if (info.project.name === 'phone')
             await page.getByRole('button', { name: 'К ходу', exact: true }).click();
-          await page.getByTestId('roll').click();
+          await rollHere(page);
           await expect(page.getByTestId('offer')).toBeVisible();
           await page.getByText(historyLabel, { exact: true }).click();
           await expect(card).toBeVisible();

@@ -36,14 +36,17 @@ public class RollTests
             s.Ruleset.Version, 12m, s.Ruleset.Reward.DiceCount, s.Ruleset.Reward.DieByDifficulty, s.Ruleset.Roll.TechRerollWindowHours,
             s.Ruleset.Reward.ChallengeBonus.ExtraDice, s.Ruleset.Reward.Coins);
         var rolled = Assert.IsType<GameRolled>(Assert.Single(s.Last.Events));
+        var reveal = Assert.IsType<RollReveal>(rolled.Reveal);
+        Assert.NotEqual(Guid.Empty, reveal.Id);
+        Assert.Equal(rolledAt.AddMinutes(2), reveal.ExpiresAt);
         Assert.Equal(
-            new GameRolled(s.PlayerId("Вася"), "Horror", [], s.GameId("Silent Hill"), expectedSnapshot, rolledAt, ["Horror"]),
+            new GameRolled(s.PlayerId("Вася"), "Horror", [], s.GameId("Silent Hill"), expectedSnapshot, rolledAt, ["Horror"], [s.GameId("Silent Hill")], reveal),
             rolled);
 
         // And the player is Rolling with the game offered (reserved), nothing else changed
         var player = s.Player("Вася");
         Assert.Equal(TurnPhase.Rolling, player.Phase);
-        Assert.Equal(new RollOffer(s.GameId("Silent Hill"), expectedSnapshot, rolledAt), player.Offer);
+        Assert.Equal(new RollOffer(s.GameId("Silent Hill"), expectedSnapshot, rolledAt) { Reveal = reveal, RevealId = reveal.Id }, player.Offer);
         Assert.Null(player.ActiveRunId);
         Assert.Equal(0, player.Points);
         Assert.Equal("start", player.CellId);

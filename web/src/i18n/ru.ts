@@ -428,6 +428,7 @@ const feedLines = {
   choiceDiscarded: <T>(p: T): Line<T> => [p, ': админ снимает выбор игры'],
   branchDiscarded: <T>(p: T): Line<T> => [p, ': админ снимает выбор ветки на развилке'],
   rolled: <T>(p: T, g: T): Line<T> => [p, ' выкручивает ', g],
+  rollHidden: <T>(p: T): Line<T> => [p, ' крутит колесо игр…'],
   choiceRolled: <T>(p: T, count: number): Line<T> => [
     p,
     ` выкручивает выбор из ${count} ${plural(count, 'игры', 'игр', 'игр')}`,
@@ -590,7 +591,7 @@ export const ru = {
       closedNext: 'Броски закрыты.',
       frozenClosedNext: 'Броски закрыты. Первое место подтверждено.',
     },
-    roll: 'Крутить колесо',
+    roll: 'Крутить жанр',
     start: 'Начать',
     // SPEC «Награда»: the die follows the difficulty named at the start; lowered on the way — the lower counts (D-633)
     startDifficulty: 'На какой сложности начинаешь',
@@ -897,6 +898,15 @@ export const ru = {
     toTurn: 'К ходу',
     skipHint: 'Нажми на анимацию, чтобы сразу увидеть результат',
     wheel: {
+      genreStep: 'Шаг 1 из 2: жанр',
+      gameStep: 'Шаг 2 из 2: игра',
+      spinGenre: 'Крутится колесо жанров…',
+      spinGame: 'Крутится колесо игр…',
+      genre: (name: string) => `Жанр: ${name}`,
+      gameSectors: (n: number) => `На колесе ${games(n)}`,
+      rollGame: 'Крутить игру',
+      showOptions: 'Открыть варианты',
+      skipRoll: 'Показать игру сразу',
       spinning: 'Крутится колесо жанров…',
       category: (name: string) => `Категория: ${name}`,
       miss: (who: string) => `Уже прошёл ${who}, крутим дальше`,

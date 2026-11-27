@@ -4,6 +4,7 @@ export const momentBudget = 3.5;
 
 export const wheelMotion = {
   firstSpinSeconds: 3.2,
+  gameSpinSeconds: 3,
   loadingBudgetSeconds: 3.45,
   missPauseSeconds: 1,
   nextSpinSeconds: 1.4,

@@ -67,6 +67,20 @@ const now = new Date('2026-09-26T18:00:00Z');
 const one = (entries: Entry[]) => feedDays(entries, refs, now)[0]?.items[0];
 
 describe('feed lines', () => {
+  it('says whose game wheel is pending and leaves the reveal receipt out of the feed', () => {
+    const item = one([
+      entry('shown', 'roll-game-shown', { playerId: vasya, revealId: 'r' }),
+      entry('hidden', 'game-roll-hidden', { playerId: vasya, revealId: 'r' }),
+    ]);
+
+    expect(text(item)).toBe('Вася крутит колесо игр…');
+    expect(item?.actor?.name).toBe('Вася');
+    expect(refsOf(item).every((part) => part.kind === 'player')).toBe(true);
+    expect(
+      one([entry('shown', 'roll-game-shown', { playerId: vasya, revealId: 'r' })]),
+    ).toBeUndefined();
+  });
+
   it('makes one line of a completion: the game by its run, the dice, points and cells as one fact, the finish', () => {
     // Newest first, as the feed gives them
     const item = one([

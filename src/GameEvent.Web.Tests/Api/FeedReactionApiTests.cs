@@ -90,6 +90,7 @@ public sealed class FeedReactionApiTests : IAsyncLifetime
     {
         await EnableReactionsAsync();
         var (_, target) = await RollAsync();
+        _site.Clock.Advance(TimeSpan.FromMinutes(2));
         var spectator = await _site.SignedInAsync("zritel");
         var admin = await _site.SignedInAsync("admin");
         await SetAsync(spectator, target, "🔥", true);

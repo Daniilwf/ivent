@@ -112,7 +112,8 @@ describe('the wheel moment', () => {
     ];
     spins.count = 0;
     const phase = vi.fn();
-    vi.useFakeTimers();
+    // Control the pauses between spins. Motion's opacity transition uses browser frames.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       render(
         <WheelMoment
@@ -133,11 +134,12 @@ describe('the wheel moment', () => {
       expect(phase).toHaveBeenCalledExactlyOnceWith('done');
       expect(spins.last?.duration).toBe(1.4);
       expect(spins.last?.distance).toBeLessThanOrEqual(360);
-      await act(() => vi.advanceTimersByTimeAsync(450));
-      expect(screen.getByText(/И ещё 2 промаха/u)).toBeVisible();
     } finally {
       vi.useRealTimers();
     }
+    await waitFor(() => {
+      expect(screen.getByText(/И ещё 2 промаха/u)).toBeVisible();
+    });
   });
 
   it('shows the server pick by 3.5 seconds while motion is still downloading', async () => {

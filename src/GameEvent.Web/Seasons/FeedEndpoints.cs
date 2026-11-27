@@ -6,17 +6,21 @@ using GameEvent.Engine.Content;
 using GameEvent.Engine.Gallery;
 using GameEvent.Engine.Kernel;
 using GameEvent.Engine.Map;
+using GameEvent.Engine.Players;
 using GameEvent.Engine.Reactions;
+using GameEvent.Engine.Rolls;
 using GameEvent.Engine.Rulesets;
 using GameEvent.Engine.Runs;
 using GameEvent.Engine.Seasons;
 using GameEvent.Engine.Turns;
 using GameEvent.Infrastructure.Database;
 using GameEvent.Infrastructure.EventLog;
+using GameEvent.Infrastructure.Seasons;
 using GameEvent.Web.Accounts;
 using GameEvent.Web.Files;
 using GameEvent.Web.Hosting;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace GameEvent.Web.Seasons;
@@ -132,7 +136,7 @@ public static class FeedEndpoints
 
     private static async Task<Results<Ok<FeedView>, NotFound, ValidationProblem>> FeedAsync(
         Guid seasonId, System.Security.Claims.ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards,
-        IFeedReactionTargets targets, CancellationToken ct, long? before = null, int limit = 50)
+        IFeedReactionTargets targets, IClock clock, CancellationToken ct, long? before = null, int limit = 50)
     {
         if (limit is < 1 or > MaxFeedPage)
         {
@@ -144,6 +148,27 @@ public static class FeedEndpoints
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["before"] = ["A sequence starts from 1."] });
         }
 
+        await db.Database.OpenConnectionAsync(ct);
+        try
+        {
+            // The log and disclosure state must agree even when a roll commits during this read.
+            var connection = (SqliteConnection)db.Database.GetDbConnection();
+            await using var snapshot = connection.BeginTransaction(deferred: true);
+            await using var enlistment = await db.Database.UseTransactionAsync(snapshot, ct);
+            var feed = await FeedFromSnapshotAsync(seasonId, user, db, contentCards, targets, clock.UtcNow, before, limit, ct);
+            await snapshot.CommitAsync(ct);
+            return feed;
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
+    }
+
+    private static async Task<Results<Ok<FeedView>, NotFound, ValidationProblem>> FeedFromSnapshotAsync(
+        Guid seasonId, System.Security.Claims.ClaimsPrincipal user, GameEventDbContext db, ContentCards contentCards,
+        IFeedReactionTargets targets, DateTimeOffset now, long? before, int limit, CancellationToken ct)
+    {
         // The global log (accounts, files, bug reports) is nobody's season, whatever the tables hold
         var rulesetJson = await db.Seasons.AsNoTracking().Where(s => s.Id == seasonId).Select(s => s.RulesetJson).SingleOrDefaultAsync(ct);
         if (seasonId == Guid.Empty || rulesetJson is null)
@@ -153,10 +178,9 @@ public static class FeedEndpoints
 
         var admin = user.IsInRole(nameof(Infrastructure.Accounts.Role.Admin));
         var viewer = user.UserId();
-        var viewerPlayerId = await db.SeasonPlayers.AsNoTracking()
-            .Where(p => p.SeasonId == seasonId && p.UserId == viewer)
-            .Select(p => (Guid?)p.Id)
-            .SingleOrDefaultAsync(ct);
+        var seasonPlayers = (await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToListAsync(ct)).InTokenOrder();
+        var viewerPlayerId = seasonPlayers.SingleOrDefault(player => player.UserId == viewer)?.Id;
+        var pendingRolls = RollPresentation.PendingByPlayer(seasonPlayers);
 
         var rows = await db.Events.AsNoTracking()
             .Where(e => e.SeasonId == seasonId && e.Type != ReviewReactionSet.Type && e.Type != FeedReactionSet.Type && e.Type != GalleryReactionSet.Type
@@ -172,13 +196,16 @@ public static class FeedEndpoints
             ? await BranchChoiceIdsAsync(db, seasonId, ct)
             : [];
         var decodedRows = rows.Select(row => (Row: row, Event: EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)))).ToArray();
+        var disclosure = decodedRows.Any(row => row.Event is GameRolled or GameChoiceRolled or OfferDiscarded)
+            ? await RecentDisclosureAsync(db, seasonId, now, ct)
+            : new RollDisclosure([], []);
         var publicReviews = admin
             ? null
             : await PublicReviewsAsync(db, seasonId, decodedRows.Select(row => row.Event).OfType<RunReviewed>(), ct);
         IReadOnlyList<FeedEntryView> entries = [.. decodedRows.Select(item =>
         {
             var (r, decoded) = item;
-            var data = (JsonObject)JsonSerializer.SerializeToNode(decoded, decoded.GetType(), EngineJson.Options)!;
+            var (type, data) = RollFeedData(r, decoded, pendingRolls, disclosure, now);
             if (decoded is ChoiceDiscarded discarded)
             {
                 // The log keeps only the choice's id: the feed names what was discarded, a branch or a game (MP-1)
@@ -200,13 +227,13 @@ public static class FeedEndpoints
                     r.Sequence,
                     r.CommandId,
                     r.OccurredAt,
-                    r.Type,
+                    type,
                     JsonSerializer.SerializeToElement(shown),
                     !anonymous && r.AuthorId is { } author ? authors.GetValueOrDefault(author) : null,
                     r.UndoneByEventId is not null);
         }).OfType<FeedEntryView>()];
         var nextBefore = rows.Count == limit && rows[^1].Sequence > 1 ? rows[^1].Sequence : (long?)null;
-        var (players, games, runs) = await ReferencesAsync(db, seasonId, entries, admin, ct);
+        var (players, games, runs) = await ReferencesAsync(db, seasonPlayers, entries, admin, ct);
         var rules = JsonSerializer.Deserialize<Ruleset>(rulesetJson, EngineJson.Options)!;
         var commandIds = entries.Select(e => e.CommandId).Distinct().ToArray();
         var reactions = rules.Features.Reactions
@@ -223,6 +250,63 @@ public static class FeedEndpoints
 
         return TypedResults.Ok(new FeedView(
             entries, nextBefore, players, games, runs, await ObjectsAsync(db, contentCards, seasonId, entries, ct), reactions, commentTargets));
+    }
+
+    private sealed record RollDisclosure(HashSet<Guid> Shown, Dictionary<(Guid Player, Guid Game), long> HiddenOffers);
+
+    private static async Task<RollDisclosure> RecentDisclosureAsync(
+        GameEventDbContext db, Guid seasonId, DateTimeOffset now, CancellationToken ct)
+    {
+        var cutoff = now - (RollReveal.DisclosureDelay + RollReveal.DisclosureDelay);
+        var recent = await db.Events.AsNoTracking()
+            .Where(row => row.SeasonId == seasonId && row.OccurredAt >= cutoff && row.UndoneByEventId == null
+                && (row.Type == "roll-game-shown" || row.Type == "game-rolled"))
+            .Select(row => new { row.Sequence, row.Type, row.Version, row.Data })
+            .ToListAsync(ct);
+        var decoded = recent.Select(row => (row.Sequence, Event: EventCodec.Decode(new StoredEvent(row.Type, row.Version, row.Data)))).ToArray();
+        var shown = decoded.Select(row => row.Event).OfType<RollGameShown>().Select(roll => roll.RevealId).ToHashSet();
+        var hiddenOffers = decoded
+            .Where(row => row.Event is GameRolled { Reveal: { } reveal } && reveal.ExpiresAt > now && !shown.Contains(reveal.Id))
+            .Select(row => (row.Sequence, Roll: (GameRolled)row.Event))
+            .GroupBy(row => (row.Roll.PlayerId, row.Roll.GameId))
+            .ToDictionary(group => group.Key, group => group.Min(row => row.Sequence));
+        return new RollDisclosure(shown, hiddenOffers);
+    }
+
+    private static (string Type, JsonObject Data) RollFeedData(
+        GameEventRecord row, IGameEvent decoded, Dictionary<Guid, UnshownRoll> pending,
+        RollDisclosure disclosure, DateTimeOffset now)
+    {
+        var (playerId, reveal, misses, wheel) = decoded switch
+        {
+            GameRolled roll => (roll.PlayerId, roll.Reveal, roll.Misses, roll.WheelGames),
+            GameChoiceRolled roll => (roll.PlayerId, roll.Reveal, roll.Misses, roll.WheelGames),
+            _ => default,
+        };
+        if (reveal is not null && reveal.ExpiresAt > now && !disclosure.Shown.Contains(reveal.Id))
+        {
+            return ("game-roll-hidden", new JsonObject
+            {
+                ["playerId"] = JsonValue.Create(playerId),
+                ["revealId"] = JsonValue.Create(reveal.Id),
+            });
+        }
+
+        var data = (JsonObject)JsonSerializer.SerializeToNode(decoded, decoded.GetType(), EngineJson.Options)!;
+        if (decoded is OfferDiscarded discarded
+            && disclosure.HiddenOffers.TryGetValue((discarded.PlayerId, discarded.GameId), out var rollSequence)
+            && rollSequence < row.Sequence)
+        {
+            data.Remove("gameId");
+        }
+        else if (decoded is GameRolled or GameChoiceRolled)
+        {
+            data.Remove("wheelGames");
+            data.Remove("reveal");
+            data["misses"] = JsonSerializer.SerializeToNode(misses.Where(miss => RollPresentation.NamesMiss(wheel, pending, miss, now)).ToArray(), EngineJson.Options);
+        }
+
+        return (row.Type, data);
     }
 
     private static async Task<Dictionary<Guid, string>> PublicReviewsAsync(
@@ -265,9 +349,8 @@ public static class FeedEndpoints
     /// events name with their games, and the titles of those games.
     /// </summary>
     private static async Task<(IReadOnlyList<FeedPlayerView> Players, IReadOnlyList<FeedGameView> Games, IReadOnlyList<FeedRunView> Runs)> ReferencesAsync(
-        GameEventDbContext db, Guid seasonId, IReadOnlyList<FeedEntryView> entries, bool admin, CancellationToken ct)
+        GameEventDbContext db, IReadOnlyList<SeasonPlayerRecord> seasonPlayers, IReadOnlyList<FeedEntryView> entries, bool admin, CancellationToken ct)
     {
-        var seasonPlayers = (await db.SeasonPlayers.AsNoTracking().Where(p => p.SeasonId == seasonId).ToListAsync(ct)).InTokenOrder();
         var userIds = seasonPlayers.Select(p => p.UserId).Distinct().ToList();
         var users = await db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, ct);
         IReadOnlyList<FeedPlayerView> players = [.. seasonPlayers.Select((p, token) =>

@@ -22,11 +22,13 @@ export function FeedPreview({
   seasonId,
   version,
   visibleThrough,
+  hiddenRollSequence,
   className,
 }: {
   seasonId: string;
   version: number;
   visibleThrough?: number;
+  hiddenRollSequence?: number | undefined;
   className?: string;
 }) {
   // A failed refresh keeps the lines shown
@@ -38,20 +40,24 @@ export function FeedPreview({
   const days = useMemo(() => {
     if (state.kind !== 'ready') return [];
     const all = feedDays(state.value.entries, withRefs(emptyRefs(), state.value));
+    const hiddenCommand = state.value.entries.find(
+      (entry) => entry.sequence === hiddenRollSequence,
+    )?.commandId;
     // The newest lines only, their days kept
     let left = PREVIEW_LINES;
     return all.flatMap((day) => {
       if (left <= 0) return [];
-      const visible =
-        visibleThrough === undefined
-          ? day.items
-          : day.items.filter((item) => item.sequence <= visibleThrough);
+      const visible = day.items.filter(
+        (item) =>
+          item.id !== hiddenCommand &&
+          (visibleThrough === undefined || item.sequence <= visibleThrough),
+      );
       const items = visible.slice(0, left);
       if (items.length === 0) return [];
       left -= items.length;
       return [{ ...day, items }];
     });
-  }, [state, visibleThrough]);
+  }, [state, visibleThrough, hiddenRollSequence]);
 
   return (
     <Panel title={ru.feed.preview} className={cx(className)} data-testid="feed-preview">

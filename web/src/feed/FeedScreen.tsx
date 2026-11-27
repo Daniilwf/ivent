@@ -41,6 +41,15 @@ type State =
 const liveRefreshIntervalMs = 3000;
 const commandIdsOf = (entries: readonly Entry[]) => [...new Set(entries.map((e) => e.commandId))];
 
+function rollRevealId({ data }: Entry) {
+  return data !== null &&
+    typeof data === 'object' &&
+    'revealId' in data &&
+    typeof data.revealId === 'string'
+    ? data.revealId
+    : null;
+}
+
 function mergeCommentTargets(
   previous: ReadonlyMap<string, boolean> | null,
   pageIds: readonly string[],
@@ -189,6 +198,40 @@ export function FeedScreen({
     [seasonId, onSignedOut, show],
   );
 
+  const refreshOlderRolls = useCallback(
+    async (entries: readonly Entry[], head: readonly Entry[], signal: AbortSignal) => {
+      const revealed = new Set(
+        head.filter((entry) => entry.type === 'roll-game-shown').map(rollRevealId),
+      );
+      if (revealed.size === 0) return;
+      for (const entry of entries) {
+        if (entry.type !== 'game-roll-hidden') continue;
+        const id = rollRevealId(entry);
+        if (id === null || !revealed.has(id)) continue;
+        // The reveal receipt carries no title. Read just the already loaded row from the canonical feed.
+        const updated = await fetchFeedPage(seasonId, entry.sequence + 1, 1, signal);
+        if (signal.aborted) return;
+        if (updated.kind === 'signedOut') {
+          onSignedOut();
+          return;
+        }
+        const latest = current.current;
+        if (updated.kind !== 'ready' || latest.kind !== 'ready') continue;
+        const roll = updated.value.entries.find(
+          (candidate) => candidate.sequence === entry.sequence,
+        );
+        if (roll && roll.type !== 'game-roll-hidden') {
+          show({
+            ...latest,
+            entries: mergeEntries(latest.entries, [roll]),
+            refs: withRefs(latest.refs, updated.value),
+          });
+        }
+      }
+    },
+    [seasonId, onSignedOut, show],
+  );
+
   const load = useCallback(async () => {
     newestPage.current?.abort();
     const request = new AbortController();
@@ -244,7 +287,9 @@ export function FeedScreen({
     const known = new Set(before.entries.map((e) => e.commandId));
     const arrived = new Set(
       page.entries
-        .filter((e) => e.sequence > newest && !known.has(e.commandId))
+        .filter(
+          (e) => e.type !== 'roll-game-shown' && e.sequence > newest && !known.has(e.commandId),
+        )
         .map((e) => e.commandId),
     );
     const entries = markUndone(mergeEntries(before.entries, page.entries), page.entries);
@@ -259,6 +304,7 @@ export function FeedScreen({
       setFresh(arrived);
       setAnnounced(ru.feed.fresh(arrived.size));
     }
+    void refreshOlderRolls(entries, page.entries, request.signal);
     if (commentTargets && page.nextBefore !== null) {
       const oldestUnchecked = entries.findLast(
         (entry) => !entry.undone && !commentTargets.has(entry.commandId),
@@ -273,7 +319,7 @@ export function FeedScreen({
       );
       void refreshReactions(olderIds, request.signal);
     }
-  }, [seasonId, onSignedOut, refreshCommentTargets, refreshReactions, show]);
+  }, [seasonId, onSignedOut, refreshCommentTargets, refreshOlderRolls, refreshReactions, show]);
 
   // Others' actions come in without a reload (DESIGN.md «Обновления в реальном времени»)
   const version = useSeasonVersion(seasonId, {

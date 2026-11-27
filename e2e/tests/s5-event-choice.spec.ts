@@ -7,6 +7,7 @@ import {
   complete,
   live,
   rollAndStart,
+  rollHere,
   seasonOf,
   setUpSeason,
   signIn,
@@ -231,7 +232,7 @@ test('waiting events and conditions follow the roll and show one completion resu
       path: designShot(`s5-21-waiting-${info.project.name}.png`),
       fullPage: true,
     });
-    await page.getByTestId('roll').click();
+    await rollHere(page);
     await expect(page.getByTestId('offer').or(page.getByTestId('choice'))).toBeVisible(live);
     const rolled = await seasonOf(owner, world.seasonId);
     if (rolled.me?.choice?.kind === 'game') {
