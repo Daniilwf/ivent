@@ -45,6 +45,8 @@ describe('CompletionMoment in full motion (H4)', () => {
     );
     expect(stage.querySelector('[data-die]')).toBeNull();
     expect(done).not.toHaveBeenCalled();
+    expect(within(stage).getByTestId('move-distance')).toHaveTextContent('Фишка идёт на 2 клетки');
+    expect(within(stage).getByText('1 + 2 = 3')).toBeVisible();
 
     await vi.waitFor(
       () => {
@@ -60,6 +62,7 @@ describe('CompletionMoment in full motion (H4)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: ru.moments.skip }));
     expect(done).toHaveBeenCalledTimes(1);
+    expect(done).toHaveBeenCalledWith(true);
 
     // Nothing more comes after the skip: no walk and no second end
     await new Promise((resolve) => setTimeout(resolve, 2500));

@@ -1,6 +1,7 @@
 import { m, useReducedMotion } from 'motion/react';
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { ru } from '../i18n/ru';
+import { diceMotion } from '../design/motion';
 import './board.css';
 import { cx } from '../ui/cx';
 import { Table } from '../ui/Surface';
@@ -8,9 +9,8 @@ import { Motion } from './Motion';
 import { diceSettleSeconds, type MomentHandle, type MomentPhase } from './moment';
 
 const t = ru.moments.dice;
-const faceSpinSeconds = 1.2;
 // Leave a frame between the last face settling and the total appearing.
-const staggerBudget = diceSettleSeconds - faceSpinSeconds - 0.03;
+const staggerBudget = diceSettleSeconds - diceMotion.faceSeconds - 0.03;
 
 /** The server's throw: every die's value; the last `challenge` of them are the challenge dice; `sides` of each die
  *  (a d6 without it) */
@@ -92,7 +92,7 @@ function Face({
   );
 }
 
-/** A die thrown in from the left edge of the table: it tumbles, bounces and settles on its face */
+/** A die tumbles along the table and settles on its saved face. */
 export function Die({
   value,
   index = 0,
@@ -111,19 +111,15 @@ export function Die({
 }) {
   const numeric = sides !== 6 || !(value in pips);
   const [x, y] = numeric ? [0, 0] : (faceTurn[value] ?? [0, 0]);
-  const spin = thrown ? 720 : 0;
+  const spin = thrown ? diceMotion.degrees : 0;
   return (
     <Motion>
       <span className="inline-grid justify-items-center gap-2" data-die={value}>
         <m.span
           className="block"
-          initial={thrown ? { x: -260 - index * 30, y: -90, rotate: -200 } : false}
+          initial={thrown ? { x: index % 2 === 0 ? -12 : 12, y: -12, rotate: -30 } : false}
           animate={{ x: 0, y: 0, rotate: 0 }}
-          transition={
-            thrown
-              ? { type: 'spring', stiffness: 110, damping: 11, mass: 0.9, delay }
-              : { duration: 0 }
-          }
+          transition={thrown ? { ...diceMotion.spring, delay } : { duration: 0 }}
         >
           <m.span
             className="relative block size-16 transform-3d"
@@ -131,7 +127,7 @@ export function Die({
             animate={{ rotateX: x + spin, rotateY: y + spin }}
             transition={
               thrown
-                ? { duration: faceSpinSeconds, delay, ease: [0.2, 0.7, 0.3, 1] }
+                ? { duration: diceMotion.faceSeconds, delay, ease: diceMotion.ease }
                 : { duration: 0 }
             }
           >
@@ -216,7 +212,10 @@ export function DiceMoment({
   const plain = values.slice(0, values.length - extra);
   const challenge = values.slice(values.length - extra);
   const thrown = roll !== null && !shown && !reduce;
-  const stagger = Math.min(0.09, staggerBudget / Math.max(1, values.length - 1));
+  const stagger = Math.min(
+    diceMotion.maxStaggerSeconds,
+    staggerBudget / Math.max(1, values.length - 1),
+  );
 
   const content = (
     <Motion>
@@ -235,14 +234,12 @@ export function DiceMoment({
         ))}
       </div>
       {shown && roll && mode !== 'free' ? (
-        <m.span
-          className="rounded-full border-3 border-ink bg-card px-6 font-display text-3xl font-heavy"
-          initial={reduce ? false : { scale: 0.5 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+        <span
+          data-testid="dice-equation"
+          className="max-w-full rounded-lg border-3 border-ink bg-card px-4 py-1 text-center font-display text-2xl font-heavy tabular-nums desk:text-3xl"
         >
-          +{total}
-        </m.span>
+          {t.sum(values, total)}
+        </span>
       ) : null}
     </Motion>
   );

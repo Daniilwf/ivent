@@ -108,6 +108,7 @@ function AlreadyPlayed({
  */
 export function OfferCard({
   offer,
+  className,
   roll,
   price,
   coins = null,
@@ -118,6 +119,7 @@ export function OfferCard({
   onReroll,
 }: {
   offer: Offered;
+  className?: string | undefined;
   roll: Roll | null;
   price: Schemas['RerollPriceView'] | null;
   coins?: number | null;
@@ -129,7 +131,10 @@ export function OfferCard({
 }) {
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   return (
-    <div data-testid="offer" className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3">
+    <div
+      data-testid="offer"
+      className={cx('grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3', className)}
+    >
       <Cover game={{ title: offer.title, cover: offer.cover?.thumbnailUrl }} />
       <div className="grid content-start gap-1">
         <h3
@@ -190,6 +195,7 @@ export function OfferCard({
 /** Several games of one category (D-06): each is a card to pick, its «Уже проходил» inside the same frame */
 export function ChoiceCard({
   choice,
+  className,
   roll,
   price,
   coins = null,
@@ -200,6 +206,7 @@ export function ChoiceCard({
   onReroll,
 }: {
   choice: Schemas['ChoiceView'];
+  className?: string | undefined;
   roll: Roll | null;
   price: Schemas['RerollPriceView'] | null;
   coins?: number | null;
@@ -215,7 +222,7 @@ export function ChoiceCard({
   // Four games and more: a denser card, so the choice fits a phone's screen or two
   const dense = options.length >= 4;
   return (
-    <fieldset data-testid="choice" className="grid min-w-0 gap-3">
+    <fieldset data-testid="choice" className={cx('grid min-w-0 gap-3', className)}>
       <legend className="mb-2 font-display font-heavy">
         <span id={rollResultTitle} tabIndex={-1} className="focus:outline-none">
           {ru.turn.choose}

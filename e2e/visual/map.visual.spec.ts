@@ -152,6 +152,7 @@ for (const section of [
   'content',
   'map-background',
   'drawn-event',
+  'finish',
   'global-event',
   'poll-card',
   'whats-new',

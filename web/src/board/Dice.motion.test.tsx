@@ -16,12 +16,14 @@ it('shows the saved faces on all ten dice at settlement while Motion is still lo
     );
     expect(container.querySelectorAll('[data-die]')).toHaveLength(10);
 
-    await act(() => vi.advanceTimersByTimeAsync(1499));
+    await act(() => vi.advanceTimersByTimeAsync(1599));
     expect(onPhase).not.toHaveBeenCalled();
     await act(() => vi.advanceTimersByTimeAsync(1));
 
     expect(onPhase).toHaveBeenCalledExactlyOnceWith('done');
-    expect(screen.getByText('+29')).toBeVisible();
+    expect(screen.getByTestId('dice-equation')).toHaveTextContent(
+      '6 + 2 + 3 + 4 + 5 + 1 + 1 + 1 + 1 + 5 = 29',
+    );
     const cubes = container.querySelectorAll('.transform-3d');
     const faces = [
       'rotateY(180deg)',

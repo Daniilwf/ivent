@@ -83,6 +83,27 @@ describe('skipping a fresh event while its real Motion features are still loadin
     features.load.mockReset();
   });
 
+  it('offers a focusable button to reveal the event', () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    features.load.mockReturnValue(new Promise(() => undefined));
+    render(<DrawnEventCard drawn={drawn} fresh />);
+    const article = screen.getByRole('article', { name: drawn.name });
+    const skip = screen.getByTestId('event-moment-skip');
+
+    expect(article).toHaveAttribute('inert');
+    skip.focus();
+    fireEvent.click(skip);
+
+    expectVisibleResult(article);
+    expect(article).not.toHaveAttribute('inert');
+    expect(screen.getByRole('heading', { name: drawn.name })).toHaveFocus();
+    expect(skip).not.toBeInTheDocument();
+  });
+
   it('reveals the existing card and answer immediately, then stays final when the delayed features arrive', async () => {
     const media = {
       matches: false,
@@ -145,7 +166,7 @@ describe('skipping a fresh event while its real Motion features are still loadin
     expect(step).toHaveFocus();
   });
 
-  it('reveals the same card within three seconds without a click or loaded features and never restarts on late resolution', async () => {
+  it('reveals the same card within the chain budget without loaded features and never restarts on late resolution', async () => {
     vi.useFakeTimers();
     const media = {
       matches: false,
@@ -170,7 +191,7 @@ describe('skipping a fresh event while its real Motion features are still loadin
       // The result must be available by DESIGN's limit even when the lazy network request never finishes.
       // No pointer or keyboard event, feature resolution or application-specific timeout is involved.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(1500);
       });
 
       expect(screen.getByRole('article', { name: drawn.name })).toBe(article);

@@ -124,7 +124,9 @@
   --duration-base: 200ms;
   --duration-slow: 250ms;
   /* Main moment: Motion's typed values in design/motion.ts are kept equal by tokens.test.ts. */
-  --duration-event-draw: 900ms;
+  --duration-event-draw: 1100ms;
+  --duration-wheel-result: 400ms;
+  --animate-wheel-result: wheel-result var(--duration-wheel-result) var(--ease-out);
   /* A new line of the feed from another player comes in softly on top (DESIGN.md «Обновления в реальном времени») */
   --animate-arrive: arrive var(--duration-base) var(--ease-out);
 
@@ -132,6 +134,13 @@
     from {
       opacity: 0;
       transform: translateY(-8px);
+    }
+  }
+
+  @keyframes wheel-result {
+    from {
+      opacity: 0;
+      transform: translateY(calc(var(--spacing) * 2));
     }
   }
 

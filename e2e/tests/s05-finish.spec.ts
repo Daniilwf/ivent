@@ -31,7 +31,7 @@ async function finishSoon(world: World, login: string) {
 
 test('finish: provisional first, a second with the bonus, the first rejected, the new first approved and frozen', async ({
   browser,
-}) => {
+}, testInfo) => {
   const world = await setUpSeason({ players: ['Вася', 'Петя'] });
   const [vasya, petya] = world.players;
   if (!vasya || !petya) throw new Error('No players.');
@@ -54,8 +54,15 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
   expect(view.me?.finish).toEqual({ order: 1, frozen: false });
   // D-260: his turn card says where he stands — the first, provisionally — and the season goes on for him
   const vasyaFinish = vasyaPage.getByTestId('my-finish');
+  await expect(vasyaFinish.getByRole('heading', { name: 'Ты первый на финише!' })).toBeVisible();
   await expect(vasyaFinish).toContainText('Первое место — твоё, пока предварительно');
   await expect(vasyaPage.getByTestId('roll')).toBeEnabled();
+  await expect(vasyaPage.getByTestId('roll')).toHaveAttribute('data-variant', 'quiet');
+  await expect(vasyaPage.getByTestId('send-proof')).toHaveText('Отправить пруф');
+  await expect(vasyaPage.getByTestId('send-proof')).toHaveAttribute('data-variant', 'main');
+  await expect(vasyaPage.getByTestId('proof-details')).toHaveJSProperty('open', true);
+  await vasyaFinish.scrollIntoViewIfNeeded();
+  await vasyaPage.screenshot({ path: testInfo.outputPath('finish-proof.png') });
 
   // Petya finishes second: the bonus of the second place on top of his dice
   await finishSoon(world, petya.login);
@@ -69,6 +76,7 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
   expect(view.me?.finish?.order).toBe(2);
   // A later finisher's card: the bonus taken, the token stays, the points still grow
   const petyaFinish = petyaPage.getByTestId('my-finish');
+  await expect(petyaFinish.getByRole('heading', { name: 'Ты на финише, 2-е место' })).toBeVisible();
   await expect(petyaFinish).toContainText('бонус за финиш получен');
   await expect(petyaFinish).toContainText('кубы за прохождения ещё дают очки');
   const petyaPoints = petyaRun.total + secondBonus;
@@ -77,6 +85,16 @@ test('finish: provisional first, a second with the bonus, the first rejected, th
   );
   // The first stays on top whatever the points (Vasya may have fewer)
   await expect(leaderRow(petyaPage, vasya.playerId)).toContainText('1. Вася');
+
+  const petyaProof = petyaPage.getByTestId('proof-details');
+  await expect(petyaProof).toHaveJSProperty('open', true);
+  await petyaPage.getByTestId('send-proof').click();
+  await expect(petyaProof.getByTestId('proof-link')).toBeFocused();
+  await petyaProof.getByTestId('proof-link').fill('https://example.com/finish-credits.png');
+  await petyaProof.getByTestId('proof-submit').click();
+  await expect(petyaFinish).toContainText('Пруф на проверке.');
+  await expect(petyaPage.getByTestId('send-proof')).toHaveCount(0);
+  await expect(petyaPage.getByTestId('roll')).toHaveAttribute('data-variant', 'main');
 
   // The admin: the finishes come first in the queue; Vasya's run is rejected
   const admin = await signIn(browser, world.admin);

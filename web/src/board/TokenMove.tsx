@@ -8,10 +8,11 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
+import { cameraFrameSeconds, moveMotion, movePathSeconds } from '../design/motion';
 import { cellById } from './geometry';
 import { loadMotion } from './loadMotion';
 import { MapSticker, MapView, type MapApi } from './MapView';
-import { momentBudget, momentHop, type MomentHandle, type MomentPhase } from './moment';
+import { momentBudget, type MomentHandle, type MomentPhase } from './moment';
 import type { Board, Player, Point } from './types';
 
 /** The start and the finish are big cells: a sticker on them stands higher, clear of the label */
@@ -23,7 +24,7 @@ const atBigCell = (board: Board, p: Point) =>
 /** No flights: one array for every render, so the move does not restart */
 const noJumps: number[] = [];
 
-/** A token hopping along its path cell by cell, the camera following each hop. Give it `key` per move. */
+/** A token hopping along its path after the camera frames it. Give it `key` per move. */
 export function TokenMove({
   board,
   players,
@@ -31,6 +32,7 @@ export function TokenMove({
   path,
   className,
   size = 36,
+  onArrive,
   onPhase,
   ref,
   children,
@@ -49,6 +51,8 @@ export function TokenMove({
   path: number[] | null;
   className?: string;
   size?: number;
+  /** Destination in viewport pixels after the animated move, while its map is still mounted. */
+  onArrive?: ((position: Point | null) => void) | undefined;
   onPhase?: ((phase: MomentPhase) => void) | undefined;
   ref?: Ref<MomentHandle> | undefined;
   children?: ReactNode;
@@ -69,7 +73,7 @@ export function TokenMove({
   const step = useEffectEvent((p: Point) => {
     setPos(p);
   });
-  const end = () => {
+  const end = (walked: boolean) => {
     if (ended.current) return;
     ended.current = true;
     window.clearTimeout(deadline.current);
@@ -77,7 +81,7 @@ export function TokenMove({
     controls.current = null;
     const cell = cellById(move.board, last);
     setPos(cell);
-    camera.current?.centerOn(cell, 420);
+    if (walked) onArrive?.(camera.current?.project(cell) ?? null);
     onPhase?.('done');
   };
   const arrive = useEffectEvent(end);
@@ -87,52 +91,91 @@ export function TokenMove({
     loadMotion().catch(() => undefined);
   }, []);
 
-  useImperativeHandle(ref, () => ({ skip: end }));
+  useImperativeHandle(ref, () => ({
+    skip: () => {
+      end(false);
+    },
+  }));
 
   useEffect(() => {
     const { board, path, budget, jumps } = move;
     if (!path || ended.current) return;
 
     // Loading Motion is part of the budget, including when this is the walking part of a completion.
-    const timer = window.setTimeout(arrive, reduce ? 0 : budget * 1000);
+    const timer = window.setTimeout(
+      () => {
+        arrive(false);
+      },
+      reduce ? 0 : budget * 1000,
+    );
     deadline.current = timer;
     let cancelled = false;
     const halted = () => cancelled || ended.current;
-    // The whole move fits the moments' budget: long moves hop faster; a flight takes two hops' time
-    const hops = path.length - 1 + jumps.filter((i) => i > 0 && i < path.length).length;
-    const hop = Math.min(momentHop, budget / Math.max(hops, 1));
     const run = async () => {
       // Without the animation engine (its download failed) the token stands on its last cell at once
       const motion = await loadMotion().catch(() => null);
       if (halted()) return;
       if (!motion) {
-        arrive();
+        arrive(false);
         return;
       }
       const { animate } = motion;
-      for (let i = 1; i < path.length; i++) {
-        const a = cellById(board, path[i - 1] as number);
-        const b = cellById(board, path[i] as number);
-        // The camera moves once a hop, not every frame
-        camera.current?.centerOn(b, 420);
-        const flight = jumps.includes(i);
-        // A flight arcs high over the map, as far up as a third of its length
-        const height = flight ? Math.max(Math.hypot(b.x - a.x, b.y - a.y) / 3, 40) : 22;
+      const points = path.map((id) => cellById(board, id));
+      const plan = camera.current?.planMove(points);
+      const frameSeconds = plan?.frame
+        ? Math.min(cameraFrameSeconds, Math.max(0, budget - moveMotion.minHopSeconds))
+        : 0;
+      if (plan?.frame && frameSeconds > 0) {
         controls.current = animate(0, 1, {
-          duration: flight ? hop * 2 : hop,
+          duration: frameSeconds,
+          ease: 'easeInOut',
+          onUpdate: plan.frame,
+        });
+        await controls.current;
+        if (halted()) return;
+      }
+
+      const travelBudget = Math.min(movePathSeconds, budget - frameSeconds);
+      const steps = points.length - 1;
+      const units = steps + jumps.filter((i) => i > 0 && i <= steps).length;
+      const long = units * moveMotion.minHopSeconds > travelBudget;
+      const groups = long
+        ? Math.min(steps, Math.max(1, Math.floor(travelBudget / moveMotion.minHopSeconds)))
+        : steps;
+      const hop = Math.min(
+        moveMotion.hopSeconds,
+        travelBudget / Math.max(1, long ? groups : units),
+      );
+      const started = performance.now();
+      for (let group = 1; group <= groups; group++) {
+        // A long route groups several cells into a single hop, still crossing them in order.
+        const start = Math.round(((group - 1) * steps) / groups);
+        const finish = Math.round((group * steps) / groups);
+        const from = points[start] as Point;
+        const to = points[finish] as Point;
+        const flight = finish === start + 1 && jumps.includes(finish);
+        const height = flight
+          ? Math.max(Math.hypot(to.x - from.x, to.y - from.y) / 3, 40)
+          : moveMotion.hopHeight;
+        controls.current = animate(0, 1, {
+          duration: flight && !long ? hop * 2 : hop,
           ease: 'easeInOut',
           onUpdate: (k) => {
             if (halted()) return;
-            step({
-              x: a.x + (b.x - a.x) * k,
-              y: a.y + (b.y - a.y) * k - Math.sin(Math.PI * k) * height,
-            });
+            const progress = start + (finish - start) * k;
+            const index = Math.min(finish - 1, Math.floor(progress));
+            const a = points[index] as Point;
+            const b = points[index + 1] as Point;
+            const along = progress - index;
+            const position = { x: a.x + (b.x - a.x) * along, y: a.y + (b.y - a.y) * along };
+            plan?.follow?.(position, (performance.now() - started) / 1000);
+            step({ ...position, y: position.y - Math.sin(Math.PI * k) * height });
           },
         });
         await controls.current;
         if (halted()) return;
       }
-      arrive();
+      arrive(true);
     };
     if (!reduce) void run();
     return () => {

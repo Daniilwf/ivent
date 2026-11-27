@@ -570,7 +570,10 @@ export const ru = {
     // The player's own finish on the turn card (D-99, D-260): the place, provisional until the proofs are checked, frozen
     // for the first; the season goes on for them (SPEC: the first plays on without counting, the later finishers score)
     myFinish: {
-      title: 'Ты на финише',
+      title: 'Ты первый на финише!',
+      laterTitle: (place: number | null) =>
+        place === null ? 'Ты на финише' : `Ты на финише, ${String(place)}-е место`,
+      proofPending: 'Пруф на проверке.',
       firstProvisional:
         'Первое место — твоё, пока предварительно: станет окончательным, когда админ проверит пруфы.',
       firstProvisionalNext: 'Пока идёт проверка, очки за прохождения считаются как обычно.',
@@ -891,13 +894,17 @@ export const ru = {
   },
   moments: {
     skip: 'Показать результат',
+    toTurn: 'К ходу',
     skipHint: 'Нажми на анимацию, чтобы сразу увидеть результат',
     wheel: {
+      spinning: 'Крутится колесо жанров…',
       category: (name: string) => `Категория: ${name}`,
       miss: (who: string) => `Уже прошёл ${who}, крутим дальше`,
       missPlaying: (who: string) => `Сейчас играет ${who}, крутим дальше`,
       // The result, when the wheel stands: past tense, no «крутим дальше»
       missed: (count: number) => `Колесо пропустило ${games(count)}`,
+      moreMisses: (count: number) =>
+        `И ещё ${count} ${plural(count, 'промах', 'промаха', 'промахов')}`,
       missedCompleted: (title: string, who: string, day: string | null) =>
         `${title} — уже прошёл ${who}${day ? `, ${day}` : ''}`,
       missedPlaying: (title: string, who: string) => `${title} — сейчас играет ${who}`,
@@ -908,6 +915,12 @@ export const ru = {
       result: (title: string) => `Выпала игра: ${title}`,
     },
     dice: {
+      sum: (values: readonly number[], total: number) => `${values.join(' + ')} = ${total}`,
+      moving: (distance: number) =>
+        distance > 0
+          ? `Фишка идёт на ${distance} ${plural(distance, 'клетку', 'клетки', 'клеток')}`
+          : 'Фишка перемещается…',
+      drawing: 'Тянем ивент…',
       challengeDie: 'челлендж',
       sides: (n: number) => `d${String(n)}`,
       // «до»: steps past the finish burn, the points do not

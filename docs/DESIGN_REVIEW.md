@@ -1,5 +1,26 @@
 # Дизайн-ревью
 
+## Этап 7. Колесо, ход и финиш (2026-11-27)
+
+Независимое ревью на 390×844 и 1440×900. Сценарии Playwright сняли колесо, бросок, движение, карточку ивента и финиш на изолированных тестовых сезонах. Для границ темпа и порядка раскрытия использованы измерения из тех же сценариев.
+
+| Состояние | 390×844 | 1440×900 |
+| --- | --- | --- |
+| Колесо и действие пропуска | [Телефон](../test-artifacts/season-motion-e2e-r3/s7-wheel-motion-the-wheel--f47fb-d-turns-at-a-readable-speed-phone/wheel-turning.png) | [Десктоп](../test-artifacts/season-motion-e2e-r3/s7-wheel-motion-the-wheel--f47fb-d-turns-at-a-readable-speed-desktop/wheel-turning.png) |
+| Кубы и сумма | [Телефон](../test-artifacts/season-motion-e2e-r3/s5-event-motion-real-dice--03fd3-eplay-on-refresh-or-history-phone/dice-total.png) | [Десктоп](../test-artifacts/season-motion-e2e-r3/s5-event-motion-real-dice--03fd3-eplay-on-refresh-or-history-desktop/dice-total.png) |
+| Ход фишки и расстояние | [Телефон](../test-artifacts/season-motion-e2e-r3/s5-event-motion-real-dice--03fd3-eplay-on-refresh-or-history-phone/token-moving.png) | [Десктоп](../test-artifacts/season-motion-e2e-r3/s5-event-motion-real-dice--03fd3-eplay-on-refresh-or-history-desktop/token-moving.png) |
+| Карточка ивента после хода | [Телефон](../test-artifacts/season-motion-e2e-r3/s5-event-motion-real-dice--03fd3-eplay-on-refresh-or-history-phone/event-drawn.png) | [Десктоп](../test-artifacts/season-motion-e2e-r3/s5-event-motion-real-dice--03fd3-eplay-on-refresh-or-history-desktop/event-drawn.png) |
+| Конфетти у клетки финиша | [Телефон](../test-artifacts/season-motion-e2e-r3/s7-finish-motion-no-prefer-022af-pects-the-motion-preference-phone/finish.png) | [Десктоп](../test-artifacts/season-motion-e2e-r3/s7-finish-motion-no-prefer-022af-pects-the-motion-preference-desktop/finish.png) |
+| Главный слот финиша | [Телефон](../test-artifacts/season-motion-e2e-r3/s05-finish-finish-provisio-3f993-w-first-approved-and-frozen-phone/finish-proof.png) | [Десктоп](../test-artifacts/season-motion-e2e-r3/s05-finish-finish-provisio-3f993-w-first-approved-and-frozen-desktop/finish-proof.png) |
+
+- **DR7-01.** В прогоне r2 позиция прокрутки на телефоне менялась с 769 до 613 px к первому кадру кубов и до 573 px при раскрытии ивента. Повтор после исправления прошёл на обоих размерах. Нижняя панель оставляет кубы, ход и карточку в видимой области телефона. Лента и лидерборд раскрывают итог после момента. [Первый прогон](../test-artifacts/season-motion-e2e-r2.log) · [Повтор, 26 сценариев](../test-artifacts/season-motion-e2e-r3.log)
+- **DR7-02 и DR7-03.** Конфетти начинается у клетки финиша. На обоих размерах видны частицы, сумма и расстояние. У кубов последнее действие — «Показать результат», в раскрытой мобильной карточке — «К ходу». Цвет дерева, фишка и типографика связывают новые состояния с картой сезона.
+- **DR7-04 и DR7-16.** На финише читаются короткий заголовок, предварительный статус и главное действие. «Крутить колесо» визуально вторично. Playwright проверяет фокус нужного поля после нажатия и возврат ролла в главный слот после отправки. Во время вращения статус и пропуск видны в десктопной карточке хода.
+- **Проверка токенов и состояний.** Контраст по токенам составляет 4,71:1 у зелёной метки ивента, 4,83:1 у главной кнопки, 5,51:1 у вторичного текста на серой подложке и 16,10:1 у основного текста на белом. Кнопки и подписи целиком помещаются по ширине. Playwright покрывает обычное движение, системное уменьшение движения, мгновенный пропуск и задержку загрузки колеса.
+- **P3, сцена ивента.** На десктопе закреплённая шапка перекрывает верхнюю метку ивента в точке прокрутки после завершения. Заголовок и описание видны. Общая сцена ключевого момента могла бы удерживать карточку целиком в пределах карты. [Кадр ивента](../test-artifacts/season-motion-e2e-r3/s5-event-motion-real-dice--03fd3-eplay-on-refresh-or-history-desktop/event-drawn.png)
+- **P3, возврат к ходу.** После «К ходу» кнопка исчезает. Общему компоненту панели нужен явный возврат фокуса на доступное действие хода.
+- **P3, повтор текста.** Под кубами сумма повторяется в пояснении. Блок «После прохождения» повторяет место и предварительный статус из финишной карточки. Одной формулы и одного сообщения о статусе достаточно.
+
 ## Этап 7. Фокус формы и навигации (2026-11-27)
 
 | Состояние | 390×844 | 1440×900 |

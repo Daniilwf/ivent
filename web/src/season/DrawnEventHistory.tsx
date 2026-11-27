@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Schemas } from '../api/client';
 import { ru } from '../i18n/ru';
 import { Summary } from '../ui/Disclosure';
@@ -8,12 +8,18 @@ import { DrawnEventCard } from './DrawnEventCard';
 export function DrawnEventHistory({
   drawn,
   fresh,
+  revealing = false,
+  className,
+  actions,
   initiallyOpen,
   onShown,
   onSettled,
 }: {
   drawn: Schemas['DrawnEventView'];
   fresh: boolean;
+  revealing?: boolean;
+  className?: string | undefined;
+  actions?: ReactNode;
   initiallyOpen: boolean;
   onShown: (sequence: number) => void;
   onSettled?: ((sequence: number) => void) | undefined;
@@ -28,10 +34,13 @@ export function DrawnEventHistory({
       }}
     >
       <Summary className="font-bold">
-        <span className="wrap-anywhere">{ru.events.history(drawn.name)}</span>
+        <span className="wrap-anywhere">
+          {revealing ? ru.events.title : ru.events.history(drawn.name)}
+        </span>
       </Summary>
-      <div className="pt-2">
+      <div className={className ?? 'pt-2'}>
         <DrawnEventCard drawn={drawn} fresh={fresh} onShown={onShown} onSettled={onSettled} />
+        {actions}
       </div>
     </details>
   );

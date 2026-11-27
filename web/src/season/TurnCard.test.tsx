@@ -125,7 +125,7 @@ const emptyFeed = { entries: [], nextBefore: null, players: [], games: [], runs:
 
 type Sent = { path: string; body: Record<string, unknown> };
 
-function serve(view: Schemas['SeasonView']) {
+function serve(view: Schemas['SeasonView'] | (() => Schemas['SeasonView']), onPost?: () => void) {
   const sent: Sent[] = [];
   vi.stubGlobal(
     'fetch',
@@ -133,8 +133,9 @@ function serve(view: Schemas['SeasonView']) {
       const path = new URL(r.url).pathname;
       if (r.method === 'GET' && path.endsWith('/api/auth/me')) return json(200, account);
       if (r.method === 'GET' && path.endsWith('/feed')) return json(200, emptyFeed);
-      if (r.method === 'GET') return json(200, view);
+      if (r.method === 'GET') return json(200, typeof view === 'function' ? view() : view);
       sent.push({ path, body: (await r.json()) as Record<string, unknown> });
+      onPost?.();
       return json(200, { duplicate: false, events: [] });
     }),
   );
@@ -230,6 +231,101 @@ describe('the turn card (K1S)', () => {
     const inside = screen.getByTestId('check-run-2');
     expect(within(inside).getByTestId('check-proof')).toHaveProperty('open', true);
     expect(inside).toContainElement(document.activeElement as HTMLElement);
+  });
+
+  it.each([1, 2])(
+    'DR7-04: makes proof primary and leaves the roll enabled after finish %i',
+    async (order) => {
+      serve(
+        season({
+          ...idle,
+          finish: { order, frozen: false },
+          lastCompleted: completed('finishing', 'Darkwood'),
+        }),
+      );
+      const user = userEvent.setup();
+      render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+      const main = await screen.findByTestId('send-proof');
+      expect(main).toHaveTextContent('Отправить пруф');
+      expect(main).toHaveAttribute('data-variant', 'main');
+      const roll = screen.getByTestId('roll');
+      expect(roll).toBeEnabled();
+      expect(roll).toHaveAttribute('data-variant', 'quiet');
+      const proof = screen.getByTestId('proof-details');
+      expect(proof).toHaveProperty('open', true);
+
+      await user.click(within(proof).getByText(ru.turn.proofToSend));
+      expect(proof).toHaveProperty('open', false);
+      await user.click(main);
+      expect(proof).toHaveProperty('open', true);
+      expect(within(proof).getByTestId('proof-link')).toHaveFocus();
+    },
+  );
+
+  it('DR7-04: submits the oldest waiting proof on a loaded finish and restores the main roll', async () => {
+    let submitted = false;
+    const proof = {
+      status: 'pending' as const,
+      links: ['https://example.com/finish.png'],
+      note: null,
+      comment: null,
+      files: [],
+    };
+    const sent = serve(
+      () =>
+        season(
+          {
+            ...idle,
+            finish: { order: 2, frozen: false },
+            lastCompleted: completed('newer', 'Inside'),
+            checks: [completed('finishing', 'Darkwood', submitted ? { proof } : {})],
+          },
+          { lastSequence: submitted ? 5 : 3 },
+        ),
+      () => {
+        submitted = true;
+      },
+    );
+    const user = userEvent.setup();
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    await user.click(await screen.findByTestId('send-proof'));
+    const older = await screen.findByTestId('check-finishing');
+    const link = within(older).getByTestId('proof-link');
+    expect(link).toHaveFocus();
+    expect(screen.getByTestId('proof-details')).toHaveProperty('open', false);
+    await user.type(link, proof.links[0] ?? '');
+    await user.click(within(older).getByTestId('proof-submit'));
+
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId('send-proof')).not.toBeInTheDocument();
+      expect(screen.getByTestId('roll')).toHaveAttribute('data-variant', 'main');
+    });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      path: `/api/seasons/${seasonId}/runs/finishing/proof`,
+      body: { links: proof.links },
+    });
+    expect(screen.getByTestId('my-finish')).toHaveTextContent('Пруф на проверке.');
+  });
+
+  it('DR7-04: keeps the finish proof action available after rolls close', async () => {
+    serve(
+      season(
+        {
+          ...idle,
+          finish: { order: 1, frozen: false },
+          lastCompleted: completed('finishing', 'Inside'),
+        },
+        { status: 'closing' },
+      ),
+    );
+    render(<SeasonScreen seasonId={seasonId} onSignedOut={vi.fn()} />);
+
+    expect(await screen.findByTestId('send-proof')).toHaveAttribute('data-variant', 'main');
+    expect(screen.getByTestId('proof-details')).toHaveProperty('open', true);
+    expect(screen.queryByTestId('roll')).toBeNull();
   });
 
   it('K1S-9: tells a rejection of an older run with the admin comment', async () => {

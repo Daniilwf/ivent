@@ -1,11 +1,12 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { onDesktop } from '../test/desk';
 import userEvent from '@testing-library/user-event';
+import { createRef } from 'react';
 import { ru } from '../i18n/ru';
 import { graphBoard } from './graphBoard';
 import { linearBoard, type ChainCell } from './linearBoard';
 import { camera, mapLabel, openingView } from './camera';
-import { MapView } from './MapView';
+import { MapView, type MapApi } from './MapView';
 import type { Board, Player } from './types';
 
 // The map's camera and taps (K1M exploratory testing of stages 1 and 2): pan and zoom keep the board in the frame, a
@@ -104,6 +105,70 @@ function drag(dx: number, dy: number, times = 1) {
 }
 
 const dev = () => linearBoard(chain(71)).board;
+
+it('projects the finish through the live map transformation into viewport pixels', () => {
+  const ref = createRef<MapApi>();
+  const board = dev();
+  const finish = board.cells.at(-1);
+  if (!finish) throw new Error('The test board needs a finish');
+  render(<MapView board={board} players={[]} ref={ref} />);
+  const svg = screen.getByRole('application');
+  const matrix = { a: 0.5, b: 0, c: 0, d: 0.5, e: 120, f: 240 };
+  Object.defineProperty(svg, 'getScreenCTM', { value: () => matrix });
+
+  expect(ref.current?.project(finish)).toEqual({
+    x: 120 + finish.x * 0.5,
+    y: 240 + finish.y * 0.5,
+  });
+  matrix.e = 100;
+  matrix.f = 200;
+  expect(ref.current?.project(finish)).toEqual({
+    x: 100 + finish.x * 0.5,
+    y: 200 + finish.y * 0.5,
+  });
+});
+
+const movingBoard: Board = {
+  width: 1850,
+  height: 380,
+  cells: [
+    { id: 1, kind: 'start', x: 100, y: 200 },
+    { id: 2, kind: 'plain', x: 435, y: 200 },
+    { id: 3, kind: 'finish', x: 1500, y: 200 },
+  ],
+  edges: [],
+  roads: [],
+  zones: [],
+};
+
+it('frames the whole short path once and keeps the angle still during the hops', () => {
+  const ref = createRef<MapApi>();
+  render(<MapView board={movingBoard} players={[]} ref={ref} focus={1} tools="none" />);
+  const before = viewBox();
+  const plan = ref.current?.planMove(movingBoard.cells.slice(0, 2));
+  expect(plan?.frame).toBeDefined();
+  expect(viewBox()).toEqual(before);
+  act(() => plan?.frame?.(0.5));
+  expect(viewBox().w).toBeGreaterThan(before.w);
+  act(() => plan?.frame?.(1));
+  const framed = viewBox();
+  expect(framed.x).toBeLessThan(100);
+  expect(framed.x + framed.w).toBeGreaterThan(435);
+  expect(plan?.follow).toBeUndefined();
+});
+
+it('follows a long path at at most half a screen per second without changing zoom', () => {
+  const ref = createRef<MapApi>();
+  render(<MapView board={movingBoard} players={[]} ref={ref} focus={1} tools="none" />);
+  const plan = ref.current?.planMove(movingBoard.cells);
+  act(() => plan?.frame?.(1));
+  expect(plan?.follow).toBeDefined();
+  const before = viewBox();
+  act(() => plan?.follow?.({ x: 1500, y: 200 }, 0.25));
+  expect(viewBox().w).toBe(before.w);
+  expect(viewBox().x - before.x).toBeGreaterThan(0);
+  expect(viewBox().x - before.x).toBeLessThanOrEqual((before.w * 0.25) / 2);
+});
 
 describe('the camera of the map', () => {
   it('keeps the board in the frame however far the map is dragged (K1M-2)', () => {
